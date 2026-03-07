@@ -19,7 +19,8 @@
       "Bash(grep -v '^agents$')",
       "Bash(for f in ~/.claude/agents/*.md)",
       "Bash(do cp -L \"$f\" /Users/korchasa/www/tools/auto-sdlc/.claude/agents/)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(git remote add origin git@github.com:korchasa/auto-flow.git)"
     ],
     "additionalDirectories": [
       "/Users/korchasa/www/tools/auto-sdlc/.claude"
