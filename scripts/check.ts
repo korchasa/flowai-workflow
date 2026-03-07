@@ -80,7 +80,7 @@ async function* walkDir(dir: string): AsyncGenerator<string> {
   }
 }
 
-console.log("=== agents-flow: Full Check ===");
+console.log("=== auto-flow: Full Check ===");
 
 await run("deno", ["fmt", "--check"], "Formatting Check");
 await run("deno", ["lint"], "Linting");

@@ -31,7 +31,7 @@
 
 ## Project Information
 
-- Project Name: agents-flow
+- Project Name: auto-flow
 
 ## Project Vision
 

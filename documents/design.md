@@ -2,7 +2,7 @@
 
 ## 1. Intro
 
-- **Purpose:** Define implementation details for agents-flow: automated
+- **Purpose:** Define implementation details for auto-flow: automated
   multi-agent SDLC pipeline.
 - **Rel to SRS:** Implements all FRs from `documents/requirements.md`. Each
   component maps to one or more FRs.
