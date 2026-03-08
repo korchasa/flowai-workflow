@@ -1,4 +1,4 @@
-import { parse as parseYaml } from "jsr:@std/yaml";
+import { parse as parseYaml } from "@std/yaml";
 import type {
   NodeConfig,
   NodeSettings,

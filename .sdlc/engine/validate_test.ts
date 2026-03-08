@@ -1,9 +1,5 @@
-import { assertEquals } from "jsr:@std/assert";
-import {
-  allPassed,
-  formatFailures,
-  runValidations,
-} from "./validate.ts";
+import { assertEquals } from "@std/assert";
+import { allPassed, formatFailures, runValidations } from "./validate.ts";
 import type { TemplateContext, ValidationRule } from "./types.ts";
 
 function makeCtx(nodeDir: string): TemplateContext {
@@ -218,7 +214,10 @@ Deno.test("formatFailures — formats only failures", () => {
     },
   ];
   const output = formatFailures(results);
-  assertEquals(output, "- [file_exists] File not found: b.md\n- [file_not_empty] File is empty: c.md");
+  assertEquals(
+    output,
+    "- [file_exists] File not found: b.md\n- [file_not_empty] File is empty: c.md",
+  );
 });
 
 Deno.test("multiple rules — mixed results", async () => {

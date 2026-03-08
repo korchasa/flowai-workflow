@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from "jsr:@std/assert";
+import { assertEquals, assertThrows } from "@std/assert";
 import { DEFAULT_SETTINGS, parseConfig } from "./config.ts";
 
 const MINIMAL_AGENT = `
@@ -39,7 +39,10 @@ Deno.test("parseConfig — defaults are merged into node settings", () => {
   assertEquals(settings.timeout_seconds, DEFAULT_SETTINGS.timeout_seconds);
   assertEquals(settings.on_error, DEFAULT_SETTINGS.on_error);
   assertEquals(settings.max_retries, DEFAULT_SETTINGS.max_retries);
-  assertEquals(settings.retry_delay_seconds, DEFAULT_SETTINGS.retry_delay_seconds);
+  assertEquals(
+    settings.retry_delay_seconds,
+    DEFAULT_SETTINGS.retry_delay_seconds,
+  );
 });
 
 Deno.test("parseConfig — pipeline defaults override global defaults", () => {
@@ -195,7 +198,10 @@ nodes:
 
 Deno.test("parseConfig — missing name throws", () => {
   assertThrows(
-    () => parseConfig(`version: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    task_template: x`),
+    () =>
+      parseConfig(
+        `version: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    task_template: x`,
+      ),
     Error,
     "non-empty 'name'",
   );
@@ -203,7 +209,10 @@ Deno.test("parseConfig — missing name throws", () => {
 
 Deno.test("parseConfig — wrong version throws", () => {
   assertThrows(
-    () => parseConfig(`name: test\nversion: "2"\nnodes:\n  a:\n    type: agent\n    label: A\n    task_template: x`),
+    () =>
+      parseConfig(
+        `name: test\nversion: "2"\nnodes:\n  a:\n    type: agent\n    label: A\n    task_template: x`,
+      ),
     Error,
     "Unsupported pipeline config version",
   );
@@ -227,7 +236,10 @@ Deno.test("parseConfig — empty nodes throws", () => {
 
 Deno.test("parseConfig — invalid node type throws", () => {
   assertThrows(
-    () => parseConfig(`name: test\nversion: "1"\nnodes:\n  a:\n    type: invalid\n    label: A`),
+    () =>
+      parseConfig(
+        `name: test\nversion: "1"\nnodes:\n  a:\n    type: invalid\n    label: A`,
+      ),
     Error,
     "invalid type 'invalid'",
   );
@@ -235,7 +247,10 @@ Deno.test("parseConfig — invalid node type throws", () => {
 
 Deno.test("parseConfig — missing label throws", () => {
   assertThrows(
-    () => parseConfig(`name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    task_template: x`),
+    () =>
+      parseConfig(
+        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    task_template: x`,
+      ),
     Error,
     "non-empty 'label'",
   );
@@ -243,7 +258,10 @@ Deno.test("parseConfig — missing label throws", () => {
 
 Deno.test("parseConfig — agent without prompt or task_template throws", () => {
   assertThrows(
-    () => parseConfig(`name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A`),
+    () =>
+      parseConfig(
+        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A`,
+      ),
     Error,
     "requires at least 'prompt' or 'task_template'",
   );

@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import type { AgentRunOptions } from "./agent.ts";
 import type { NodeConfig, NodeSettings, TemplateContext } from "./types.ts";
 

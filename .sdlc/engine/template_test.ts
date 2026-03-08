@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from "jsr:@std/assert";
+import { assertEquals, assertThrows } from "@std/assert";
 import { interpolate } from "./template.ts";
 import type { TemplateContext } from "./types.ts";
 

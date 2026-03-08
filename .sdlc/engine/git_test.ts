@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import type { SafetyCheckResult } from "./git.ts";
 
 // Note: Full git integration tests require a real git repo.

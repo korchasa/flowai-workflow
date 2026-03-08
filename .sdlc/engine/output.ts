@@ -44,7 +44,11 @@ export class OutputManager {
   }
 
   /** Log a loop iteration event. */
-  loopIteration(nodeId: string, iteration: number, maxIterations: number): void {
+  loopIteration(
+    nodeId: string,
+    iteration: number,
+    maxIterations: number,
+  ): void {
     this.status(nodeId, `ITERATION ${iteration}/${maxIterations}`);
   }
 
@@ -100,7 +104,9 @@ export class OutputManager {
   private timestamp(): string {
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, "0");
-    return `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    return `${pad(now.getHours())}:${pad(now.getMinutes())}:${
+      pad(now.getSeconds())
+    }`;
   }
 
   private formatDuration(ms: number): string {

@@ -1,4 +1,4 @@
-import { parse as parseYaml } from "jsr:@std/yaml";
+import { parse as parseYaml } from "@std/yaml";
 import type {
   NodeConfig,
   NodeSettings,
@@ -9,11 +9,7 @@ import type {
 import { buildLoopBodyOrder } from "./dag.ts";
 import { runAgent } from "./agent.ts";
 import type { AgentResult } from "./agent.ts";
-import {
-  markNodeCompleted,
-  markNodeFailed,
-  markNodeStarted,
-} from "./state.ts";
+import { markNodeCompleted, markNodeFailed, markNodeStarted } from "./state.ts";
 
 /** Result of a loop execution. */
 export interface LoopResult {
@@ -30,7 +26,11 @@ export interface LoopRunOptions {
   state: RunState;
   buildCtx: (nodeId: string, iteration: number) => TemplateContext;
   onNodeStart?: (nodeId: string, iteration: number) => void;
-  onNodeComplete?: (nodeId: string, iteration: number, result: AgentResult) => void;
+  onNodeComplete?: (
+    nodeId: string,
+    iteration: number,
+    result: AgentResult,
+  ) => void;
   onIteration?: (iteration: number, maxIterations: number) => void;
   onOutput?: (nodeId: string, line: string) => void;
   saveState?: () => Promise<void>;
@@ -92,7 +92,8 @@ export async function runLoop(opts: LoopRunOptions): Promise<LoopResult> {
         return {
           success: false,
           iterations: iteration,
-          error: `Body node '${bodyNodeId}' failed on iteration ${iteration}: ${result.error}`,
+          error:
+            `Body node '${bodyNodeId}' failed on iteration ${iteration}: ${result.error}`,
           lastConditionValue,
         };
       }
@@ -118,7 +119,8 @@ export async function runLoop(opts: LoopRunOptions): Promise<LoopResult> {
   return {
     success: false,
     iterations: maxIterations,
-    error: `Loop '${loopNodeId}' reached max iterations (${maxIterations}) without exit condition. Last ${conditionField}=${lastConditionValue}, expected ${exitValue}`,
+    error:
+      `Loop '${loopNodeId}' reached max iterations (${maxIterations}) without exit condition. Last ${conditionField}=${lastConditionValue}, expected ${exitValue}`,
     lastConditionValue,
   };
 }
@@ -130,7 +132,7 @@ export async function runLoop(opts: LoopRunOptions): Promise<LoopResult> {
  */
 async function extractConditionValue(
   ctx: TemplateContext,
-  node: NodeConfig,
+  _node: NodeConfig,
   field: string,
 ): Promise<string | undefined> {
   // Strategy: look for the field in YAML frontmatter of any .md file

@@ -4,7 +4,9 @@ import type { NodeState, NodeStatus, RunState } from "./types.ts";
 export function generateRunId(): string {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}T${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}T${
+    pad(now.getHours())
+  }${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
 /** Create a fresh RunState for a new pipeline execution. */
@@ -88,7 +90,9 @@ export function markNodeStarted(state: RunState, nodeId: string): void {
 /** Mark a node as completed. */
 export function markNodeCompleted(state: RunState, nodeId: string): void {
   const node = state.nodes[nodeId];
-  const startedAt = node.started_at ? new Date(node.started_at).getTime() : Date.now();
+  const startedAt = node.started_at
+    ? new Date(node.started_at).getTime()
+    : Date.now();
   updateNodeState(state, nodeId, {
     status: "completed",
     completed_at: new Date().toISOString(),
@@ -103,7 +107,9 @@ export function markNodeFailed(
   error: string,
 ): void {
   const node = state.nodes[nodeId];
-  const startedAt = node.started_at ? new Date(node.started_at).getTime() : Date.now();
+  const startedAt = node.started_at
+    ? new Date(node.started_at).getTime()
+    : Date.now();
   updateNodeState(state, nodeId, {
     status: "failed",
     completed_at: new Date().toISOString(),
@@ -153,6 +159,8 @@ export function isNodeCompleted(state: RunState, nodeId: string): boolean {
 /** Get nodes that need to be (re-)executed on resume. */
 export function getResumableNodes(state: RunState): string[] {
   return Object.entries(state.nodes)
-    .filter(([_, node]) => node.status !== "completed" && node.status !== "skipped")
+    .filter(([_, node]) =>
+      node.status !== "completed" && node.status !== "skipped"
+    )
     .map(([id]) => id);
 }

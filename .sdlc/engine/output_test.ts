@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { OutputManager } from "./output.ts";
 import type { RunSummary } from "./output.ts";
 

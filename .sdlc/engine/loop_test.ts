@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { extractFrontmatterField } from "./loop.ts";
 
 // Note: Full integration tests for runLoop require claude CLI.

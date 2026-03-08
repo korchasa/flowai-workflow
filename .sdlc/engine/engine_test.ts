@@ -1,5 +1,5 @@
-import { assertEquals } from "jsr:@std/assert";
-import type { EngineOptions, PipelineConfig } from "./types.ts";
+import { assertEquals } from "@std/assert";
+import type { EngineOptions } from "./types.ts";
 import { Engine } from "./engine.ts";
 
 // Note: Full integration tests for Engine require claude CLI and a git repo.

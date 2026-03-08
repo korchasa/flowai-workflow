@@ -155,7 +155,9 @@ export class Engine {
           chunk.map((id) => this.executeNode(id)),
         );
         for (const r of results) {
-          if (r.status === "rejected" || (r.status === "fulfilled" && !r.value)) {
+          if (
+            r.status === "rejected" || (r.status === "fulfilled" && !r.value)
+          ) {
             return false;
           }
         }

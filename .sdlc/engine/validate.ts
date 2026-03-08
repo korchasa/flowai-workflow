@@ -78,7 +78,11 @@ async function checkFileNotEmpty(
     if (stat.size === 0) {
       return { rule, passed: false, message: `File is empty: ${path}` };
     }
-    return { rule, passed: true, message: `File is non-empty: ${path} (${stat.size} bytes)` };
+    return {
+      rule,
+      passed: true,
+      message: `File is non-empty: ${path} (${stat.size} bytes)`,
+    };
   } catch {
     return { rule, passed: false, message: `File not found: ${path}` };
   }
@@ -148,7 +152,9 @@ async function checkCustomScript(
     return {
       rule,
       passed: false,
-      message: `Script execution error: ${scriptPath} — ${(err as Error).message}`,
+      message: `Script execution error: ${scriptPath} — ${
+        (err as Error).message
+      }`,
     };
   }
 }

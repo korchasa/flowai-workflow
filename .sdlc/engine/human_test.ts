@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { runHuman } from "./human.ts";
 import type { UserInput } from "./human.ts";
 import type { NodeConfig, TemplateContext } from "./types.ts";
@@ -16,7 +16,7 @@ function makeCtx(): TemplateContext {
 
 function mockInput(response: string): UserInput {
   return {
-    prompt: async (_msg: string) => response,
+    prompt: (_msg: string) => Promise.resolve(response),
   };
 }
 
@@ -100,16 +100,17 @@ Deno.test("runHuman — no abort_on configured", async () => {
 Deno.test("runHuman — template variables in question", async () => {
   let capturedMessage = "";
   const input: UserInput = {
-    prompt: async (msg: string) => {
+    prompt: (msg: string) => {
       capturedMessage = msg;
-      return "approve";
+      return Promise.resolve("approve");
     },
   };
 
   const node: NodeConfig = {
     type: "human",
     label: "Review",
-    question: "Review spec at {{input.spec}}/01-spec.md for issue #{{args.issue}}?",
+    question:
+      "Review spec at {{input.spec}}/01-spec.md for issue #{{args.issue}}?",
     options: ["approve", "reject"],
     abort_on: ["reject"],
   };

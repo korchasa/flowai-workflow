@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from "jsr:@std/assert";
+import { assertEquals, assertThrows } from "@std/assert";
 import {
   createRunState,
   generateRunId,
@@ -8,7 +8,6 @@ import {
   getRunDir,
   getStatePath,
   isNodeCompleted,
-  loadState,
   markNodeCompleted,
   markNodeFailed,
   markNodeSkipped,
@@ -16,7 +15,6 @@ import {
   markRunAborted,
   markRunCompleted,
   markRunFailed,
-  saveState,
   updateNodeState,
 } from "./state.ts";
 
@@ -172,7 +170,13 @@ Deno.test("getResumableNodes — returns non-completed, non-skipped", () => {
 
 Deno.test("saveState + loadState — roundtrip", async () => {
   const tmpRunId = `test-${Date.now()}`;
-  const state = createRunState(tmpRunId, "cfg.yaml", ["a", "b"], { issue: "1" }, {});
+  const state = createRunState(
+    tmpRunId,
+    "cfg.yaml",
+    ["a", "b"],
+    { issue: "1" },
+    {},
+  );
   markNodeStarted(state, "a");
   markNodeCompleted(state, "a");
 

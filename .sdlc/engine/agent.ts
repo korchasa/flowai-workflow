@@ -3,14 +3,9 @@ import type {
   NodeConfig,
   NodeSettings,
   TemplateContext,
-  ValidationRule,
 } from "./types.ts";
 import { interpolate } from "./template.ts";
-import {
-  allPassed,
-  formatFailures,
-  runValidations,
-} from "./validate.ts";
+import { allPassed, formatFailures, runValidations } from "./validate.ts";
 
 /** Result of an agent node execution. */
 export interface AgentResult {
@@ -80,7 +75,8 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
         session_id: result.output?.session_id,
         output: result.output,
         continuations,
-        error: `Continuation limit (${settings.max_continuations}) reached. Failures:\n${failures}`,
+        error:
+          `Continuation limit (${settings.max_continuations}) reached. Failures:\n${failures}`,
       };
     }
 
@@ -166,7 +162,11 @@ async function invokeClaudeCli(opts: InvokeOptions): Promise<InvokeResult> {
 
   for (let attempt = 1; attempt <= opts.maxRetries; attempt++) {
     try {
-      const output = await executeClaudeProcess(args, opts.timeoutSeconds, opts.onOutput);
+      const output = await executeClaudeProcess(
+        args,
+        opts.timeoutSeconds,
+        opts.onOutput,
+      );
       if (output.is_error) {
         lastError = `Claude CLI returned error: ${output.result}`;
         if (attempt < opts.maxRetries) {
@@ -187,7 +187,9 @@ async function invokeClaudeCli(opts: InvokeOptions): Promise<InvokeResult> {
     }
   }
 
-  return { error: `Claude CLI failed after ${opts.maxRetries} attempts: ${lastError}` };
+  return {
+    error: `Claude CLI failed after ${opts.maxRetries} attempts: ${lastError}`,
+  };
 }
 
 function buildClaudeArgs(opts: InvokeOptions): string[] {
@@ -259,7 +261,9 @@ async function executeClaudeProcess(
   if (!output.success && !stdout) {
     const stderr = new TextDecoder().decode(output.stderr).trim();
     throw new Error(
-      `Claude CLI exited with code ${output.code}${stderr ? `: ${stderr}` : ""}`,
+      `Claude CLI exited with code ${output.code}${
+        stderr ? `: ${stderr}` : ""
+      }`,
     );
   }
 
@@ -285,7 +289,9 @@ async function runShellCommand(
   const output = await cmd.output();
   if (!output.success) {
     const stderr = new TextDecoder().decode(output.stderr).trim();
-    throw new Error(`${label} failed: ${command}${stderr ? `\n${stderr}` : ""}`);
+    throw new Error(
+      `${label} failed: ${command}${stderr ? `\n${stderr}` : ""}`,
+    );
   }
 }
 
