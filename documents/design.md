@@ -137,30 +137,40 @@ graph TD
 - **Node types:** `agent`, `merge`, `loop`, `human`
 - **Verbose Output (Direct Injection pattern):**
   - `output.ts` exposes 6 verbose-guarded methods on `OutputManager`:
-    `verbosePrompt(prompt)`, `verboseInputs(inputs: {path, sizeBytes}[])`,
-    `verboseValidation(results: ValidationResult[])`,
-    `verboseContinuation(attempt, max, failures)`,
-    `verboseSafety(files, violations)`, `verboseCommit(files, message, branch)`.
+    `verbosePrompt(nodeId, prompt)`,
+    `verboseInputs(nodeId, inputs: {path, sizeBytes}[])`,
+    `verboseValidation(nodeId, results: {rule, passed, detail?}[])`,
+    `verboseContinuation(nodeId, attempt, max, failures)`,
+    `verboseSafety(nodeId, files, violations)`,
+    `verboseCommit(nodeId, files, message, branch)`.
     All no-op when `verbosity !== "verbose"`. Output: human-readable stderr with
-    section headers.
-  - `agent.ts`: `AgentRunOptions` gains optional `output?: OutputManager`.
-    `runAgent()` calls `verbosePrompt()` after prompt construction,
-    `verboseValidation()` after validation, `verboseContinuation()` at resume
-    trigger. Guarded by `if (output)`.
+    section headers. Note: AC #5 (agent stdout streaming) already implemented
+    via existing `nodeOutput()` method — no new work needed.
+  - `agent.ts`: `AgentRunOptions` gains optional `output?: OutputManager` and
+    `nodeId?: string`. `runAgent()` calls `verbosePrompt()` after prompt
+    construction, `verboseValidation()` after each `runValidations()` call,
+    `verboseContinuation()` before resume invocation. Guarded by `if (output)`.
   - `loop.ts`: `LoopRunOptions` gains optional `output?: OutputManager`.
-    Forwarded to `runAgent()`. Single parameter, no callback chains.
-  - `git.ts`: `commitNodeChanges()` gains optional `output?: OutputManager`.
-    Resolves staged files via `git diff --cached --name-only` before commit.
-    Returns enriched `CommitResult` with `filesStaged: string[]` and
-    `message: string`. Calls `verboseCommit()` after successful commit.
-    `safetyCheckDiff()` gains optional `output?: OutputManager`. Returns
-    enriched `SafetyCheckResult` with `checkedFiles: string[]`. Calls
-    `verboseSafety()` before returning.
+    Forwarded to `runAgent()` calls. Enables prompt/validation/continuation
+    verbose for loop body nodes. Safety/commit verbose for loop body nodes:
+    deferred (loop body bypasses `executeAgentNode()`).
+  - `git.ts`: No `OutputManager` dependency. Pure data enrichment only.
+    `commitNodeChanges()` runs `git diff --cached --name-only` after
+    `git add -A` to capture staged files. Returns enriched `CommitResult` with
+    `filesStaged: string[]` and `message: string`. `safetyCheckDiff()` returns
+    enriched `SafetyCheckResult` with `checkedFiles: string[]` (from
+    already-computed `changedFiles`). Verbose calls for safety/commit stay in
+    engine.
   - `engine.ts`: `executeAgentNode()` resolves input artifact paths+sizes by
-    walking `ctx.input` directories; calls `this.output.verboseInputs()` before
-    `runAgent()`. Passes `this.output` to `runAgent()`, `safetyCheckDiff()`,
-    `commitNodeChanges()`. Sequencing: inputs → agent (prompt/validation/
-    continuation verbose) → safety (verbose) → commit (verbose).
+    walking `ctx.input` directories via `Deno.stat()`; calls
+    `this.output.verboseInputs()` before `runAgent()`. Passes `this.output`
+    and `nodeId` to `runAgent()`. After `safetyCheckDiff()`, calls
+    `this.output.verboseSafety()` with `checkedFiles` and `violations`.
+    `commitIfNeeded()` (called from `executeNode()` after agent returns): after
+    `commitNodeChanges()` returns, calls `this.output.verboseCommit()` with
+    `filesStaged`, `message`, branch. Sequencing: inputs → agent
+    (prompt/validation/continuation verbose) → safety (verbose) → commit
+    (verbose via `commitIfNeeded()`).
   - All existing callers pass no `output` arg — zero behavioral change.
 - **Deps:** `claude` CLI, `deno`, `git`, `jsr:@std/yaml`.
 
@@ -218,12 +228,18 @@ graph TD
     out-of-scope modifications, unauthorized deletions, secret patterns.
   - **Verbose Output Flow** (`-v` mode, agent nodes only): In
     `executeAgentNode()`: (1) resolve input artifact file paths+sizes from
-    `ctx.input` dirs → `verboseInputs()`, (2) `runAgent()` emits
-    `verbosePrompt()` → Claude CLI executes → `verboseValidation()` → on
-    failure: `verboseContinuation()` → retry, (3) `safetyCheckDiff()` →
-    `verboseSafety()`, (4) `commitNodeChanges()` → `verboseCommit()`. All
-    verbose methods guarded by `verbosity !== "verbose"` — no-op in
-    default/quiet. Output: human-readable stderr lines with section headers.
+    `ctx.input` dirs via `Deno.stat()` → `verboseInputs()`, (2) `runAgent()`
+    (with `output` + `nodeId`) emits `verbosePrompt()` → Claude CLI executes →
+    `verboseValidation()` → on failure: `verboseContinuation()` → retry,
+    (3) `safetyCheckDiff()` returns enriched result → engine calls
+    `verboseSafety()` with `checkedFiles` + `violations`. Then in
+    `commitIfNeeded()` (called from `executeNode()` after agent returns):
+    (4) `commitNodeChanges()` returns enriched result → engine calls
+    `verboseCommit()` with `filesStaged`, `message`, branch. All verbose
+    methods guarded by `verbosity !== "verbose"` — no-op in default/quiet.
+    Output: human-readable stderr lines with section headers. Loop body nodes
+    get prompt/validation/continuation verbose only; safety/commit verbose
+    deferred (loop body bypasses `executeAgentNode()`).
   - **Meta-Agent Trigger**: Engine executes meta-agent as last DAG node
     (`run_always: true`). On failure: reads failed node ID from `state.json`.
     Runs meta-agent with failure context.
