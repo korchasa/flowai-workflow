@@ -1,14 +1,19 @@
 import { assertEquals } from "@std/assert";
-import type { SafetyCheckResult } from "./git.ts";
+import type { CommitResult, SafetyCheckResult } from "./git.ts";
 
 // Note: Full git integration tests require a real git repo.
 // These tests verify the data structures and logic patterns.
 // Integration tests should be run in a temporary git repository.
 
 Deno.test("SafetyCheckResult — no violations is safe", () => {
-  const result: SafetyCheckResult = { safe: true, violations: [] };
+  const result: SafetyCheckResult = {
+    safe: true,
+    violations: [],
+    checkedFiles: [],
+  };
   assertEquals(result.safe, true);
   assertEquals(result.violations.length, 0);
+  assertEquals(result.checkedFiles.length, 0);
 });
 
 Deno.test("SafetyCheckResult — with violations is not safe", () => {
@@ -18,33 +23,57 @@ Deno.test("SafetyCheckResult — with violations is not safe", () => {
       "Out-of-scope modification: .github/workflows/ci.yml",
       "Potential secret detected in diff content",
     ],
+    checkedFiles: [".github/workflows/ci.yml", "src/main.ts"],
   };
   assertEquals(result.safe, false);
   assertEquals(result.violations.length, 2);
+  assertEquals(result.checkedFiles.length, 2);
 });
 
-Deno.test("CommitResult — successful commit structure", () => {
-  const result = {
+Deno.test("SafetyCheckResult — checkedFiles exposes changed files list", () => {
+  const result: SafetyCheckResult = {
+    safe: true,
+    violations: [],
+    checkedFiles: ["src/main.ts", "src/util.ts", "tests/main_test.ts"],
+  };
+  assertEquals(result.checkedFiles, [
+    "src/main.ts",
+    "src/util.ts",
+    "tests/main_test.ts",
+  ]);
+});
+
+Deno.test("CommitResult — successful commit with enriched fields", () => {
+  const result: CommitResult = {
     success: true,
     commitHash: "abc123def456",
+    filesStaged: ["src/main.ts", "src/util.ts"],
+    message: "sdlc(executor): run-1 — Executor",
   };
   assertEquals(result.success, true);
   assertEquals(typeof result.commitHash, "string");
+  assertEquals(result.filesStaged.length, 2);
+  assertEquals(result.message, "sdlc(executor): run-1 — Executor");
 });
 
-Deno.test("CommitResult — nothing to commit", () => {
-  const result = {
+Deno.test("CommitResult — nothing to commit has empty filesStaged", () => {
+  const result: CommitResult = {
     success: true,
     commitHash: undefined,
+    filesStaged: [],
+    message: "",
   };
   assertEquals(result.success, true);
   assertEquals(result.commitHash, undefined);
+  assertEquals(result.filesStaged.length, 0);
 });
 
 Deno.test("CommitResult — failed commit", () => {
-  const result = {
+  const result: CommitResult = {
     success: false,
     error: "Git commit failed: not a git repository",
+    filesStaged: [],
+    message: "",
   };
   assertEquals(result.success, false);
   assertEquals(result.error!.includes("not a git repository"), true);
@@ -86,4 +115,12 @@ Deno.test("secret pattern — detects API key", () => {
   assertEquals(pattern.test('token: "ghp_xxxxxxxxxxxx"'), true);
   assertEquals(pattern.test('password = "short"'), false); // too short
   assertEquals(pattern.test("const x = 42"), false);
+});
+
+// branch() helper tests — require real git repo
+Deno.test("branch — returns current branch name", async () => {
+  const { branch } = await import("./git.ts");
+  const result = await branch();
+  assertEquals(typeof result, "string");
+  assertEquals(result.length > 0, true);
 });
