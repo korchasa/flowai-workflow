@@ -319,7 +319,6 @@ export class Engine {
       let sessionId = result.session_id;
 
       // Safety-continuation loop: re-invoke agent on violations
-      // deno-lint-ignore no-constant-condition
       while (true) {
         const safetyResult = await safetyCheckDiff(resolvedPaths);
 
@@ -337,7 +336,9 @@ export class Engine {
           markNodeFailed(
             this.state,
             nodeId,
-            `Safety violations after ${continuations} continuations: ${safetyResult.violations.join("; ")}`,
+            `Safety violations after ${continuations} continuations: ${
+              safetyResult.violations.join("; ")
+            }`,
           );
           return false;
         }
@@ -347,14 +348,18 @@ export class Engine {
           markNodeFailed(
             this.state,
             nodeId,
-            `Safety violations (no session_id for continuation): ${safetyResult.violations.join("; ")}`,
+            `Safety violations (no session_id for continuation): ${
+              safetyResult.violations.join("; ")
+            }`,
           );
           return false;
         }
 
         continuations++;
         const resumePrompt =
-          `Safety check violations detected (continuation ${continuations}/${maxContinuations}):\n${safetyResult.violations.join("\n")}\nRevert the problematic changes and fix the issues.`;
+          `Safety check violations detected (continuation ${continuations}/${maxContinuations}):\n${
+            safetyResult.violations.join("\n")
+          }\nRevert the problematic changes and fix the issues.`;
 
         // Verbose: show continuation context
         this.output.verboseContinuation(

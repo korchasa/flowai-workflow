@@ -208,7 +208,9 @@ export async function runGitleaks(): Promise<GitleaksResult> {
     return {
       detected: false,
       usedFallback: true,
-      warning: `gitleaks failed: ${(err as Error).message}, falling back to regex`,
+      warning: `gitleaks failed: ${
+        (err as Error).message
+      }, falling back to regex`,
     };
   }
 }

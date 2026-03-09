@@ -193,10 +193,11 @@ Deno.test("Safety violation triggers continuation pattern — not immediate fail
   assertEquals(shouldContinue, true, "Should trigger continuation, not fail");
 
   // Resume prompt includes violation details
-  const resumePrompt =
-    `Safety check violations detected (continuation ${continuations + 1}/${maxContinuations}):\n${
-      safetyResult.violations.join("\n")
-    }\nRevert the problematic changes and fix the issues.`;
+  const resumePrompt = `Safety check violations detected (continuation ${
+    continuations + 1
+  }/${maxContinuations}):\n${
+    safetyResult.violations.join("\n")
+  }\nRevert the problematic changes and fix the issues.`;
   assertEquals(resumePrompt.includes("Out-of-scope"), true);
   assertEquals(resumePrompt.includes("continuation 1/3"), true);
 });

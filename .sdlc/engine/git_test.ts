@@ -176,8 +176,16 @@ Deno.test("runGitleaks — fallback flag set when binary missing", async () => {
   const result = await runGitleaks();
   // We can't guarantee gitleaks is installed, so just verify the structure
   if (result.usedFallback) {
-    assertEquals(result.detected, false, "Fallback should not detect secrets in clean repo");
-    assertEquals(typeof result.warning, "string", "Fallback should include warning");
+    assertEquals(
+      result.detected,
+      false,
+      "Fallback should not detect secrets in clean repo",
+    );
+    assertEquals(
+      typeof result.warning,
+      "string",
+      "Fallback should include warning",
+    );
   } else {
     assertEquals(typeof result.detected, "boolean");
   }

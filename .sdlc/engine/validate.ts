@@ -213,7 +213,9 @@ async function checkFrontmatterField(
         rule,
         passed: false,
         message:
-          `Field '${rule.field}' has value '${value}', not in allowed set [${rule.allowed.join(", ")}] in ${path}`,
+          `Field '${rule.field}' has value '${value}', not in allowed set [${
+            rule.allowed.join(", ")
+          }] in ${path}`,
       };
     }
   }
