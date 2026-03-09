@@ -123,6 +123,11 @@ nodes:
       Implement the changes following the task breakdown.
       This is iteration {{loop.iteration}}.
     after: "deno task check"
+    allowed_paths:
+      - ".sdlc/engine/"
+      - ".sdlc/runs/"
+      - ".sdlc/pipeline/"
+      - "documents/"
 
   qa:
     type: agent
