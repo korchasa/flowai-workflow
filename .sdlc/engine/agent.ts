@@ -5,7 +5,13 @@ import type {
   TemplateContext,
 } from "./types.ts";
 import { interpolate } from "./template.ts";
-import { allPassed, formatFailures, runValidations } from "./validate.ts";
+import {
+  allPassed,
+  formatFailures,
+  runValidations,
+  type ValidationResult,
+} from "./validate.ts";
+import type { OutputManager } from "./output.ts";
 
 /** Result of an agent node execution. */
 export interface AgentResult {
@@ -22,7 +28,10 @@ export interface AgentRunOptions {
   ctx: TemplateContext;
   settings: Required<NodeSettings>;
   claudeArgs?: string[];
-  onOutput?: (line: string) => void;
+  /** OutputManager for verbose diagnostics. */
+  output?: OutputManager;
+  /** Node ID for verbose output tagging. */
+  nodeId?: string;
 }
 
 /**
@@ -36,7 +45,12 @@ export interface AgentRunOptions {
  * 5. Run `after` hook if configured
  */
 export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
-  const { node, ctx, settings, claudeArgs, onOutput } = opts;
+  const { node, ctx, settings, claudeArgs, output, nodeId } = opts;
+
+  // Derive onOutput callback from OutputManager
+  const onOutput = output && nodeId
+    ? (line: string) => output.nodeOutput(nodeId, line)
+    : undefined;
 
   // Run before hook
   if (node.before) {
@@ -48,6 +62,11 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
   const taskPrompt = node.task_template
     ? interpolate(node.task_template, ctx)
     : "";
+
+  // Verbose: show interpolated prompt
+  if (output && nodeId) {
+    output.verbosePrompt(nodeId, taskPrompt);
+  }
 
   // Initial invocation
   let result = await invokeClaudeCli({
@@ -75,6 +94,15 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
   // Continuation loop
   while (validationRules.length > 0) {
     const validationResults = await runValidations(validationRules, ctx);
+
+    // Verbose: show validation results
+    if (output && nodeId) {
+      output.verboseValidation(
+        nodeId,
+        toVerboseValidation(validationResults),
+      );
+    }
+
     if (allPassed(validationResults)) {
       break;
     }
@@ -93,6 +121,19 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
 
     continuations++;
     const failures = formatFailures(validationResults);
+
+    // Verbose: show continuation context
+    if (output && nodeId) {
+      output.verboseContinuation(
+        nodeId,
+        continuations,
+        settings.max_continuations,
+        validationResults.filter((r) => !r.passed).map((r) =>
+          `${r.rule.type}: ${r.message}`
+        ),
+      );
+    }
+
     const resumePrompt =
       `Validation failed (continuation ${continuations}/${settings.max_continuations}):\n${failures}\nFix the issues.`;
 
@@ -340,6 +381,17 @@ async function runShellCommand(
       `${label} failed: ${command}${stderr ? `\n${stderr}` : ""}`,
     );
   }
+}
+
+/** Convert ValidationResult[] to verbose format for output. */
+function toVerboseValidation(
+  results: ValidationResult[],
+): { rule: string; passed: boolean; detail?: string }[] {
+  return results.map((r) => ({
+    rule: r.rule.type,
+    passed: r.passed,
+    detail: r.message,
+  }));
 }
 
 function sleep(ms: number): Promise<void> {

@@ -1,6 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { buildClaudeArgs } from "./agent.ts";
 import type { AgentRunOptions, InvokeOptions } from "./agent.ts";
+import { OutputManager } from "./output.ts";
 import type { NodeConfig, NodeSettings, TemplateContext } from "./types.ts";
 
 // Note: Full integration tests for runAgent require a real claude CLI.
@@ -28,7 +29,7 @@ function makeCtx(): TemplateContext {
   };
 }
 
-Deno.test("AgentRunOptions — type structure compiles", () => {
+Deno.test("AgentRunOptions — type structure with OutputManager", () => {
   const node: NodeConfig = {
     type: "agent",
     label: "Test agent",
@@ -41,15 +42,36 @@ Deno.test("AgentRunOptions — type structure compiles", () => {
     after: "echo after",
   };
 
+  const output = new OutputManager("verbose");
   const opts: AgentRunOptions = {
     node,
     ctx: makeCtx(),
     settings: makeSettings(),
-    onOutput: (line: string) => console.log(line),
+    output,
+    nodeId: "executor",
   };
 
   assertEquals(opts.node.type, "agent");
   assertEquals(opts.settings.max_continuations, 3);
+  assertEquals(opts.output instanceof OutputManager, true);
+  assertEquals(opts.nodeId, "executor");
+});
+
+Deno.test("AgentRunOptions — output and nodeId are optional", () => {
+  const node: NodeConfig = {
+    type: "agent",
+    label: "Test",
+    task_template: "Do something",
+  };
+
+  const opts: AgentRunOptions = {
+    node,
+    ctx: makeCtx(),
+    settings: makeSettings(),
+  };
+
+  assertEquals(opts.output, undefined);
+  assertEquals(opts.nodeId, undefined);
 });
 
 Deno.test("AgentRunOptions — task_template interpolation structure", () => {
