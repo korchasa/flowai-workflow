@@ -122,7 +122,9 @@ nodes:
       Read documents/requirements.md and documents/design.md.
       Implement the changes following the task breakdown.
       This is iteration {{loop.iteration}}.
-    after: "deno task check"
+    validate:
+      - type: custom_script
+        path: "deno task check"
     allowed_paths:
       - ".sdlc/engine/"
       - ".sdlc/runs/"
