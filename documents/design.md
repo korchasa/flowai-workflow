@@ -128,7 +128,7 @@ graph TD
   - `cli.ts` — CLI entry point: argument parsing, .env loading
   - `mod.ts` — public API re-exports
 - **Interfaces:**
-  - CLI: `deno task run --issue <N> [--config <path>] [--resume <run-id>]
+  - CLI: `deno task run:{issue|text|file} <arg> [--config <path>] [--resume <run-id>]
     [--dry-run] [-v|-q] [--env KEY=VAL] [--skip nodes] [--only nodes]`
   - Config: `.sdlc/pipeline.yaml` (YAML, version "1")
   - State: `.sdlc/runs/<run-id>/state.json` (JSON)
@@ -138,8 +138,8 @@ graph TD
 ### 3.6 Pipeline Trigger (Legacy)
 
 - **Purpose:** Trigger pipeline on issue number, run stages sequentially.
-- **Interfaces:** CLI: `deno task run --issue <N>`. Fetches issue via `gh`.
-- **Deps:** Devcontainer, environment secrets (`ANTHROPIC_API_KEY`, `GITHUB_TOKEN`).
+- **Interfaces:** CLI: `deno task run:issue <N>`. Fetches issue via `gh`.
+- **Deps:** Devcontainer, Claude CLI auth (OAuth or API key), `GITHUB_TOKEN`.
 
 ## 4. Data
 

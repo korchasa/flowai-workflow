@@ -16,7 +16,7 @@
 ## 1. Introduction
 
 - **Document purpose:** Define the specification for the automated multi-agent development pipeline orchestrated via Claude Code agents and Deno engine.
-- **Scope:** A locally-run system where a GitHub Issue triggers a chain of specialized AI agents (via `deno task run --issue <N>`), each performing a distinct role in the software development lifecycle — from specification writing to QA verification.
+- **Scope:** A locally-run system where a GitHub Issue triggers a chain of specialized AI agents (via `deno task run:issue <N>`), each performing a distinct role in the software development lifecycle — from specification writing to QA verification.
 - **Audience:** Project maintainer (korchasa), contributors.
 - **Definitions and abbreviations:**
   - **Agent:** An isolated Claude Code CLI invocation with a dedicated system prompt (role).
@@ -28,7 +28,7 @@
 
 ## 2. General description
 
-- **System context:** Operates as a local Deno engine process triggered by CLI command (`deno task run --issue <N>`). The engine reads pipeline DAG config (`.sdlc/pipeline.yaml`), executes nodes sequentially/in parallel via `claude` CLI, validates outputs, and commits artifacts. Agents communicate through files in the repository.
+- **System context:** Operates as a local Deno engine process triggered by CLI command (`deno task run:issue <N>`). The engine reads pipeline DAG config (`.sdlc/pipeline.yaml`), executes nodes sequentially/in parallel via `claude` CLI, validates outputs, and commits artifacts. Agents communicate through files in the repository.
 - **Assumptions and constraints:**
   - A devcontainer provides the runtime environment with all required tools (see FR-12).
   - Each agent is stateless between runs — all context comes from input artifacts and its system prompt.
@@ -39,17 +39,18 @@
 
 ### 3.1 FR-1: Pipeline Trigger
 
-- **Description:** Pipeline triggered via local CLI. Two input modes: GitHub Issue number or free-form text.
-- **Use case scenarios:**
-  - **Issue mode:** `deno task run --issue <N>`. Engine fetches issue title+body via `gh` CLI.
-  - **Text mode:** `deno task run --text "description"` or `deno task run --file path/to/task.md`. Engine uses provided text directly as input to the first agent. No GitHub issue required; branch name derived from run-id.
+- **Description:** Pipeline triggered via separate `deno task` subcommands, one per input source type. Each subcommand determines how the initial task description is obtained.
+- **Subcommands:**
+  - `deno task run:issue <N>` — fetches GitHub Issue title+body via `gh issue view`. Branch: `agent/<N>`.
+  - `deno task run:text "description"` — uses inline text as task input. Branch: `agent/<run-id>`.
+  - `deno task run:file <path>` — reads task description from a local file. Branch: `agent/<run-id>`.
 - **Acceptance criteria:**
-  - [ ] Pipeline starts via `deno task run --issue <N>` (issue mode).
-  - [ ] Pipeline starts via `deno task run --text "..."` or `--file <path>` (text mode).
-  - [ ] In issue mode: issue body and title extracted via `gh issue view` and passed as input.
-  - [ ] In text mode: provided text passed directly as input. No `gh` dependency required.
-  - [ ] `--issue` and `--text`/`--file` are mutually exclusive. Engine errors if both or neither provided.
-  - [ ] **Re-run guard (issue mode only):** engine checks if a PR from branch `agent/<issue-number>` has already been merged. If yes, logs warning and exits.
+  - [ ] `deno task run:issue <N>` starts pipeline with issue data from GitHub.
+  - [ ] `deno task run:text "..."` starts pipeline with provided inline text.
+  - [ ] `deno task run:file <path>` starts pipeline with file contents as task input.
+  - [ ] Each subcommand maps to a separate `deno.json` task entry.
+  - [ ] Common engine flags (`--resume`, `--dry-run`, `-v`, `-q`, `--config`) work with all subcommands.
+  - [ ] **Re-run guard (issue mode only):** engine checks if a PR from branch `agent/<N>` has already been merged. If yes, logs warning and exits.
 
 ### 3.2 FR-2: Stage 1 — Project Manager (Specification)
 
@@ -317,7 +318,7 @@
   - Scripts share common functions via `.sdlc/scripts/lib.sh` (logging, git operations, continuation loop, artifact validation).
 - **Acceptance criteria:**
   - Devcontainer builds successfully and contains all listed tools.
-  - Primary launch: `deno task run --issue <N>` (engine path).
+  - Primary launch: `deno task run:issue <N>` (engine path).
   - Legacy: each stage can be run independently via `.sdlc/scripts/stage-1-pm.sh <issue-number>`.
   - Stage scripts are executable and pass `shellcheck` without errors.
   - **Retry logic:** `lib.sh` implements a generic retry wrapper (`retry_with_backoff`) used for all external API calls (`claude` CLI, `gh` CLI). Parameters: max attempts = 3, initial delay = 5s, backoff multiplier = 2x. Retryable conditions: non-zero exit code from CLI tools (network errors, rate limits). Non-retryable: validation failures, agent logic errors.
@@ -369,11 +370,11 @@
 ### 3.16 FR-16: Secrets
 
 - **Description:** Defines the required secrets for pipeline operation.
-- **Required secrets (environment variables):**
-  - `ANTHROPIC_API_KEY` — API key for Claude Code CLI authentication.
+- **Authentication:**
+  - **Claude Code CLI:** OAuth session (`claude login`) or `ANTHROPIC_API_KEY` env var. OAuth is the default method in devcontainer; API key is an optional alternative.
   - `GITHUB_TOKEN` — used by `gh` CLI for PR creation and issue comments. Must have `issues:write`, `pull-requests:write`, `contents:write` permissions. Can be obtained via `gh auth token`.
 - **Acceptance criteria:**
-  - Secrets are provided via environment variables (`.env` file or shell export) before running the engine.
+  - Claude CLI auth is available (OAuth session or API key) before running the engine.
   - No secrets are hardcoded in scripts, prompts, or Dockerfile.
   - Diff-based safety checks (FR-8) detect and reject any secret-like patterns in agent-produced code.
 
@@ -410,13 +411,13 @@
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution for different issues is not supported.
 - **Reproducibility:** Agent prompts are versioned in the repository under `.sdlc/agents/`.
 - **Observability:** Full logs stored per stage in `.sdlc/runs/<run-id>/logs/`. Total pipeline duration reported in the final PR description.
-- **Fault tolerance:** If a stage fails (agent error, timeout, continuation limit exhausted), the pipeline stops, Meta-Agent runs to analyze the failure. Manual restart via `deno task run --issue <N> --resume <run-id>`.
+- **Fault tolerance:** If a stage fails (agent error, timeout, continuation limit exhausted), the pipeline stops, Meta-Agent runs to analyze the failure. Manual restart via `deno task run:issue <N> --resume <run-id>`.
 - **Timeouts:** Each stage has a configurable timeout via `SDLC_STAGE_TIMEOUT_MINUTES` env var (default: 30 min). Engine enforces timeout per node. When a timeout fires, the stage is treated as failed — Meta-Agent is triggered for analysis.
 - **Security:** Enforced at the engine/stage script level via diff-based checks (see FR-8). Agents run with the local user's permissions.
 
 ## 5. Interfaces
 
-- **Trigger:** CLI command with two modes: `deno task run --issue <N>` (fetches issue via `gh issue view`) or `deno task run --text "..."` / `--file <path>` (uses provided text directly). Mutually exclusive flags.
+- **Trigger:** Separate `deno task` subcommands per input source: `run:issue <N>` (GitHub Issue via `gh`), `run:text "..."` (inline text), `run:file <path>` (local file). All share common engine flags.
 - **Agent runtime:** `claude` CLI invoked by the Deno engine. Invocation: `claude -p "<task prompt>" --append-system-prompt-file .sdlc/agents/<role>.md --output-format json`. Key flags:
   - `--append-system-prompt-file` — adds role-specific instructions while preserving Claude Code's built-in capabilities (tool use, file access). Preferred over `--system-prompt-file` which replaces the default prompt entirely.
   - `--output-format json` — returns structured JSON with `result`, `session_id`, `total_cost_usd`, `duration_ms`, `num_turns`, `is_error`.
@@ -432,7 +433,7 @@
 
 The system is considered accepted if:
 
-1. Running `deno task run --issue <N>` triggers the full pipeline for the given issue.
+1. Running `deno task run:issue <N>` triggers the full pipeline for the given issue.
 2. Each stage produces its expected artifact with all required sections.
 3. The Continuation mechanism catches and fixes `deno task check` failures without human intervention.
 4. The Executor+QA loop iterates until quality checks pass.
@@ -481,7 +482,7 @@ The system is considered accepted if:
     stage-8-presenter.sh
     stage-9-meta-agent.sh
   engine/                              # Deno/TypeScript pipeline engine
-    cli.ts                             # Entry point: deno task run --issue <N>
+    cli.ts                             # Entry point: deno task run:issue <N>
     engine.ts                          # DAG executor
     ...
   runs/

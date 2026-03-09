@@ -235,18 +235,15 @@ async function executeClaudeProcess(
   timeoutSeconds: number,
   onOutput?: (line: string) => void,
 ): Promise<ClaudeCliOutput> {
-  // Build env without CLAUDECODE to allow nested claude CLI invocations.
-  // Claude Code sets this variable and refuses to launch inside another session.
-  const env = Object.fromEntries(
-    Object.entries(Deno.env.toObject()).filter(([k]) => k !== "CLAUDECODE"),
-  );
-
+  // Unset CLAUDECODE to allow nested claude CLI invocations.
+  // Claude Code checks this variable and refuses to launch inside another session.
+  // Deno.Command merges env with parent, so setting empty string overrides it.
   const cmd = new Deno.Command("claude", {
     args,
     stdin: "null",
     stdout: "piped",
     stderr: "piped",
-    env,
+    env: { CLAUDECODE: "" },
   });
 
   const process = cmd.spawn();
