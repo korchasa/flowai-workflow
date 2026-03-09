@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
-import type { AgentRunOptions } from "./agent.ts";
+import { buildClaudeArgs } from "./agent.ts";
+import type { AgentRunOptions, InvokeOptions } from "./agent.ts";
 import type { NodeConfig, NodeSettings, TemplateContext } from "./types.ts";
 
 // Note: Full integration tests for runAgent require a real claude CLI.
@@ -81,6 +82,56 @@ Deno.test("AgentRunOptions — loop context available", () => {
   };
 
   assertEquals(ctx.loop!.iteration, 2);
+});
+
+function makeInvokeOpts(
+  overrides?: Partial<InvokeOptions>,
+): InvokeOptions {
+  return {
+    taskPrompt: "do something",
+    timeoutSeconds: 60,
+    maxRetries: 1,
+    retryDelaySeconds: 1,
+    ...overrides,
+  };
+}
+
+Deno.test("buildClaudeArgs — includes extra claudeArgs", () => {
+  const args = buildClaudeArgs(
+    makeInvokeOpts({
+      claudeArgs: ["--dangerously-skip-permissions"],
+    }),
+  );
+  assertEquals(args.includes("--dangerously-skip-permissions"), true);
+  assertEquals(args.includes("--output-format"), true);
+  assertEquals(args.includes("-p"), true);
+});
+
+Deno.test("buildClaudeArgs — claudeArgs placed before -p", () => {
+  const args = buildClaudeArgs(
+    makeInvokeOpts({
+      claudeArgs: ["--dangerously-skip-permissions", "--verbose"],
+    }),
+  );
+  const pIdx = args.indexOf("-p");
+  const dspIdx = args.indexOf("--dangerously-skip-permissions");
+  assertEquals(dspIdx < pIdx, true, "claudeArgs should appear before -p");
+});
+
+Deno.test("buildClaudeArgs — no claudeArgs by default", () => {
+  const args = buildClaudeArgs(makeInvokeOpts());
+  assertEquals(args.includes("--dangerously-skip-permissions"), false);
+});
+
+Deno.test("buildClaudeArgs — resume mode omits promptFile", () => {
+  const args = buildClaudeArgs(
+    makeInvokeOpts({
+      resumeSessionId: "sess-123",
+      promptFile: "prompt.md",
+    }),
+  );
+  assertEquals(args.includes("--resume"), true);
+  assertEquals(args.includes("--append-system-prompt-file"), false);
 });
 
 Deno.test("settings — default values", () => {

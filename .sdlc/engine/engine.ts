@@ -26,6 +26,7 @@ import {
   saveState,
 } from "./state.ts";
 import { runAgent } from "./agent.ts";
+import { saveAgentLog } from "./log.ts";
 import { runLoop } from "./loop.ts";
 import { runHuman, terminalInput } from "./human.ts";
 import type { UserInput } from "./human.ts";
@@ -248,6 +249,7 @@ export class Engine {
       node,
       ctx,
       settings,
+      claudeArgs: this.config.defaults?.claude_args,
       onOutput: (line) => this.output.nodeOutput(nodeId, line),
     });
 
@@ -260,6 +262,12 @@ export class Engine {
       this.state.nodes[nodeId].session_id = result.session_id;
     }
     this.state.nodes[nodeId].continuations = result.continuations;
+
+    // Save agent log (JSON output + JSONL transcript)
+    if (result.output) {
+      const runDir = getRunDir(this.state.run_id);
+      await saveAgentLog(runDir, nodeId, result.output);
+    }
 
     // Safety check
     if (node.allowed_paths && node.allowed_paths.length > 0) {

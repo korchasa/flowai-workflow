@@ -21,6 +21,7 @@ export interface AgentRunOptions {
   node: NodeConfig;
   ctx: TemplateContext;
   settings: Required<NodeSettings>;
+  claudeArgs?: string[];
   onOutput?: (line: string) => void;
 }
 
@@ -35,7 +36,7 @@ export interface AgentRunOptions {
  * 5. Run `after` hook if configured
  */
 export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
-  const { node, ctx, settings, onOutput } = opts;
+  const { node, ctx, settings, claudeArgs, onOutput } = opts;
 
   // Run before hook
   if (node.before) {
@@ -52,6 +53,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
   let result = await invokeClaudeCli({
     promptFile: node.prompt ? interpolate(node.prompt, ctx) : undefined,
     taskPrompt,
+    claudeArgs,
     timeoutSeconds: settings.timeout_seconds,
     maxRetries: settings.max_retries,
     retryDelaySeconds: settings.retry_delay_seconds,
@@ -60,6 +62,15 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
 
   let continuations = 0;
   const validationRules = node.validate ?? [];
+
+  // Fail fast if initial invocation returned no output at all
+  if (result.error && !result.output) {
+    return {
+      success: false,
+      continuations,
+      error: result.error,
+    };
+  }
 
   // Continuation loop
   while (validationRules.length > 0) {
@@ -97,6 +108,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
     result = await invokeClaudeCli({
       resumeSessionId: result.output.session_id,
       taskPrompt: resumePrompt,
+      claudeArgs,
       timeoutSeconds: settings.timeout_seconds,
       maxRetries: settings.max_retries,
       retryDelaySeconds: settings.retry_delay_seconds,
@@ -140,10 +152,11 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
 
 // --- Internal helpers ---
 
-interface InvokeOptions {
+export interface InvokeOptions {
   promptFile?: string;
   taskPrompt: string;
   resumeSessionId?: string;
+  claudeArgs?: string[];
   timeoutSeconds: number;
   maxRetries: number;
   retryDelaySeconds: number;
@@ -192,8 +205,14 @@ async function invokeClaudeCli(opts: InvokeOptions): Promise<InvokeResult> {
   };
 }
 
-function buildClaudeArgs(opts: InvokeOptions): string[] {
+/** Build CLI arguments for the claude command. Exported for testing. */
+export function buildClaudeArgs(opts: InvokeOptions): string[] {
   const args: string[] = [];
+
+  // Extra CLI args (e.g. --dangerously-skip-permissions) go first
+  if (opts.claudeArgs && opts.claudeArgs.length > 0) {
+    args.push(...opts.claudeArgs);
+  }
 
   if (opts.resumeSessionId) {
     args.push("--resume", opts.resumeSessionId);
@@ -216,10 +235,18 @@ async function executeClaudeProcess(
   timeoutSeconds: number,
   onOutput?: (line: string) => void,
 ): Promise<ClaudeCliOutput> {
+  // Build env without CLAUDECODE to allow nested claude CLI invocations.
+  // Claude Code sets this variable and refuses to launch inside another session.
+  const env = Object.fromEntries(
+    Object.entries(Deno.env.toObject()).filter(([k]) => k !== "CLAUDECODE"),
+  );
+
   const cmd = new Deno.Command("claude", {
     args,
+    stdin: "null",
     stdout: "piped",
     stderr: "piped",
+    env,
   });
 
   const process = cmd.spawn();
@@ -233,35 +260,58 @@ async function executeClaudeProcess(
     }
   }, timeoutSeconds * 1000);
 
-  // Read stderr for streaming output
-  if (onOutput) {
-    const stderrReader = process.stderr.getReader();
-    const decoder = new TextDecoder();
-    (async () => {
-      try {
-        while (true) {
-          const { done, value } = await stderrReader.read();
-          if (done) break;
-          const text = decoder.decode(value, { stream: true });
+  // Collect stdout fully
+  const stdoutChunks: Uint8Array[] = [];
+  const stdoutReader = process.stdout.getReader();
+  (async () => {
+    try {
+      while (true) {
+        const { done, value } = await stdoutReader.read();
+        if (done) break;
+        stdoutChunks.push(value);
+      }
+    } catch { /* stream closed */ }
+  })();
+
+  // Collect stderr, optionally streaming lines to onOutput
+  const stderrChunks: Uint8Array[] = [];
+  const stderrReader = process.stderr.getReader();
+  const stderrDecoder = new TextDecoder();
+  (async () => {
+    try {
+      while (true) {
+        const { done, value } = await stderrReader.read();
+        if (done) break;
+        stderrChunks.push(value);
+        if (onOutput) {
+          const text = stderrDecoder.decode(value, { stream: true });
           for (const line of text.split("\n").filter(Boolean)) {
             onOutput(line);
           }
         }
-      } catch {
-        // Stream closed
       }
-    })();
-  }
+    } catch { /* stream closed */ }
+  })();
 
-  const output = await process.output();
+  const status = await process.status;
   clearTimeout(timeoutId);
 
-  const stdout = new TextDecoder().decode(output.stdout).trim();
+  const concat = (chunks: Uint8Array[]) => {
+    const total = chunks.reduce((n, c) => n + c.length, 0);
+    const buf = new Uint8Array(total);
+    let offset = 0;
+    for (const c of chunks) {
+      buf.set(c, offset);
+      offset += c.length;
+    }
+    return buf;
+  };
+  const stdout = new TextDecoder().decode(concat(stdoutChunks)).trim();
+  const stderr = new TextDecoder().decode(concat(stderrChunks)).trim();
 
-  if (!output.success && !stdout) {
-    const stderr = new TextDecoder().decode(output.stderr).trim();
+  if (!status.success && !stdout) {
     throw new Error(
-      `Claude CLI exited with code ${output.code}${
+      `Claude CLI exited with code ${status.code}${
         stderr ? `: ${stderr}` : ""
       }`,
     );
