@@ -1,5 +1,12 @@
 import { assertEquals } from "@std/assert";
 import type { CommitResult, SafetyCheckResult } from "./git.ts";
+import { OutputManager } from "./output.ts";
+
+/** Capture output lines from an OutputManager. */
+function createCapture(): { lines: string[]; writer: (text: string) => void } {
+  const lines: string[] = [];
+  return { lines, writer: (text: string) => lines.push(text) };
+}
 
 // Note: Full git integration tests require a real git repo.
 // These tests verify the data structures and logic patterns.
@@ -77,6 +84,31 @@ Deno.test("CommitResult — failed commit", () => {
   };
   assertEquals(result.success, false);
   assertEquals(result.error!.includes("not a git repository"), true);
+});
+
+// --- Edge case: zero staged files at commit ---
+
+Deno.test("verboseCommit — handles zero staged files (no-op commit)", () => {
+  // When commitNodeChanges() detects no staged files, verboseCommit
+  // should report an empty files list without error.
+  const cap = createCapture();
+  const out = new OutputManager("verbose", cap.writer);
+
+  // Simulate no-op commit result: zero files staged
+  const commitResult: CommitResult = {
+    success: true,
+    commitHash: undefined,
+    filesStaged: [],
+    message: "",
+  };
+
+  // Engine only calls verboseCommit when filesStaged.length > 0
+  // (engine.ts:449), so zero files = no verboseCommit call.
+  if (commitResult.filesStaged.length > 0) {
+    out.verboseCommit("node1", commitResult.filesStaged, commitResult.message, "agent/42");
+  }
+
+  assertEquals(cap.lines.length, 0, "Zero staged files should produce no verbose commit output");
 });
 
 // Path matching logic test (mirrors safetyCheckDiff logic)

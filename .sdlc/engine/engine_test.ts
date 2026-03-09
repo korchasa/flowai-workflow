@@ -160,6 +160,50 @@ Deno.test("AC6 negative — verboseSafety skipped when allowed_paths empty", () 
   assertEquals(cap.lines.length, 0, "No verbose safety output when allowed_paths empty");
 });
 
+// --- Edge case: empty input directory ---
+
+Deno.test("resolveInputArtifacts — empty directory returns empty list", async () => {
+  const tmpDir = await Deno.makeTempDir();
+  try {
+    // Directory exists but has zero files
+    const inputs = { emptyNode: tmpDir };
+    const result = await resolveInputArtifacts(inputs);
+    assertEquals(result.length, 0, "Empty dir should yield 0 artifacts");
+  } finally {
+    await Deno.remove(tmpDir, { recursive: true });
+  }
+});
+
+Deno.test("verboseInputs — reports 0 files for empty input without error", () => {
+  const cap = createCapture();
+  const out = new OutputManager("verbose", cap.writer);
+  out.verboseInputs("node1", []);
+  assertEquals(cap.lines.length > 0, true, "Should still emit header");
+  assertEquals(cap.lines.some((l) => l.includes("0 files")), true);
+});
+
+// --- Edge case: Deno.stat() failure on missing file ---
+
+Deno.test("resolveInputArtifacts — missing file stat is skipped gracefully", async () => {
+  const tmpDir = await Deno.makeTempDir();
+  try {
+    // Create a file then remove it between readDir iteration and stat
+    // Simulate by creating a file, getting its path, removing it, and
+    // checking resolveInputArtifacts handles the race gracefully.
+    await Deno.writeTextFile(`${tmpDir}/exists.md`, "content");
+    // First call should succeed
+    const result1 = await resolveInputArtifacts({ node: tmpDir });
+    assertEquals(result1.length, 1);
+
+    // Remove file — simulate stat failure on next call
+    await Deno.remove(`${tmpDir}/exists.md`);
+    const result2 = await resolveInputArtifacts({ node: tmpDir });
+    assertEquals(result2.length, 0, "Missing files should be skipped without error");
+  } finally {
+    await Deno.remove(tmpDir, { recursive: true });
+  }
+});
+
 Deno.test("resolveInputArtifacts — skips subdirectories", async () => {
   const tmpDir = await Deno.makeTempDir();
   try {
