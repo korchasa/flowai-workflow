@@ -128,6 +128,20 @@ export function markNodeFailed(
   });
 }
 
+/** Mark a node as waiting for human input (HITL). */
+export function markNodeWaiting(
+  state: RunState,
+  nodeId: string,
+  sessionId: string,
+  questionJson: string,
+): void {
+  updateNodeState(state, nodeId, {
+    status: "waiting",
+    session_id: sessionId,
+    question_json: questionJson,
+  });
+}
+
 /** Mark a node as skipped. */
 export function markNodeSkipped(state: RunState, nodeId: string): void {
   updateNodeState(state, nodeId, { status: "skipped" });

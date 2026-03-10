@@ -12,6 +12,12 @@ defaults:
   retry_delay_seconds: 5
   claude_args:
     - "--dangerously-skip-permissions"
+  hitl:
+    ask_script: .sdlc/scripts/hitl-ask.sh
+    check_script: .sdlc/scripts/hitl-check.sh
+    poll_interval: 60
+    timeout: 7200
+    bot_login: "github-actions[bot]"
 
 nodes:
   # Stage 1: Project Manager — specification

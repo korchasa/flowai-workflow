@@ -161,6 +161,8 @@ graph TD
   - `agent.ts` — Claude CLI invocation, continuation loop, retry
   - `loop.ts` — loop node execution with condition extraction, per-iteration
     `AgentResult` accumulation into `LoopResult.bodyResults`
+  - `hitl.ts` — HITL detection (`detectHitlRequest`) and poll loop
+    (`runHitlLoop`); injectable `scriptRunner`/`claudeRunner` for testing
   - `human.ts` — terminal user input, abort logic
   - `git.ts` — commit helper (used by committer agent nodes), branch query
   - `output.ts` — terminal output manager (quiet/normal/verbose), verbose
@@ -220,7 +222,29 @@ graph TD
   - All existing callers pass no `output` arg — zero behavioral change.
 - **Deps:** `claude` CLI, `deno`, `git`, `jsr:@std/yaml`.
 
-### 3.7 Pipeline Trigger (Legacy)
+### 3.7 HITL Pipeline Scripts (`.sdlc/scripts/hitl-*.sh`)
+
+- **Purpose:** Deliver agent questions to humans and poll for replies. Pipeline-
+  specific (GitHub), not engine code. Engine invokes via configurable paths.
+- **Scripts:**
+  - `hitl-ask.sh` — render question JSON → markdown, post to GitHub issue.
+    - Input: `--repo`, `--issue`, `--run-id`, `--node-id`, `--question-json`.
+    - Renders: header, blockquoted question, numbered options (from
+      `options[].label` + `options[].description`), HTML marker
+      `<!-- hitl:<run-id>:<node-id> -->`.
+    - Posts via `gh issue comment --repo <repo> <issue> --body "$md"`.
+    - Deps: `jq`, `gh`.
+  - `hitl-check.sh` — poll GitHub issue for human reply after marker.
+    - Input: `--repo`, `--issue`, `--run-id`, `--node-id`, `--bot-login`.
+    - Fetches comments: `gh api repos/{owner}/{repo}/issues/<N>/comments`.
+    - jq filter: find comment with marker `<!-- hitl:<run-id>:<node-id> -->`,
+      then first subsequent comment where `.user.login != bot-login`.
+    - Exit 0 + body on stdout = reply found. Exit 1 = no reply yet.
+    - Deps: `jq`, `gh`.
+- **Interfaces:** Called by engine via `defaults.hitl.ask_script` /
+  `defaults.hitl.check_script` paths in `pipeline.yaml`.
+
+### 3.8 Pipeline Trigger (Legacy)
 
 - **Purpose:** Trigger pipeline on issue number, run stages sequentially.
 - **Interfaces:** CLI: `deno task run:issue <N>`. Fetches issue via `gh`.
@@ -327,6 +351,40 @@ graph TD
     has no strict dependency on `presenter`, enabling execution even when
     upstream nodes fail. On failure: reads failed node ID from `state.json`,
     runs with failure context.
+  - **HITL via AskUserQuestion Interception** (FR-21):
+    Engine detects agent HITL requests by inspecting `permission_denials` in
+    Claude CLI JSON output. Flow:
+    1. Agent node completes → engine parses JSON `result` event.
+    2. If `permission_denials[]` contains entry with
+       `tool_name == "AskUserQuestion"`: extract `tool_input.questions` (structured
+       question with `question`, `header`, `options[]`, `multiSelect`) and
+       `session_id` from result.
+    3. Engine calls `defaults.hitl.ask_script` (external pipeline script) with
+       question JSON + context args (repo, issue, run-id, node-id).
+    4. Engine sets node state to `waiting` in `state.json`, saves `session_id`.
+    5. Engine enters poll loop: `sleep(poll_interval)` → call
+       `defaults.hitl.check_script` → if exit 0, read reply from stdout.
+    6. Engine resumes agent: `claude --resume <session_id> -p "<reply>"
+       --output-format json`. Agent sees full previous context + reply as new
+       user message.
+    7. On `timeout` exceeded: node marked `failed`, Meta-Agent triggered.
+    Experimentally verified (see `documents/rnd/human-in-the-loop.md`):
+    - `AskUserQuestion` denied in `-p` mode regardless of `--dangerously-skip-
+      permissions` (cause: no terminal, not permissions).
+    - Question JSON in `permission_denials[0].tool_input`: `{questions: [{
+      question, header, options: [{label, description}], multiSelect}]}`.
+    - `--resume <session_id> -p "<answer>"` preserves full session context;
+      agent correctly interprets answer in context of its original question.
+    - Cost per HITL roundtrip: ~$0.08 (question turn + resume turn).
+    Pipeline config:
+    ```yaml
+    defaults:
+      hitl:
+        ask_script: .sdlc/scripts/hitl-ask.sh
+        check_script: .sdlc/scripts/hitl-check.sh
+        poll_interval: 60
+        timeout: 7200
+    ```
 - **Rules:**
   - Artifacts overwritten on re-run (git history preserves previous).
   - QA iteration numbering restarts on re-run.

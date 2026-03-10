@@ -426,6 +426,29 @@
   - [ ] Check runs as part of `deno task check` (integrated into `scripts/check.ts`).
   - [ ] Failures produce actionable error messages with config file path and line context.
 
+### 3.21 FR-21: Human-in-the-Loop (Agent-Initiated)
+
+- **Description:** Any pipeline agent can request human input mid-task by calling the built-in `AskUserQuestion` tool. The engine detects this call (denied in `-p` mode but visible in JSON output as `permission_denials`), delegates question delivery and reply polling to external pipeline scripts, and resumes the agent session with the human's answer via `--resume`.
+- **Mechanism:**
+  1. Agent calls `AskUserQuestion` → Claude CLI denies it in `-p` mode (no terminal) → structured question visible in `permission_denials` field of JSON `result` event.
+  2. Engine extracts question (`{question, header, options[], multiSelect}`) and `session_id`.
+  3. Engine invokes configurable `ask_script` (pipeline script, not engine code) to deliver question (e.g., `gh issue comment`).
+  4. Engine enters poll loop: `sleep poll_interval` → invoke `check_script` → if exit 0 (reply found), read reply from stdout.
+  5. Engine resumes agent: `claude --resume <session_id> -p "<reply>"`. Agent continues with full session context.
+- **Key constraint:** Engine contains zero GitHub/Slack/email-specific code. All delivery/polling logic lives in pipeline scripts (`.sdlc/scripts/`).
+- **Acceptance criteria:**
+  - [x] Engine detects `AskUserQuestion` in `permission_denials` of Claude CLI JSON output after agent node completes. Evidence: `.sdlc/engine/hitl.ts:61-93` (`detectHitlRequest()`), `.sdlc/engine/engine.ts:316-319` (call in `executeAgentNode`)
+  - [x] Engine saves `session_id`, question JSON, and node status `waiting` to `state.json`. Evidence: `.sdlc/engine/state.ts:93-103` (`markNodeWaiting()`), `.sdlc/engine/engine.ts:324-325` (call + saveState), `.sdlc/engine/types.ts:104` (`question_json` field)
+  - [x] Engine invokes `ask_script` (path from `pipeline.yaml` `defaults.hitl`) with args: `--repo`, `--issue`, `--run-id`, `--node-id`, `--question-json`. Evidence: `.sdlc/engine/hitl.ts:111-125` (`buildScriptArgs("ask")`), `.sdlc/engine/hitl.ts:127-134` (ask invocation)
+  - [x] Engine enters poll loop calling `check_script` with args: `--repo`, `--issue`, `--run-id`, `--node-id`, `--bot-login`. Exit 0 = reply in stdout; exit 1 = no reply yet. Evidence: `.sdlc/engine/hitl.ts:137-175` (poll loop), `.sdlc/engine/hitl_test.ts:184-214` (poll test)
+  - [x] On reply: engine resumes agent via `claude --resume <session_id> -p "<reply>"`. Evidence: `.sdlc/engine/hitl.ts:158-172` (claudeRun with resumeSessionId)
+  - [x] Configurable `poll_interval` (default 60s) and `timeout` (default 7200s) per pipeline. Evidence: `.sdlc/engine/types.ts:170-175` (`HitlConfig`), `.sdlc/pipeline.yaml:16-20` (defaults.hitl)
+  - [x] On timeout: node fails, Meta-Agent triggered. Evidence: `.sdlc/engine/hitl.ts:183-188` (timeout return), `.sdlc/engine/engine.ts:342-347` (markNodeFailed on HITL failure), `.sdlc/engine/hitl_test.ts:216-230` (timeout test)
+  - [x] `deno task run` on a pipeline with `waiting` nodes auto-resumes polling (no manual `--resume` needed). Evidence: `.sdlc/engine/engine.ts:278-310` (wasWaiting resume path in executeAgentNode)
+  - [x] Pipeline scripts `hitl-ask.sh` and `hitl-check.sh` exist in `.sdlc/scripts/`. Evidence: `.sdlc/scripts/hitl-ask.sh`, `.sdlc/scripts/hitl-check.sh`
+  - [x] `hitl-ask.sh` renders question JSON → markdown with HTML marker `<!-- hitl:<run-id>:<node-id> -->`, posts via `gh issue comment`. Evidence: `.sdlc/scripts/hitl-ask.sh:52-76` (markdown render + marker + gh post)
+  - [x] `hitl-check.sh` finds first non-bot comment after marker, outputs body to stdout (exit 0) or exits 1 if no reply. Evidence: `.sdlc/scripts/hitl-check.sh:39-54` (jq filter + exit codes)
+
 ## 4. Non-functional requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution is not supported.

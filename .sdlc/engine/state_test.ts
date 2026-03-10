@@ -12,6 +12,7 @@ import {
   markNodeFailed,
   markNodeSkipped,
   markNodeStarted,
+  markNodeWaiting,
   markRunAborted,
   markRunCompleted,
   markRunFailed,
@@ -212,4 +213,26 @@ Deno.test("saveState + loadState — roundtrip", async () => {
   assertEquals(loaded.args.issue, "1");
 
   await Deno.remove(tmpDir, { recursive: true });
+});
+
+Deno.test("markNodeWaiting — sets status, session_id, question_json", () => {
+  const state = createRunState("test", "cfg.yaml", ["a"], {}, {});
+  markNodeStarted(state, "a");
+  markNodeWaiting(state, "a", "sess-123", '{"question":"Which language?"}');
+
+  assertEquals(state.nodes.a.status, "waiting");
+  assertEquals(state.nodes.a.session_id, "sess-123");
+  assertEquals(state.nodes.a.question_json, '{"question":"Which language?"}');
+});
+
+Deno.test("getResumableNodes — includes waiting nodes", () => {
+  const state = createRunState("test", "cfg.yaml", ["a", "b", "c"], {}, {});
+  markNodeStarted(state, "a");
+  markNodeCompleted(state, "a");
+  markNodeStarted(state, "b");
+  markNodeWaiting(state, "b", "sess-1", "{}");
+  // c stays pending
+
+  const resumable = getResumableNodes(state);
+  assertEquals(resumable.sort(), ["b", "c"]);
 });

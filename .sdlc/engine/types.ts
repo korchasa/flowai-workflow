@@ -18,6 +18,7 @@ export interface PipelineConfig {
 export interface PipelineDefaults extends NodeSettings {
   max_parallel?: number; // 0 = unlimited (default)
   claude_args?: string[]; // extra args passed to claude CLI (e.g. ["--dangerously-skip-permissions"])
+  hitl?: HitlConfig; // human-in-the-loop config (ask/check scripts, poll, timeout)
 }
 
 /** Configuration for a single pipeline node. */
@@ -89,7 +90,8 @@ export type NodeStatus =
   | "running"
   | "completed"
   | "failed"
-  | "skipped";
+  | "skipped"
+  | "waiting";
 
 /** Execution record for a single node. */
 export interface NodeState {
@@ -101,6 +103,7 @@ export interface NodeState {
   iteration?: number; // for loop nodes
   continuations?: number;
   session_id?: string; // claude CLI session ID
+  question_json?: string; // serialized HitlQuestion; set when status=waiting
 }
 
 /** Persisted run state (state.json). */
@@ -150,6 +153,12 @@ export interface EngineOptions {
 
 // --- Claude CLI Output ---
 
+/** A single permission denial from Claude CLI JSON output. */
+export interface PermissionDenial {
+  tool_name: string;
+  tool_input: Record<string, unknown>;
+}
+
 /** JSON output from `claude -p ... --output-format json`. */
 export interface ClaudeCliOutput {
   result: string;
@@ -159,4 +168,16 @@ export interface ClaudeCliOutput {
   duration_api_ms: number;
   num_turns: number;
   is_error: boolean;
+  permission_denials?: PermissionDenial[];
+}
+
+// --- HITL Configuration ---
+
+/** Human-in-the-loop configuration for pipeline defaults. */
+export interface HitlConfig {
+  ask_script: string;
+  check_script: string;
+  poll_interval: number; // seconds between polls, default 60
+  timeout: number; // max wait seconds, default 7200
+  bot_login?: string; // login to exclude in hitl-check.sh
 }

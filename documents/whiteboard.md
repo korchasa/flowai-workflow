@@ -1,199 +1,286 @@
-# Deferred Commit Strategy
+# FR-21: Human-in-the-Loop (Agent-Initiated)
 
 ## Goal
 
-Eliminate per-node git commits during pipeline execution. Reduce overhead,
-fix chicken-and-egg config mutation bug, simplify git history.
+Enable any pipeline agent to pause mid-task, ask a question to a human, and
+resume with the answer — without breaking pipeline autonomy in the common case.
+Business value: prevents hallucination/failure when agents face genuine
+ambiguity; enables 1-min human input to save 30-min executor+QA rework cycles.
 
 ## Overview
 
 ### Context
 
-Pipeline engine commits after every successful node (`commitIfNeeded()` in
-`engine.ts:251`). This causes:
-
-1. **Performance overhead:** ~15s per node × 8 nodes = ~2 min wasted on
-   `git add -A` + `git commit` + safety check per commit.
-2. **Chicken-and-egg bug:** Executor modifies `pipeline.yaml` on disk, but
-   engine has config loaded in memory. QA/meta-agent use stale in-memory
-   config referencing deleted paths (FR-19 run: QA failed with
-   `file not found: .sdlc/agents/qa.md`).
-3. **Noisy git history:** FR-19 run produced 10 commits instead of 1-2
-   meaningful ones. Executor alone made 7 micro-commits.
-4. **No practical value:** Inter-agent communication is filesystem-based
-   (`{{input.<node>}}` templates read files from disk). `--resume` skip
-   logic uses `state.json`, not git history.
+- SRS: `documents/requirements.md` §3.21 (FR-21)
+- SDS: `documents/design.md` §3.7, §4.1 HITL, §5 "HITL via AskUserQuestion Interception"
+- RnD: `documents/rnd/human-in-the-loop.md` (experiments confirmed; all key questions resolved)
+- Pipeline is fully autonomous — no agent can currently request human input mid-task
+- `AskUserQuestion` is a built-in Claude Code tool; denied in `-p` mode but visible as structured
+  JSON in `permission_denials` of the CLI JSON output
+- Verified (see RnD): `--resume <session_id> -p "<answer>"` restores full context; agent
+  correctly interprets answer. Cost: ~$0.08/roundtrip
+- Engine must remain project-agnostic: zero GitHub/Slack-specific code in engine core;
+  delivery/polling delegated to configurable pipeline scripts
 
 ### Current State
 
-**Commit flow** (`engine.ts:527-551`, `git.ts:27-67`):
-- `commitNodeChanges()` runs after every successful node
-- `git add -A` → `git diff --cached --name-only` → `git commit -m "sdlc(...)"`
-- Includes ALL changes (artifacts + project files + logs)
+Engine (`agent.ts`, `engine.ts`, `types.ts`, `state.ts`):
+- `ClaudeCliOutput` has no `permission_denials` field → engine cannot detect HITL requests
+- `NodeStatus` has no `waiting` state → cannot persist HITL pause in `state.json`
+- `PipelineDefaults` has no `hitl` config → no `ask_script`/`check_script`/`poll_interval`/`timeout`
+- `NodeState` has no `question_json` field → question not persisted for recovery
+- `engine.ts:executeAgentNode()` has no HITL detection or poll loop
+- `waiting` nodes not handled on `--resume`
 
-**Safety check flow** (`engine.ts:307-396`, `git.ts:74-133`):
-- `safetyCheckDiff()` runs before commit for nodes with `allowed_paths`
-- Uses `git diff --name-only HEAD` — compares against last commit
-- If engine stops committing, HEAD stays at branch point → all accumulated
-  changes visible in diff → scope check breaks for later nodes
-
-**Resume flow** (`engine.ts:153-155`):
-- `isNodeCompleted(state)` — pure state.json check
-- Does NOT depend on git commits
-
-**Executor behavior:**
-- Claude Code agent commits independently (7 commits in FR-19 run)
-- Engine then tries `commitNodeChanges()` on top — usually no-op or duplicate
-- Engine cannot control agent's commit granularity
+Pipeline scripts (`.sdlc/scripts/`):
+- `hitl-ask.sh` — does not exist
+- `hitl-check.sh` — does not exist
 
 ### Constraints
 
-- Gitleaks secret detection must run (via `deno task check`)
-- `--resume` must still skip completed nodes
-- Presenter needs `git diff main...HEAD` for PR description
-- Meta-agent needs to see what changed
-- Executor must NOT commit — only explicit commit nodes do
-- Must not break `deno task check`
+- Engine must contain zero GitHub/Slack/email-specific code (SRS §3.21 key constraint)
+- No Claude API calls during human wait (poll must be cheap: `sleep` + shell script)
+- `--resume` skip logic is state.json-based (no changes needed to core resume mechanism)
+- HITL timeout → node `failed` → Meta-Agent triggered (existing `run_always` reused)
+- Must pass `deno task check` after each change (TDD: RED → GREEN → REFACTOR)
 
 ## Definition of Done
 
-- [x] Committer agent created (`agents/committer/SKILL.md`)
-- [x] Commit nodes in pipeline = `type: agent` using committer prompt
-- [x] Engine does NOT auto-commit after any node
-- [x] Executor agent prompt: "DO NOT commit" (remove "commit per task" rule)
-- [x] `safetyCheckDiff()` + `allowed_paths` fully removed (engine, git, types, config, YAML)
-- [x] Gitleaks added to `scripts/check.ts` (replaces engine-level secret check)
-- [x] `runGitleaks()` removed from `git.ts` (moved to check.ts)
-- [x] `--resume` still works (state.json based — no change expected)
-- [x] Chicken-and-egg bug eliminated (config not committed mid-run)
+- [x] `ClaudeCliOutput` type includes `permission_denials?: PermissionDenial[]`
+- [x] `NodeStatus` includes `"waiting"` state
+- [x] `NodeState` includes `question_json?: string` (session_id already exists)
+- [x] `PipelineDefaults` includes `hitl?: HitlConfig` (`ask_script`, `check_script`,
+      `poll_interval`, `timeout`, `bot_login`)
+- [x] Engine detects `AskUserQuestion` in `permission_denials` after agent node completes
+- [x] Engine saves `session_id`, `question_json`, status `waiting` to `state.json`
+- [x] Engine invokes `ask_script` with `--repo`, `--issue`, `--run-id`, `--node-id`,
+      `--question-json` args
+- [x] Engine enters poll loop: `sleep(poll_interval)` → `check_script` → exit 0 = reply in stdout
+- [x] On reply: engine resumes agent via `claude --resume <session_id> -p "<reply>"`
+- [x] Configurable `poll_interval` (default 60s) and `timeout` (default 7200s) in `pipeline.yaml`
+- [x] On timeout: node marked `failed`, Meta-Agent triggered (existing mechanism)
+- [x] `deno task run --resume <run-id>` on pipeline with `waiting` node auto-enters poll loop
+- [x] `hitl-ask.sh` renders question JSON → markdown with HTML marker, posts via `gh issue comment`
+- [x] `hitl-check.sh` finds first non-bot comment after marker, outputs body (exit 0) or exit 1
 - [x] `deno task check` passes
-- [x] FR-8 updated: scope check removed, gitleaks in `check`, future safety req
-- [x] FR-14 updated: commits at explicit committer agent nodes
+- [x] SRS §3.21 all `[ ]` ACs marked `[x]` with evidence
 
-## Solution (Variant D+: Committer Agent + Safety Cleanup)
+## Solution (Variant B: Extracted `hitl.ts` Module)
 
-### Step 1: Create committer agent
+### Architecture sequence
 
-**`agents/committer/SKILL.md`:**
-```markdown
-# Role: Committer
-Stage all changes and commit with a concise, meaningful message.
-## Rules
-- Run `git add -A`
-- If no staged changes: output "Nothing to commit" and exit
-- Write commit message: `sdlc(<phase>): <summary of changes>`
-- `<phase>` = value of SDLC_PHASE env var (e.g., "plan", "impl", "present")
-- `<summary>` = brief description based on `git diff --cached --stat`
-- Run `git commit -m "<message>"`
-- Output the commit hash
+```
+executeAgentNode()
+  → runAgent() → AgentResult{permission_denials?}
+    → detectHitlRequest() → HitlQuestion found
+      → markNodeWaiting(sessionId, questionJson) + saveState()
+      → runHitlLoop(skipAsk=false)
+          → ask_script (gh issue comment)
+          → poll: sleep → check_script → reply? → invokeClaudeCli(--resume)
+          → timeout → AgentResult{success:false}
+  → resume (wasWaiting=true) → runHitlLoop(skipAsk=true)
+      → skip ask_script → poll → resume agent
 ```
 
-### Step 2: Remove auto-commit from engine
+### Step 1 — RED: failing tests
 
-**`engine.ts`:**
-- Delete `await this.commitIfNeeded(nodeId, node)` (line 251)
-- Delete `commitIfNeeded()` method (lines 527-551)
+**`hitl_test.ts`** (new):
+- `detectHitlRequest()`: null when no `permission_denials`; null when no
+  AskUserQuestion entry; `HitlQuestion` when AskUserQuestion present
+- `runHitlLoop()`: ask invoked with correct args; poll exits on check exit-0;
+  timeout returns failure; `skipAsk=true` skips ask invocation
+- Tests use injected `scriptRunner` stub (see Step 5) — no real shell invocations
 
-### Step 3: Remove safety check entirely
+**`state_test.ts`** additions:
+- `markNodeWaiting()`: sets status=`waiting`, `session_id`, `question_json`
 
-**`engine.ts`:**
-- Remove safety check continuation loop (lines 307-396)
-- Remove all `allowed_paths` / `safetyCheckDiff` references
+**`agent_test.ts`** additions:
+- `AgentResult.permission_denials` populated from `ClaudeCliOutput`
 
-**`git.ts`:**
-- Delete `safetyCheckDiff()` (lines 74-133)
-- Delete `SafetyCheckResult` interface (lines 19-24)
-- Delete `runGitleaks()` + `GitleaksResult` (lines 169-217)
-- Keep: `commitNodeChanges()`, `getCurrentBranch()`, `branch()`, `pushToOrigin()`
+### Step 2 — types.ts
 
-**`types.ts`:**
-- Remove `allowed_paths?: string[]` from `NodeConfig`
+```typescript
+export interface PermissionDenial {
+  tool_name: string;
+  tool_input: Record<string, unknown>;
+}
+// ClaudeCliOutput: add field
+permission_denials?: PermissionDenial[];
+// NodeStatus: add "waiting" to union
+// NodeState: add field
+question_json?: string;   // serialized HitlQuestion; set when status=waiting
+// New interface:
+export interface HitlConfig {
+  ask_script: string;
+  check_script: string;
+  poll_interval: number;  // seconds between polls, default 60
+  timeout: number;        // max wait seconds, default 7200
+  bot_login?: string;     // login to exclude in hitl-check.sh
+}
+// PipelineDefaults: add field
+hitl?: HitlConfig;
+```
 
-**`config.ts`:**
-- Remove `allowed_paths` validation if any
+### Step 3 — state.ts
 
-**Pipeline YAML:**
-- Remove `allowed_paths` from all nodes
+Add `markNodeWaiting()`:
+```typescript
+export function markNodeWaiting(
+  state: RunState, nodeId: string,
+  sessionId: string, questionJson: string,
+): void {
+  updateNodeState(state, nodeId, {
+    status: "waiting", session_id: sessionId, question_json: questionJson,
+  });
+}
+```
 
-### Step 4: Add gitleaks to `scripts/check.ts`
+### Step 4 — agent.ts
 
-**`scripts/check.ts`:**
-- Add gitleaks step after lint, before tests:
-  `await run("gitleaks", ["detect", "--no-git"], "Secret Scan", true)`
-- `allowFailure=true` — skip if gitleaks binary not found (CI may not have it)
+- Add `permission_denials?: PermissionDenial[]` to `AgentResult` interface
+- In `runAgent()` success return: include
+  `permission_denials: result.output?.permission_denials`
 
-### Step 5: Update executor prompt
+### Step 5 — hitl.ts (new file)
 
-**`agents/executor/SKILL.md`:**
-- Remove: "Commit per task: Each task from 04-decision.md gets its own commit"
-- Remove: "Commit incrementally" from responsibilities
-- Add rule: "DO NOT make git commits. All commits are managed by the pipeline."
+Exports:
+```typescript
+export interface HitlQuestion {
+  question: string; header?: string;
+  options?: Array<{ label: string; description?: string }>;
+  multiSelect?: boolean;
+}
+export interface HitlRunOptions {
+  config: HitlConfig; nodeId: string; runId: string;
+  args: Record<string,string>; env: Record<string,string>;
+  sessionId: string; question: HitlQuestion;
+  node: NodeConfig; ctx: TemplateContext; settings: Required<NodeSettings>;
+  claudeArgs?: string[]; output?: OutputManager;
+  /** Injected script runner — defaults to real shell; override in tests. */
+  scriptRunner?: (path: string, args: string[]) => Promise<{exitCode: number; stdout: string}>;
+}
+export function detectHitlRequest(output: ClaudeCliOutput): HitlQuestion | null
+export async function runHitlLoop(
+  opts: HitlRunOptions, skipAsk?: boolean
+): Promise<AgentResult>
+```
 
-### Step 6: Update pipeline YAML
+`runHitlLoop` flow:
+1. `!skipAsk` → invoke `ask_script` via shell with args:
+   `--repo ${env.GITHUB_REPO||""} --issue ${args.issue||""} --run-id ${runId}`
+   `--node-id ${nodeId} --question-json <JSON>`
+2. Poll (`deadline = Date.now() + config.timeout * 1000`):
+   - `output?.status(nodeId, "WAITING for human reply (${elapsed}s elapsed)")` — visible in terminal
+   - `sleep(config.poll_interval * 1000)`
+   - invoke `check_script` with `--repo --issue --run-id --node-id --bot-login`
+   - exit 0 → read stdout as reply → break loop
+   - exit 1 → no reply yet → continue
+   - other exit → log warning + continue (transient error)
+3. reply → `invokeClaudeCli({ resumeSessionId: sessionId, taskPrompt: reply, ... })`
+   → return `AgentResult` from resumed invocation
+4. deadline exceeded → `{ success: false, continuations: 0, error: "HITL timeout after Xs" }`
 
-**`pipeline.yaml` + `pipeline-task.yaml`:** add 3 committer agent nodes:
+Internal `runScript(path, args): Promise<{exitCode, stdout}>` — shared by ask + check.
 
+### Step 6 — engine.ts
+
+**`executeNode()`** — capture status before overwrite:
+```typescript
+const wasWaiting = this.state.nodes[nodeId]?.status === "waiting";
+markNodeStarted(this.state, nodeId);  // only sets status+started_at; preserves session_id+question_json
+// in switch:
+case "agent": success = await this.executeAgentNode(nodeId, node, wasWaiting);
+```
+Safety: `markNodeStarted()` only mutates `status` and `started_at` — `session_id` and `question_json`
+survive on `NodeState`. Pre-capture of `wasWaiting` before `markNodeStarted()` is the only fix needed.
+
+**`executeAgentNode(nodeId, node, wasWaiting=false)`** signature extended:
+
+- **Normal path** (`!wasWaiting`): run `runAgent()` → call `detectHitlRequest(result.output)`:
+  - question found → `markNodeWaiting()` + `saveState()` → `runHitlLoop(opts, false)`
+  - no question → proceed as before
+- **Resume path** (`wasWaiting`): read `nodeState.session_id` + `nodeState.question_json`
+  → `runHitlLoop(opts, true /* skipAsk */)`
+- Both paths: `!result.success` → `markNodeFailed()`; success → save log
+
+If HITL detected but `defaults.hitl` absent: throw immediately — fail fast.
+
+### Step 7 — config.ts
+
+In `extractNodeSettings()`: destructure `hitl` out alongside `max_parallel` and
+`claude_args` to prevent it leaking into per-node `NodeSettings`.
+No schema validation needed — `hitl` is optional; missing = HITL disabled.
+
+### Step 8 — hitl-ask.sh (`.sdlc/scripts/hitl-ask.sh`)
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+# Parse args: --repo --issue --run-id --node-id --question-json
+# If REPO empty: REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+# Render via jq: header + blockquoted question + numbered options + HTML marker
+# Marker line: <!-- hitl:<RUN_ID>:<NODE_ID> -->
+# Post: gh issue comment "$ISSUE" --repo "$REPO" --body "$MARKDOWN"
+```
+
+Output markdown format:
+```
+**Agent `<node-id>` is waiting for your input**
+
+> <question>
+
+1. **<label>** — <description>
+
+_Reply with a comment below._
+<!-- hitl:<run-id>:<node-id> -->
+```
+
+### Step 9 — hitl-check.sh (`.sdlc/scripts/hitl-check.sh`)
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+# Parse: --repo --issue --run-id --node-id --bot-login
+# MARKER="<!-- hitl:${RUN_ID}:${NODE_ID} -->"
+# gh api "repos/${REPO}/issues/${ISSUE}/comments" --paginate \
+#   | jq -s "add"  ← REQUIRED: --paginate emits one array per page; -s merges into single array
+#   | jq: find marker comment → first subsequent where .user.login != BOT_LOGIN
+# Found: echo body; exit 0   Not found: exit 1
+```
+
+### Step 10 — pipeline.yaml + pipeline-task.yaml
+
+Add to `defaults`:
 ```yaml
-  commit-plan:
-    type: agent
-    label: "Commit planning artifacts"
-    prompt: agents/committer/SKILL.md
-    inputs: [sds-update]
-    env:
-      SDLC_PHASE: plan
-  impl-loop:
-    inputs: [commit-plan]    # was: [sds-update]
-  commit-impl:
-    type: agent
-    label: "Commit implementation"
-    prompt: agents/committer/SKILL.md
-    inputs: [impl-loop]
-    env:
-      SDLC_PHASE: impl
-  presenter:
-    inputs: [commit-impl]    # was: [impl-loop]
-  commit-present:
-    type: agent
-    label: "Commit presentation artifacts"
-    prompt: agents/committer/SKILL.md
-    inputs: [presenter]
-    env:
-      SDLC_PHASE: present
-  meta-agent:
-    run_always: true         # unchanged
+defaults:
+  hitl:
+    ask_script: .sdlc/scripts/hitl-ask.sh
+    check_script: .sdlc/scripts/hitl-check.sh
+    poll_interval: 60
+    timeout: 7200
+    bot_login: "github-actions[bot]"
 ```
 
-### Step 7: Tests (TDD)
+### Step 11 — GREEN + REFACTOR + CHECK
 
-**RED:**
-- DAG: topological sort with new commit nodes in graph
-- Safety: no tests (removed)
+`deno task check` → fix all errors/warnings; confirm all tests pass.
 
-**GREEN:** implement steps 2-6
+### Step 12 — SRS + SDS update
 
-**REMOVE:**
-- Tests asserting commit after agent node
-- Tests for `safetyCheckDiff()` scope logic
-- Tests for `commitIfNeeded()`
-
-### Step 8: SRS update
-
-- FR-14: "Commits via dedicated committer agent nodes, not per-stage"
-- FR-8: remove scope check, note gitleaks in `deno task check`, add future req
-  `[ ]` "simplified safety checks via git diff + file hash"
-- Section 5: update commit strategy description
+Mark all FR-21 `[ ]` ACs `[x]` with `file.ts:line` evidence.
+Update `design.md` §3.7 evidence refs.
 
 ### Execution order
 
-1. agents/committer/SKILL.md (new agent prompt)
-2. Tests RED
-3. engine.ts (remove auto-commit + safety loop)
-4. git.ts (delete safety/gitleaks functions)
-5. types.ts (remove `allowed_paths`)
-6. config.ts (remove `allowed_paths` validation)
-7. scripts/check.ts (add gitleaks step)
-8. Tests GREEN
-9. agents/executor/SKILL.md (no-commit rule)
-10. pipeline.yaml + pipeline-task.yaml (committer nodes, remove allowed_paths)
-11. `deno task check`
-12. SRS (FR-8, FR-14)
+1. `hitl_test.ts` + state/agent test additions (RED)
+2. `types.ts`
+3. `state.ts` (`markNodeWaiting`)
+4. `agent.ts` (`permission_denials` in `AgentResult`)
+5. `hitl.ts` (GREEN)
+6. `engine.ts` (`wasWaiting` flag + HITL branch in `executeAgentNode`)
+7. `config.ts` (`hitl` exclusion in `extractNodeSettings`)
+8. `deno task check` — GREEN
+9. `hitl-ask.sh` + `hitl-check.sh`
+10. `pipeline.yaml` + `pipeline-task.yaml`
+11. `deno task check` — final
+12. `requirements.md` + `design.md` (evidence)

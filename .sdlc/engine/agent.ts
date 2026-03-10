@@ -2,6 +2,7 @@ import type {
   ClaudeCliOutput,
   NodeConfig,
   NodeSettings,
+  PermissionDenial,
   TemplateContext,
 } from "./types.ts";
 import { interpolate } from "./template.ts";
@@ -20,6 +21,7 @@ export interface AgentResult {
   output?: ClaudeCliOutput;
   continuations: number;
   error?: string;
+  permission_denials?: PermissionDenial[];
 }
 
 /** Options for running an agent. */
@@ -188,6 +190,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
     session_id: result.output?.session_id,
     output: result.output,
     continuations,
+    permission_denials: result.output?.permission_denials,
   };
 }
 

@@ -19,6 +19,7 @@ import {
   markNodeFailed,
   markNodeSkipped,
   markNodeStarted,
+  markNodeWaiting,
   markRunAborted,
   markRunCompleted,
   markRunFailed,
@@ -26,6 +27,7 @@ import {
 } from "./state.ts";
 import { runAgent } from "./agent.ts";
 import { saveAgentLog } from "./log.ts";
+import { detectHitlRequest, runHitlLoop } from "./hitl.ts";
 import { runLoop } from "./loop.ts";
 import { runHuman, terminalInput } from "./human.ts";
 import type { UserInput } from "./human.ts";
@@ -210,6 +212,8 @@ export class Engine {
   /** Execute a single node based on its type. Returns true on success. */
   private async executeNode(nodeId: string): Promise<boolean> {
     const node = this.config.nodes[nodeId];
+    // Capture waiting state before markNodeStarted overwrites status
+    const wasWaiting = this.state.nodes[nodeId]?.status === "waiting";
     markNodeStarted(this.state, nodeId);
     await saveState(this.state);
 
@@ -225,7 +229,7 @@ export class Engine {
 
       switch (node.type) {
         case "agent":
-          success = await this.executeAgentNode(nodeId, node);
+          success = await this.executeAgentNode(nodeId, node, wasWaiting);
           break;
         case "merge":
           success = await this.executeMergeNode(nodeId, node);
@@ -266,10 +270,68 @@ export class Engine {
   private async executeAgentNode(
     nodeId: string,
     node: NodeConfig,
+    wasWaiting = false,
   ): Promise<boolean> {
     const ctx = this.buildContext(nodeId);
     const settings = node.settings as Required<NodeSettings>;
+    const hitlConfig = this.config.defaults?.hitl;
 
+    // Resume path: node was waiting for human reply
+    if (wasWaiting) {
+      const nodeState = this.state.nodes[nodeId];
+      if (!nodeState.session_id || !nodeState.question_json) {
+        markNodeFailed(
+          this.state,
+          nodeId,
+          "Waiting node missing session_id or question_json",
+        );
+        return false;
+      }
+      if (!hitlConfig) {
+        markNodeFailed(
+          this.state,
+          nodeId,
+          "HITL detected but defaults.hitl not configured in pipeline.yaml",
+        );
+        return false;
+      }
+
+      const question = JSON.parse(nodeState.question_json);
+      const hitlResult = await runHitlLoop({
+        config: hitlConfig,
+        nodeId,
+        runId: this.state.run_id,
+        args: this.state.args,
+        env: this.state.env,
+        sessionId: nodeState.session_id,
+        question,
+        node,
+        ctx,
+        settings,
+        claudeArgs: this.config.defaults?.claude_args,
+        output: this.output,
+      }, true /* skipAsk — question already delivered */);
+
+      if (!hitlResult.success) {
+        markNodeFailed(
+          this.state,
+          nodeId,
+          hitlResult.error ?? "HITL resume failed",
+        );
+        return false;
+      }
+
+      if (hitlResult.session_id) {
+        this.state.nodes[nodeId].session_id = hitlResult.session_id;
+      }
+      if (hitlResult.output) {
+        const runDir = getRunDir(this.state.run_id);
+        await saveAgentLog(runDir, nodeId, hitlResult.output);
+      }
+      return true;
+    }
+
+    // Normal path: run agent
     // Verbose: resolve and show input artifacts
     const inputArtifacts = await resolveInputArtifacts(ctx.input);
     this.output.verboseInputs(nodeId, inputArtifacts);
@@ -286,6 +348,63 @@ export class Engine {
     if (!result.success) {
       markNodeFailed(this.state, nodeId, result.error ?? "Agent failed");
       return false;
+    }
+
+    // Check for HITL request in permission_denials
+    if (result.output) {
+      const hitlQuestion = detectHitlRequest(result.output);
+      if (hitlQuestion) {
+        // Fail fast if hitl config absent
+        if (!hitlConfig) {
+          markNodeFailed(
+            this.state,
+            nodeId,
+            "Agent requested HITL (AskUserQuestion) but defaults.hitl not configured in pipeline.yaml",
+          );
+          return false;
+        }
+
+        const sessionId = result.output.session_id;
+        const questionJson = JSON.stringify(hitlQuestion);
+
+        // Mark node as waiting and persist
+        markNodeWaiting(this.state, nodeId, sessionId, questionJson);
+        await saveState(this.state);
+
+        // Enter HITL poll loop
+        const hitlResult = await runHitlLoop({
+          config: hitlConfig,
+          nodeId,
+          runId: this.state.run_id,
+          args: this.state.args,
+          env: this.state.env,
+          sessionId,
+          question: hitlQuestion,
+          node,
+          ctx,
+          settings,
+          claudeArgs: this.config.defaults?.claude_args,
+          output: this.output,
+        }, false /* skipAsk=false — deliver question */);
+
+        if (!hitlResult.success) {
+          markNodeFailed(
+            this.state,
+            nodeId,
+            hitlResult.error ?? "HITL failed",
+          );
+          return false;
+        }
+
+        if (hitlResult.session_id) {
+          this.state.nodes[nodeId].session_id = hitlResult.session_id;
+        }
+        if (hitlResult.output) {
+          const runDir = getRunDir(this.state.run_id);
+          await saveAgentLog(runDir, nodeId, hitlResult.output);
+        }
+        return true;
+      }
     }
 
     if (result.session_id) {

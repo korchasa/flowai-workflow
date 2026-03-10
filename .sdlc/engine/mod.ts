@@ -3,10 +3,12 @@
 export type {
   ClaudeCliOutput,
   EngineOptions,
+  HitlConfig,
   NodeConfig,
   NodeSettings,
   NodeState,
   NodeStatus,
+  PermissionDenial,
   PipelineConfig,
   PipelineDefaults,
   RunState,
@@ -30,6 +32,9 @@ export {
 } from "./state.ts";
 export { runAgent } from "./agent.ts";
 export type { AgentResult } from "./agent.ts";
+export { detectHitlRequest, runHitlLoop } from "./hitl.ts";
+export type { HitlQuestion, HitlRunOptions } from "./hitl.ts";
+export { markNodeWaiting } from "./state.ts";
 export { saveAgentLog } from "./log.ts";
 export { extractFrontmatterField, runLoop } from "./loop.ts";
 export type { LoopResult } from "./loop.ts";
