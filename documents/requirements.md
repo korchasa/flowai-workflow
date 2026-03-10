@@ -213,16 +213,10 @@
   - **Session persistence:**
     - [x] The `--resume` flag ensures the agent retains full conversation context from the initial invocation. Evidence: `.sdlc/engine/agent.ts:208-230` (`--resume` flag in `buildClaudeArgs`)
     - [x] Each continuation adds only the validation error to the context, not the full prompt. Evidence: `.sdlc/engine/agent.ts:94-97` (resume prompt = failures only)
-  - **Diff-based safety checks (all stages that modify files):**
-    - After each agent exit, the engine runs `git diff` and checks for:
-      - [x] Modifications to files outside the expected scope. Each stage defines an allowlist of files/paths it may modify (configured in `pipeline.yaml` per node via `allowed_paths`). Evidence: `.sdlc/engine/git.ts:56-104` (`safetyCheckDiff` with `allowedPaths` prefix matching)
-        - Per-stage allowlists defined in `.sdlc/pipeline.yaml` per node.
-        - **Executor (Stage 6):** file allowlist extracted from `04-decision.md` YAML frontmatter via `yq --front-matter=extract '.tasks[].files[]' 04-decision.md`, plus always-allowed paths: `.sdlc/pipeline/<issue-number>/`. Explicitly forbidden: `agents/`, `.sdlc/scripts/`, `.sdlc/engine/`, `CLAUDE.md`.
-      - [ ] Deletion of files not mentioned in the task breakdown (Executor only).
-      - Secrets detection in committed code (all stages):
-        - [x] Primary: `gitleaks detect --no-git --staged` (included in devcontainer, see FR-12). Evidence: `.sdlc/engine/git.ts:179-216` (`runGitleaks()`), `.sdlc/engine/git.ts:108-126` (integration in `safetyCheckDiff()`)
-        - [x] Fallback regex: `(?i)(api[_-]?key|secret|token|password|credential)\s*[:=]\s*['"][^'"]{8,}`. Evidence: `.sdlc/engine/git.ts:92-95`
-    - [x] If a safety violation is detected: continuation is triggered with a description of the violation, asking the agent to revert the problematic changes. Evidence: `.sdlc/engine/engine.ts:307-395` (safety-continuation loop in `executeAgentNode()`)
+  - **Secret detection (moved to `deno task check`):**
+    - [x] `gitleaks detect --no-git` runs as part of `scripts/check.ts` (after lint, before tests). `allowFailure=true` — skips if gitleaks binary not found. Evidence: `scripts/check.ts:87`
+    - Scope check (`allowed_paths`) and engine-level `safetyCheckDiff()` removed. Rationale: engine no longer commits per-node; scope enforcement via agent prompts and QA validation.
+    - [ ] Future: simplified safety checks via `git diff` + file hash comparison
   - **Stage script responsibilities (legacy path — `.sdlc/scripts/`):**
     - [x] Legacy shell implementation in `lib.sh`: `continuation_loop()`, `safety_check_diff()`, `run_agent()`, `retry_with_backoff()`. Evidence: `.sdlc/scripts/lib.sh:59-233`
 - **Quality metrics:**
@@ -339,18 +333,20 @@
   - Claude CLI's built-in context auto-compression handles large input sets; no manual context management is required.
 - **Commit strategy:**
   - All pipeline work happens on a dedicated feature branch `agent/<run-id>`.
-  - Engine commits after each successful node. Legacy scripts commit + push after each stage.
-  - Each commit message follows the format: `sdlc(<node-id>): <run-id> — <brief description>`.
-  - Commit includes: stage output artifact(s), updated project documents (if any), and the stage log.
-  - If a stage fails after exhausting continuations, the partial work is NOT committed.
+  - Engine does NOT auto-commit after nodes. Commits happen at explicit committer agent nodes (`agents/committer/SKILL.md`).
+  - Three committer nodes in pipeline: `commit-plan` (after planning stages), `commit-impl` (after executor+QA loop), `commit-present` (after presenter).
+  - Each commit message follows the format: `sdlc(<phase>): <summary of changes>`.
+  - Executor agent is instructed NOT to make git commits.
+  - Legacy scripts commit + push after each stage (unchanged).
 - **Branch lifecycle:**
   - Branch is created at the start of Stage 1 (or checked out if it already exists from a previous run).
   - On re-run, existing branch is reused — new commits overwrite previous artifacts (previous versions preserved in git history per FR-13).
   - Branch is merged via PR created by the Presenter (Stage 8).
 - **Acceptance criteria:**
-  - Engine/script validates output artifacts before committing.
-  - Every successful stage results in exactly one commit on `agent/<run-id>`.
-  - Failed stages produce no commits.
+  - [x] Engine does NOT auto-commit after any node. Evidence: `engine.ts` — `commitIfNeeded()` removed
+  - [x] Committer agent created. Evidence: `agents/committer/SKILL.md`
+  - [x] Three committer nodes in pipeline YAML. Evidence: `.sdlc/pipeline.yaml` — `commit-plan`, `commit-impl`, `commit-present`
+  - [x] Executor prompt forbids commits. Evidence: `agents/executor/SKILL.md:14,39`
   - Branch is created/reused automatically by the pipeline.
 
 ### 3.15 FR-15: Configuration
@@ -437,7 +433,7 @@
 - **Pipeline engine:** Deno/TypeScript engine (`.sdlc/engine/`) reads DAG config from `.sdlc/pipeline.yaml`, resolves node dependencies, executes nodes in topological order, manages state in `.sdlc/runs/<run-id>/state.json`.
 - **Legacy stage scripts:** `.sdlc/scripts/stage-<N>-<role>.sh` — handle invocation, validation, continuation, artifact commit. Superseded by engine but preserved.
 - **Inter-stage communication:** Engine: artifacts in `.sdlc/runs/<run-id>/<node-id>/`, linked via templates. Legacy: `.sdlc/pipeline/<issue-number>/`. Filesystem is source of truth.
-- **Branching & commits:** All work on branch `agent/<run-id>`. One commit per successful stage. Commit format: `sdlc(<node-id>): <run-id> — <description>`. Failed stages produce no commits.
+- **Branching & commits:** All work on branch `agent/<run-id>`. Commits at dedicated committer agent nodes (not per-stage). Commit format: `sdlc(<phase>): <summary>`. Failed stages produce no commits.
 
 ## 6. Acceptance criteria
 
@@ -480,10 +476,12 @@ agents/                                  # Agent system prompts (versioned, SKIL
   qa/SKILL.md
   presenter/SKILL.md
   meta-agent/SKILL.md
+  committer/SKILL.md
 .claude/skills/                          # Symlinks for Claude Code skill discovery
   agent-pm -> ../../agents/pm/
   agent-tech-lead -> ../../agents/tech-lead/
-  ...                                    # (9 symlinks total)
+  agent-committer -> ../../agents/committer/
+  ...                                    # (10 symlinks total)
 .sdlc/
   scripts/                             # Stage orchestration scripts
     lib.sh                             # Shared functions (logging, continuation loop, git ops)

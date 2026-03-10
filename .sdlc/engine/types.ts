@@ -29,7 +29,6 @@ export interface NodeConfig {
   // agent-specific
   prompt?: string;
   task_template?: string;
-  allowed_paths?: string[];
 
   // common
   settings?: NodeSettings;

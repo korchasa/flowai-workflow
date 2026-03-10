@@ -1,7 +1,7 @@
 /**
  * Git operations for the pipeline engine.
- * - Commit per node
- * - Diff-based safety checks (out-of-scope modifications, secret detection)
+ * - Commit per node (used by committer agent nodes)
+ * - Branch management
  */
 
 /** Result of a git commit operation. */
@@ -13,14 +13,6 @@ export interface CommitResult {
   filesStaged: string[];
   /** Commit message used. */
   message: string;
-}
-
-/** Result of a safety check. */
-export interface SafetyCheckResult {
-  safe: boolean;
-  violations: string[];
-  /** Files found in the diff (exposed for verbose output). */
-  checkedFiles: string[];
 }
 
 /** Commit all changes with a node-specific message. */
@@ -66,72 +58,6 @@ export async function commitNodeChanges(
   }
 }
 
-/**
- * Check git diff for safety violations:
- * 1. Out-of-scope file modifications
- * 2. Secret-like patterns in diff content
- */
-export async function safetyCheckDiff(
-  allowedPaths: string[],
-): Promise<SafetyCheckResult> {
-  const violations: string[] = [];
-
-  // Get changed files
-  let changedFiles: string[];
-  try {
-    const diffOutput = await runGit(["diff", "--name-only", "HEAD"]);
-    const stagedOutput = await runGit(["diff", "--name-only", "--cached"]);
-    const combined = `${diffOutput}\n${stagedOutput}`.trim();
-    changedFiles = combined ? combined.split("\n").filter(Boolean) : [];
-  } catch {
-    // No HEAD commit yet or no changes
-    return { safe: true, violations: [], checkedFiles: [] };
-  }
-
-  if (changedFiles.length === 0) {
-    return { safe: true, violations: [], checkedFiles: [] };
-  }
-
-  // Skip scope check if no allowed paths configured
-  if (allowedPaths.length > 0) {
-    for (const file of changedFiles) {
-      const allowed = allowedPaths.some(
-        (pattern) => file === pattern || file.startsWith(pattern),
-      );
-      if (!allowed) {
-        violations.push(`Out-of-scope modification: ${file}`);
-      }
-    }
-  }
-
-  // Check for secrets: gitleaks CLI primary, regex fallback
-  const gitleaksResult = await runGitleaks();
-  if (gitleaksResult.warning) {
-    console.warn(`[engine] ${gitleaksResult.warning}`);
-  }
-  if (gitleaksResult.detected) {
-    violations.push("Potential secret detected by gitleaks");
-  } else if (gitleaksResult.usedFallback) {
-    // Gitleaks not available — use regex fallback
-    try {
-      const diffContent = await runGit(["diff", "HEAD"]);
-      const secretPattern =
-        /(?:api[_-]?key|secret|token|password|credential)\s*[:=]\s*['"][^'"]{8,}/i;
-      if (secretPattern.test(diffContent)) {
-        violations.push("Potential secret detected in diff content");
-      }
-    } catch {
-      // Ignore diff read errors
-    }
-  }
-
-  return {
-    safe: violations.length === 0,
-    violations,
-    checkedFiles: changedFiles,
-  };
-}
-
 /** Get the current branch name. */
 export async function getCurrentBranch(): Promise<string> {
   return (await runGit(["rev-parse", "--abbrev-ref", "HEAD"])).trim();
@@ -164,56 +90,6 @@ export async function pushToOrigin(
   }
 
   throw new Error(`Git push failed after ${maxRetries} attempts: ${lastError}`);
-}
-
-/** Result of running gitleaks. */
-export interface GitleaksResult {
-  /** True if secrets were detected. */
-  detected: boolean;
-  /** True if gitleaks binary was not found and regex fallback should be used. */
-  usedFallback: boolean;
-  /** Warning message (e.g., binary not found). */
-  warning?: string;
-}
-
-/**
- * Run gitleaks to detect secrets in working directory.
- * Uses --no-git to scan files directly; .gitleaks.toml auto-discovered from CWD.
- * Returns structured result: detected flag, fallback flag, optional warning.
- * On ENOENT (binary not found): returns usedFallback=true with warning.
- */
-export async function runGitleaks(): Promise<GitleaksResult> {
-  try {
-    const cmd = new Deno.Command("gitleaks", {
-      args: ["detect", "--no-git"],
-      stdout: "piped",
-      stderr: "piped",
-    });
-    const output = await cmd.output();
-
-    // Exit 0 = clean, non-zero = leak found
-    return {
-      detected: !output.success,
-      usedFallback: false,
-    };
-  } catch (err) {
-    if (err instanceof Deno.errors.NotFound) {
-      return {
-        detected: false,
-        usedFallback: true,
-        warning:
-          "gitleaks binary not found, falling back to regex secret detection",
-      };
-    }
-    // Other errors (permission, etc.) — fall back with warning
-    return {
-      detected: false,
-      usedFallback: true,
-      warning: `gitleaks failed: ${
-        (err as Error).message
-      }, falling back to regex`,
-    };
-  }
 }
 
 // --- Internal helpers ---

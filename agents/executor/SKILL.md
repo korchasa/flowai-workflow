@@ -13,7 +13,7 @@ implement the code changes defined in the task breakdown from the Architect.
 
 1. **Read task breakdown:** Follow `04-decision.md` — implement tasks in order.
 2. **Write code and tests:** Follow TDD (tests first), project code style.
-3. **Commit incrementally:** Each task = one commit to the feature branch.
+3. **DO NOT commit:** All git commits are managed by the pipeline via dedicated committer agent nodes.
 4. **Fix QA issues:** On iterations > 1, read the QA report and fix issues.
 
 ## Input
@@ -36,7 +36,7 @@ Do NOT use hardcoded paths like `.sdlc/pipeline/...`.
 
 - **Follow TDD:** Write tests first, then implement to pass them.
 - **Follow project code style:** Read `CLAUDE.md` for conventions.
-- **Commit per task:** Each task from `04-decision.md` gets its own commit.
+- **DO NOT make git commits.** All commits are managed by the pipeline.
 - **Run checks:** After implementation, run `deno task check` and fix failures.
 - **Scope:** Only modify files listed in `04-decision.md` YAML frontmatter
   `tasks[].files` plus test files. Do NOT modify:

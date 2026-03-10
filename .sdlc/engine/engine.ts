@@ -8,7 +8,6 @@ import type {
 } from "./types.ts";
 import { loadConfig } from "./config.ts";
 import { buildLevels } from "./dag.ts";
-import { interpolate } from "./template.ts";
 import {
   createRunState,
   generateRunId,
@@ -25,12 +24,11 @@ import {
   markRunFailed,
   saveState,
 } from "./state.ts";
-import { invokeClaudeCli, runAgent } from "./agent.ts";
+import { runAgent } from "./agent.ts";
 import { saveAgentLog } from "./log.ts";
 import { runLoop } from "./loop.ts";
 import { runHuman, terminalInput } from "./human.ts";
 import type { UserInput } from "./human.ts";
-import { branch, commitNodeChanges, safetyCheckDiff } from "./git.ts";
 import { OutputManager } from "./output.ts";
 import type { RunSummary, VerboseInput } from "./output.ts";
 
@@ -246,9 +244,6 @@ export class Engine {
         markNodeCompleted(this.state, nodeId);
         const duration = this.state.nodes[nodeId].duration_ms ?? 0;
         this.output.nodeCompleted(nodeId, duration);
-
-        // Git commit if there are changes
-        await this.commitIfNeeded(nodeId, node);
       } else {
         const error = this.state.nodes[nodeId].error ?? "Unknown error";
         this.output.nodeFailed(nodeId, error);
@@ -302,97 +297,6 @@ export class Engine {
     if (result.output) {
       const runDir = getRunDir(this.state.run_id);
       await saveAgentLog(runDir, nodeId, result.output);
-    }
-
-    // Safety check with continuation support
-    if (node.allowed_paths && node.allowed_paths.length > 0) {
-      const resolvedPaths = node.allowed_paths.map((p) => {
-        try {
-          return interpolate(p, ctx);
-        } catch {
-          return p;
-        }
-      });
-
-      let continuations = result.continuations;
-      const maxContinuations = settings.max_continuations;
-      let sessionId = result.session_id;
-
-      // Safety-continuation loop: re-invoke agent on violations
-      while (true) {
-        const safetyResult = await safetyCheckDiff(resolvedPaths);
-
-        // Verbose: show safety check results
-        this.output.verboseSafety(
-          nodeId,
-          safetyResult.checkedFiles,
-          safetyResult.violations,
-        );
-
-        if (safetyResult.safe) break;
-
-        // Continuations exhausted — fail the node
-        if (continuations >= maxContinuations) {
-          markNodeFailed(
-            this.state,
-            nodeId,
-            `Safety violations after ${continuations} continuations: ${
-              safetyResult.violations.join("; ")
-            }`,
-          );
-          return false;
-        }
-
-        // No session to resume — fail
-        if (!sessionId) {
-          markNodeFailed(
-            this.state,
-            nodeId,
-            `Safety violations (no session_id for continuation): ${
-              safetyResult.violations.join("; ")
-            }`,
-          );
-          return false;
-        }
-
-        continuations++;
-        const resumePrompt =
-          `Safety check violations detected (continuation ${continuations}/${maxContinuations}):\n${
-            safetyResult.violations.join("\n")
-          }\nRevert the problematic changes and fix the issues.`;
-
-        // Verbose: show continuation context
-        this.output.verboseContinuation(
-          nodeId,
-          continuations,
-          maxContinuations,
-          safetyResult.violations,
-        );
-
-        const resumeResult = await invokeClaudeCli({
-          resumeSessionId: sessionId,
-          taskPrompt: resumePrompt,
-          claudeArgs: this.config.defaults?.claude_args,
-          timeoutSeconds: settings.timeout_seconds,
-          maxRetries: settings.max_retries,
-          retryDelaySeconds: settings.retry_delay_seconds,
-        });
-
-        if (resumeResult.error) {
-          markNodeFailed(
-            this.state,
-            nodeId,
-            `Safety continuation failed: ${resumeResult.error}`,
-          );
-          return false;
-        }
-
-        if (resumeResult.output?.session_id) {
-          sessionId = resumeResult.output.session_id;
-        }
-      }
-
-      this.state.nodes[nodeId].continuations = continuations;
     }
 
     return true;
@@ -520,33 +424,6 @@ export class Engine {
           });
         }
       }
-    }
-  }
-
-  /** Commit changes after a node completes successfully. */
-  private async commitIfNeeded(
-    nodeId: string,
-    node: NodeConfig,
-  ): Promise<void> {
-    // Only commit for nodes that may produce file changes
-    if (node.type === "merge" || node.type === "human") return;
-
-    const result = await commitNodeChanges(
-      nodeId,
-      this.state.run_id,
-      node.label,
-    );
-    if (!result.success) {
-      this.output.warn(`Git commit for ${nodeId}: ${result.error}`);
-    } else if (result.filesStaged.length > 0) {
-      // Verbose: show commit details
-      const currentBranch = await branch().catch(() => "unknown");
-      this.output.verboseCommit(
-        nodeId,
-        result.filesStaged,
-        result.message,
-        currentBranch,
-      );
     }
   }
 

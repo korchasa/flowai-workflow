@@ -1,234 +1,199 @@
-# Roadmap: FR Implementation Plan
+# Deferred Commit Strategy
 
 ## Goal
 
-Порядок реализации оставшихся FR. Учёт зависимостей, рост качества,
-стратегическая ценность. Привести SRS/SDS в актуальное состояние.
+Eliminate per-node git commits during pipeline execution. Reduce overhead,
+fix chicken-and-egg config mutation bug, simplify git history.
 
 ## Overview
 
+### Context
+
+Pipeline engine commits after every successful node (`commitIfNeeded()` in
+`engine.ts:251`). This causes:
+
+1. **Performance overhead:** ~15s per node × 8 nodes = ~2 min wasted on
+   `git add -A` + `git commit` + safety check per commit.
+2. **Chicken-and-egg bug:** Executor modifies `pipeline.yaml` on disk, but
+   engine has config loaded in memory. QA/meta-agent use stale in-memory
+   config referencing deleted paths (FR-19 run: QA failed with
+   `file not found: .sdlc/agents/qa.md`).
+3. **Noisy git history:** FR-19 run produced 10 commits instead of 1-2
+   meaningful ones. Executor alone made 7 micro-commits.
+4. **No practical value:** Inter-agent communication is filesystem-based
+   (`{{input.<node>}}` templates read files from disk). `--resume` skip
+   logic uses `state.json`, not git history.
+
 ### Current State
 
-- **SRS AC status:** 14 `[x]` / 28 `[ ]` (реальный прогресс выше — SRS
-  отстаёт от кода)
-- **Полностью реализовано (с evidence):** FR-10 (Agent Log Storage)
-- **Реализовано, SRS не обновлён:**
-  - FR-18 (Verbose Output) — merged PR #7, все 8 AC выполнены
-  - FR-8 (Continuation) — PR #8 open (agent/8), 6 AC закрыты.
-    Остаётся 1 AC: deletion check
-- **Работает де-факто, нет формальной верификации AC:**
-  - FR-2 (PM), FR-3 (Tech Lead), FR-4 (Reviewer), FR-5 (Architect),
-    FR-6 (SDS Update), FR-7 (Executor+QA), FR-9 (Presenter), FR-11 (Meta-Agent)
-- **Не реализовано:**
-  - FR-1 (Pipeline Trigger) — только `run:task` работает. `run:issue` и GH
-    pipeline **убираются из scope** (deferred). Остаются: `run:text`, `run:file`
-  - FR-17 (Directory Structure) — все 8 AC `[ ]`
-  - FR-NEW (Agents as Skills) — новое требование
-- **Частично:**
-  - FR-12 (Runtime Infra) — devcontainer OK, gitleaks нет
-  - FR-13, FR-14, FR-15, FR-16 — частично
-- **Meta-agent known bugs:**
-  - P-003: Нет логов loop body nodes — 3 occurrence
-  - P-007: Config drift pipeline.yaml ↔ pipeline-task.yaml
-  - P-008: sds-update after-hook пустой diff
+**Commit flow** (`engine.ts:527-551`, `git.ts:27-67`):
+- `commitNodeChanges()` runs after every successful node
+- `git add -A` → `git diff --cached --name-only` → `git commit -m "sdlc(...)"`
+- Includes ALL changes (artifacts + project files + logs)
 
-### Scope Changes
+**Safety check flow** (`engine.ts:307-396`, `git.ts:74-133`):
+- `safetyCheckDiff()` runs before commit for nodes with `allowed_paths`
+- Uses `git diff --name-only HEAD` — compares against last commit
+- If engine stops committing, HEAD stays at branch point → all accumulated
+  changes visible in diff → scope check breaks for later nodes
 
-1. **Убрать из SRS/SDS:**
-   - FR-1: `run:issue <N>`, GitHub Issue trigger, re-run guard
-   - FR-9: issue comment posting via `gh`
-   - FR-11: issue comment posting
-   - FR-12: GHA workflow
-   - FR-14: `agent/<issue-number>` branch naming (для issue mode)
-   - Все упоминания GH issue-based trigger
-   - Оставить: `run:task`, `run:text`, `run:file`
+**Resume flow** (`engine.ts:153-155`):
+- `isNodeCompleted(state)` — pure state.json check
+- Does NOT depend on git commits
 
-2. **Новый FR — Agents as Skills:**
-   - Каждый агент pipeline = Claude Code project skill
-   - Структура: `./agents/<name>/SKILL.md` (основной файл)
-   - Связь: `.claude/skills/<name>` → symlink на `../../agents/<name>/`
-   - 9 агентов: pm, tech-lead, tech-lead-reviewer, architect, tech-lead-sds,
-     executor, qa, presenter, meta-agent
-   - Текущие `.sdlc/agents/*.md` → мигрируют в SKILL.md
-   - Engine использует SKILL.md через symlink
-   - Каждый скил вызывается standalone через `/agent-<name>`
-   - Формат: frontmatter (name, description, disable-model-invocation) +
-     markdown instructions
+**Executor behavior:**
+- Claude Code agent commits independently (7 commits in FR-19 run)
+- Engine then tries `commitNodeChanges()` on top — usually no-op or duplicate
+- Engine cannot control agent's commit granularity
 
 ### Constraints
 
-- Одна задача за раз (single pipeline execution)
-- FR-17 (restructure) ломает все пути — последним
-- SRS accuracy — фундамент для PM agent
-- Каждая фаза оставляет систему рабочей
+- Gitleaks secret detection must run (via `deno task check`)
+- `--resume` must still skip completed nodes
+- Presenter needs `git diff main...HEAD` for PR description
+- Meta-agent needs to see what changed
+- Executor must NOT commit — only explicit commit nodes do
+- Must not break `deno task check`
 
-## Roadmap
+## Definition of Done
 
-### Фаза 0: Scope Cleanup + SRS Sync
+- [x] Committer agent created (`agents/committer/SKILL.md`)
+- [x] Commit nodes in pipeline = `type: agent` using committer prompt
+- [x] Engine does NOT auto-commit after any node
+- [x] Executor agent prompt: "DO NOT commit" (remove "commit per task" rule)
+- [x] `safetyCheckDiff()` + `allowed_paths` fully removed (engine, git, types, config, YAML)
+- [x] Gitleaks added to `scripts/check.ts` (replaces engine-level secret check)
+- [x] `runGitleaks()` removed from `git.ts` (moved to check.ts)
+- [x] `--resume` still works (state.json based — no change expected)
+- [x] Chicken-and-egg bug eliminated (config not committed mid-run)
+- [x] `deno task check` passes
+- [x] FR-8 updated: scope check removed, gitleaks in `check`, future safety req
+- [x] FR-14 updated: commits at explicit committer agent nodes
 
-**Цель:** SRS/SDS в актуальном состоянии. Deferred scope убран.
+## Solution (Variant D+: Committer Agent + Safety Cleanup)
 
-- Merge PR #8 (FR-8)
-- Убрать из SRS/SDS: `run:issue`, GH issue trigger, issue comments, GHA,
-  `agent/<N>` branching
-- Обновить SRS маркеры: FR-8 (6 AC → `[x]`), FR-18 (8 AC → `[x]`)
-- Удалить task files: fr-8.md, fr-10-agent-log-storage.md
-- Добавить новый FR (Agents as Skills) в SRS
+### Step 1: Create committer agent
 
-**Зависимости:** нет
-**Результат:** SRS точен, ~14 → ~28 `[x]`
-
----
-
-### Фаза 1: Agents as Skills (FR-NEW)
-
-**Цель:** Каждый агент = локальный скил, standalone + pipeline.
-
-- Создать `./agents/` с 9 подпапками, каждая с SKILL.md
-- Мигрировать `.sdlc/agents/*.md` → SKILL.md с frontmatter
-- Symlinks: `.claude/skills/agent-pm` → `../../agents/pm/` и т.д.
-- Engine: обновить `prompt:` пути в pipeline.yaml
-- Удалить `.sdlc/agents/` после миграции
-- Тесты: `deno task check` + pipeline dry-run
-
-**Зависимости:** Фаза 0
-**Результат:** `/agent-pm`, `/agent-qa` работают standalone. Pipeline
-использует те же файлы.
-**Качество:** Двойное использование: pipeline + интерактивно
-
----
-
-### Фаза 2: FR-1 Trigger Modes (без issue)
-
-**Цель:** Полный набор trigger modes (кроме issue).
-
-- `deno task run:text "..."` — inline text
-- `deno task run:file <path>` — файл (эволюция `run:task`)
-- Единые engine flags для всех subcommands
-
-**Зависимости:** Фаза 0
-**Результат:** Гибкий CLI
-
----
-
-### Фаза 3: Observability Gaps
-
-**Цель:** Логи для всех nodes, корректные артефакты.
-
-- P-003: Логи loop body nodes (executor, qa)
-- P-008: sds-update after-hook (`git diff HEAD~1 --`)
-- P-007: Верификация fix config drift
-
-**Зависимости:** FR-10 (done)
-**Результат:** Meta-agent анализирует 100% nodes
-
----
-
-### Фаза 4: FR-12 + FR-16 + FR-8 (Safety Net)
-
-**Цель:** Полноценные проверки безопасности.
-
-- Gitleaks в devcontainer (Dockerfile)
-- FR-8: deletion check в safetyCheckDiff
-- FR-16: no hardcoded secrets
-- Shellcheck для legacy scripts
-
-**Зависимости:** FR-8 (done)
-**Результат:** Security: regex → production-grade
-
----
-
-### Фаза 5: AC Verification (FR-2–7, FR-9, FR-11)
-
-**Цель:** Все agent stages верифицированы с evidence в SRS.
-
-- Pipeline на 3+ реальных задачах
-- Каждый AC → evidence
-- FR-13, FR-14 — попутно
-
-**Зависимости:** Фазы 1-4
-**Результат:** ~42/42 AC с evidence
-
----
-
-### Фаза 6: FR-15 + FR-13 (Config + Versioning)
-
-**Цель:** Конфигурируемость, предсказуемый re-run.
-
-- FR-15: env vars → engine, fallback to defaults
-- FR-13: overwrite on re-run, iteration suffix
-
-**Зависимости:** Фаза 5
-
----
-
-### Фаза 7: FR-17 — Directory Restructure
-
-**Цель:** Стандартная IDE-friendly структура.
-
-- `.sdlc/engine/` → `src/engine/`
-- `agents/` уже на месте (Фаза 1)
-- `.sdlc/pipeline.yaml` → root/config
-- `.sdlc/runs/` → `runs/` (gitignored)
-- `.sdlc/scripts/` → `scripts/`
-- deno.json, imports, тесты, SDS
-
-**Зависимости:** Все предыдущие (высокий риск)
-
----
-
-## Зависимости
-
-```mermaid
-graph TD
-    P0["Фаза 0: Scope Cleanup<br/>+ SRS Sync"]
-    P1["Фаза 1: Agents<br/>as Skills"]
-    P2["Фаза 2: FR-1<br/>Trigger Modes"]
-    P3["Фаза 3: Observability"]
-    P4["Фаза 4: Safety Net"]
-    P5["Фаза 5: AC<br/>Verification"]
-    P6["Фаза 6: Config<br/>+ Versioning"]
-    P7["Фаза 7: Restructure"]
-
-    P0 --> P1
-    P0 --> P2
-    P0 --> P3
-    P0 --> P4
-    P1 --> P5
-    P2 --> P5
-    P3 --> P5
-    P4 --> P5
-    P5 --> P6
-    P6 --> P7
-
-    style P0 fill:#4caf50,color:#fff
-    style P1 fill:#ff9800,color:#fff
-    style P2 fill:#ff9800,color:#fff
-    style P3 fill:#ff9800,color:#fff
-    style P4 fill:#ff9800,color:#fff
-    style P5 fill:#2196f3,color:#fff
-    style P6 fill:#2196f3,color:#fff
-    style P7 fill:#9c27b0,color:#fff
+**`agents/committer/SKILL.md`:**
+```markdown
+# Role: Committer
+Stage all changes and commit with a concise, meaningful message.
+## Rules
+- Run `git add -A`
+- If no staged changes: output "Nothing to commit" and exit
+- Write commit message: `sdlc(<phase>): <summary of changes>`
+- `<phase>` = value of SDLC_PHASE env var (e.g., "plan", "impl", "present")
+- `<summary>` = brief description based on `git diff --cached --stat`
+- Run `git commit -m "<message>"`
+- Output the commit hash
 ```
 
-## Параллелизм
+### Step 2: Remove auto-commit from engine
 
-Фазы 1, 2, 3, 4 — **параллельно** после Фазы 0:
-- Skills — `./agents/`, `.claude/skills/`, engine paths
-- Triggers — engine/cli.ts
-- Observability — engine/loop.ts, engine.ts, git.ts
-- Safety — Dockerfile, engine/git.ts
+**`engine.ts`:**
+- Delete `await this.commitIfNeeded(nodeId, node)` (line 251)
+- Delete `commitIfNeeded()` method (lines 527-551)
 
-Фазы 5, 6, 7 — **последовательно**.
+### Step 3: Remove safety check entirely
 
-## Оценка
+**`engine.ts`:**
+- Remove safety check continuation loop (lines 307-396)
+- Remove all `allowed_paths` / `safetyCheckDiff` references
 
-- Фаза 0: ручная (~1h)
-- Фаза 1: ~1 pipeline run
-- Фаза 2: ~1 pipeline run
-- Фаза 3: ~1 pipeline run
-- Фаза 4: ~1 pipeline run
-- Фаза 5: ~3 pipeline runs
-- Фаза 6: ~1 pipeline run
-- Фаза 7: ~1 pipeline run
-- **Итого: ~10-12 pipeline runs**
+**`git.ts`:**
+- Delete `safetyCheckDiff()` (lines 74-133)
+- Delete `SafetyCheckResult` interface (lines 19-24)
+- Delete `runGitleaks()` + `GitleaksResult` (lines 169-217)
+- Keep: `commitNodeChanges()`, `getCurrentBranch()`, `branch()`, `pushToOrigin()`
+
+**`types.ts`:**
+- Remove `allowed_paths?: string[]` from `NodeConfig`
+
+**`config.ts`:**
+- Remove `allowed_paths` validation if any
+
+**Pipeline YAML:**
+- Remove `allowed_paths` from all nodes
+
+### Step 4: Add gitleaks to `scripts/check.ts`
+
+**`scripts/check.ts`:**
+- Add gitleaks step after lint, before tests:
+  `await run("gitleaks", ["detect", "--no-git"], "Secret Scan", true)`
+- `allowFailure=true` — skip if gitleaks binary not found (CI may not have it)
+
+### Step 5: Update executor prompt
+
+**`agents/executor/SKILL.md`:**
+- Remove: "Commit per task: Each task from 04-decision.md gets its own commit"
+- Remove: "Commit incrementally" from responsibilities
+- Add rule: "DO NOT make git commits. All commits are managed by the pipeline."
+
+### Step 6: Update pipeline YAML
+
+**`pipeline.yaml` + `pipeline-task.yaml`:** add 3 committer agent nodes:
+
+```yaml
+  commit-plan:
+    type: agent
+    label: "Commit planning artifacts"
+    prompt: agents/committer/SKILL.md
+    inputs: [sds-update]
+    env:
+      SDLC_PHASE: plan
+  impl-loop:
+    inputs: [commit-plan]    # was: [sds-update]
+  commit-impl:
+    type: agent
+    label: "Commit implementation"
+    prompt: agents/committer/SKILL.md
+    inputs: [impl-loop]
+    env:
+      SDLC_PHASE: impl
+  presenter:
+    inputs: [commit-impl]    # was: [impl-loop]
+  commit-present:
+    type: agent
+    label: "Commit presentation artifacts"
+    prompt: agents/committer/SKILL.md
+    inputs: [presenter]
+    env:
+      SDLC_PHASE: present
+  meta-agent:
+    run_always: true         # unchanged
+```
+
+### Step 7: Tests (TDD)
+
+**RED:**
+- DAG: topological sort with new commit nodes in graph
+- Safety: no tests (removed)
+
+**GREEN:** implement steps 2-6
+
+**REMOVE:**
+- Tests asserting commit after agent node
+- Tests for `safetyCheckDiff()` scope logic
+- Tests for `commitIfNeeded()`
+
+### Step 8: SRS update
+
+- FR-14: "Commits via dedicated committer agent nodes, not per-stage"
+- FR-8: remove scope check, note gitleaks in `deno task check`, add future req
+  `[ ]` "simplified safety checks via git diff + file hash"
+- Section 5: update commit strategy description
+
+### Execution order
+
+1. agents/committer/SKILL.md (new agent prompt)
+2. Tests RED
+3. engine.ts (remove auto-commit + safety loop)
+4. git.ts (delete safety/gitleaks functions)
+5. types.ts (remove `allowed_paths`)
+6. config.ts (remove `allowed_paths` validation)
+7. scripts/check.ts (add gitleaks step)
+8. Tests GREEN
+9. agents/executor/SKILL.md (no-commit rule)
+10. pipeline.yaml + pipeline-task.yaml (committer nodes, remove allowed_paths)
+11. `deno task check`
+12. SRS (FR-8, FR-14)

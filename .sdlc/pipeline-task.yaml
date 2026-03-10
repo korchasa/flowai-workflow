@@ -38,9 +38,6 @@ nodes:
       - type: contains_section
         path: "{{node_dir}}/01-spec.md"
         value: "Scope"
-    allowed_paths:
-      - "documents/requirements.md"
-      - ".sdlc/runs/"
 
   # Stage 2: Tech Lead — plan with variants
   tech-lead:
@@ -58,8 +55,6 @@ nodes:
         path: "{{node_dir}}/02-plan.md"
       - type: file_not_empty
         path: "{{node_dir}}/02-plan.md"
-    allowed_paths:
-      - ".sdlc/runs/"
 
   # Stage 3: Reviewer — critique and revision
   reviewer:
@@ -77,8 +72,6 @@ nodes:
         path: "{{node_dir}}/03-revised-plan.md"
       - type: file_not_empty
         path: "{{node_dir}}/03-revised-plan.md"
-    allowed_paths:
-      - ".sdlc/runs/"
 
   # Stage 4: Architect — variant selection and task breakdown
   architect:
@@ -96,8 +89,6 @@ nodes:
         path: "{{node_dir}}/04-decision.md"
       - type: file_not_empty
         path: "{{node_dir}}/04-decision.md"
-    allowed_paths:
-      - ".sdlc/runs/"
 
   # Stage 5: SDS Update
   sds-update:
@@ -110,9 +101,15 @@ nodes:
       Update documents/design.md with the selected variant's design details.
       Output: updated documents/design.md
     after: "cd {{run_dir}} && git diff documents/design.md > {{node_dir}}/04a-sds-diff.md || true"
-    allowed_paths:
-      - "documents/design.md"
-      - ".sdlc/runs/"
+
+  # Commit planning artifacts
+  commit-plan:
+    type: agent
+    label: "Commit planning artifacts"
+    prompt: agents/committer/SKILL.md
+    inputs: [sds-update]
+    env:
+      SDLC_PHASE: plan
 
   # Stages 6-7: Executor + QA loop
   executor:
@@ -128,11 +125,6 @@ nodes:
     validate:
       - type: custom_script
         path: "deno task check"
-    allowed_paths:
-      - ".sdlc/engine/"
-      - ".sdlc/runs/"
-      - ".sdlc/pipeline/"
-      - "documents/"
 
   qa:
     type: agent
@@ -153,18 +145,27 @@ nodes:
   impl-loop:
     type: loop
     label: "Executor+QA Implementation Loop"
-    inputs: [sds-update]
+    inputs: [commit-plan]
     body: [executor, qa]
     condition_node: qa
     condition_field: verdict
     exit_value: PASS
     max_iterations: 3
 
+  # Commit implementation
+  commit-impl:
+    type: agent
+    label: "Commit implementation"
+    prompt: agents/committer/SKILL.md
+    inputs: [impl-loop]
+    env:
+      SDLC_PHASE: impl
+
   # Stage 8: Presenter — change summary (no GitHub issue comment in task mode)
   presenter:
     type: agent
     label: "Presenter — Change Summary"
-    inputs: [pm, architect, impl-loop]
+    inputs: [pm, architect, commit-impl]
     prompt: "agents/presenter/SKILL.md"
     task_template: |
       Create a summary of all changes made during the pipeline.
@@ -177,8 +178,15 @@ nodes:
         path: "{{node_dir}}/06-summary.md"
       - type: file_not_empty
         path: "{{node_dir}}/06-summary.md"
-    allowed_paths:
-      - ".sdlc/runs/"
+
+  # Commit presentation artifacts
+  commit-present:
+    type: agent
+    label: "Commit presentation artifacts"
+    prompt: agents/committer/SKILL.md
+    inputs: [presenter]
+    env:
+      SDLC_PHASE: present
 
   # Stage 9: Meta-Agent — prompt optimization
   meta-agent:
@@ -195,6 +203,3 @@ nodes:
     validate:
       - type: file_exists
         path: "{{node_dir}}/07-meta-report.md"
-    allowed_paths:
-      - "agents/"
-      - ".sdlc/runs/"

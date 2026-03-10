@@ -84,6 +84,7 @@ console.log("=== auto-flow: Full Check ===");
 
 await run("deno", ["fmt", "--check"], "Formatting Check");
 await run("deno", ["lint"], "Linting");
+await run("gitleaks", ["detect", "--no-git"], "Secret Scan", true);
 // Allow test failure when no test files exist yet
 // Scope tests to project dirs (exclude .claude/skills/ which may need network)
 const testDirs = ["scripts", ".sdlc"];
