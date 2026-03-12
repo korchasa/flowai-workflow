@@ -28,7 +28,6 @@ nodes:
     prompt: "agents/pm/SKILL.md"
     task_template: |
       Triage open GitHub issues and select the highest-priority one to implement.
-      Additional context: {{args.prompt}}
       Output:
         - {{node_dir}}/01-spec.md (YAML frontmatter with `issue: <N>`,
           then problem, affected requirements, SRS changes, scope)

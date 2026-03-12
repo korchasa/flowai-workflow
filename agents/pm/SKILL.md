@@ -35,7 +35,7 @@ produce a specification artifact, updating the project's SRS.
 
 ## Input
 
-- Task prompt (may contain additional context via `{{args.prompt}}`).
+- Task prompt from pipeline engine (contains output path and instructions).
 - `documents/requirements.md` — current SRS.
 - `documents/design.md` — current SDS (read-only, for context).
 - `AGENTS.md` — project vision and rules (read-only).
