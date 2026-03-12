@@ -444,6 +444,20 @@
   - [x] `hitl-ask.sh` renders question JSON → markdown with HTML marker `<!-- hitl:<run-id>:<node-id> -->`, posts via `gh issue comment`. Evidence: `.sdlc/scripts/hitl-ask.sh:52-76` (markdown render + marker + gh post)
   - [x] `hitl-check.sh` finds first non-bot comment after marker, outputs body to stdout (exit 0) or exits 1 if no reply. Evidence: `.sdlc/scripts/hitl-check.sh:39-54` (jq filter + exit codes)
 
+### 3.22 FR-22: Project Documentation (README)
+
+- **Description:** README.md must accurately reflect current project state: vision, architecture (DAG-based engine), usage (`deno task run` with flags), prerequisites (Deno, Docker/devcontainer, Claude CLI, `gh`), available `deno task` commands, configuration mechanism (YAML `pipeline.yaml`), project directory structure, and agents-as-skills.
+- **Scenario:** A new contributor reads README.md and gets correct, up-to-date information about how to set up, configure, and run the pipeline.
+- **Acceptance criteria:**
+  - [ ] README.md reflects DAG-based engine architecture (not shell script orchestration).
+  - [ ] Usage section documents `deno task run` with current flags (`--prompt`, `--resume`, `--dry-run`, `-v`, `-q`, `--config`, `--skip`, `--only`, `--env`).
+  - [ ] Prerequisites list: Deno, Docker/devcontainer, Claude Code CLI, `gh` CLI, Git.
+  - [ ] Available `deno task` commands documented (run, check, test).
+  - [ ] Configuration section references `pipeline.yaml` (not env vars).
+  - [ ] Project directory structure matches actual layout (`agents/`, `.sdlc/engine/`, `.sdlc/runs/`, `.claude/skills/`).
+  - [ ] Agents-as-skills mentioned with `/agent-<name>` slash command examples.
+  - [ ] Installation/setup instructions are accurate for devcontainer workflow.
+
 ## 4. Non-functional requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution is not supported.

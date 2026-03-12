@@ -110,9 +110,9 @@ graph TD
   Each agent lives in `agents/<name>/SKILL.md` with YAML frontmatter enabling
   dual-use: pipeline-driven (via engine `prompt:` config) and interactive
   (via Claude Code `/agent-<name>` slash commands).
-- **Directory structure:** `agents/<name>/SKILL.md` — 9 agents: `pm`,
+- **Directory structure:** `agents/<name>/SKILL.md` — 10 agents: `pm`,
   `tech-lead`, `tech-lead-reviewer`, `architect`, `tech-lead-sds`, `executor`,
-  `qa`, `presenter`, `meta-agent`.
+  `qa`, `presenter`, `meta-agent`, `committer`.
 - **SKILL.md frontmatter template:**
   ```yaml
   ---
@@ -134,11 +134,11 @@ graph TD
 
 - **Purpose:** Bridge pipeline agents into Claude Code's skill discovery system,
   enabling `/agent-<name>` slash command invocability (FR-19 AC #2, AC #6).
-- **Structure:** 9 symlinks: `.claude/skills/agent-<name>` → `../../agents/<name>/`
+- **Structure:** 10 symlinks: `.claude/skills/agent-<name>` → `../../agents/<name>/`
   (relative paths for portability within repo).
 - **Agents exposed:** `agent-pm`, `agent-tech-lead`, `agent-tech-lead-reviewer`,
   `agent-architect`, `agent-tech-lead-sds`, `agent-executor`, `agent-qa`,
-  `agent-presenter`, `agent-meta-agent`.
+  `agent-presenter`, `agent-meta-agent`, `agent-committer`.
 - **Interfaces:** Claude Code skill loader reads symlink target directory,
   discovers `SKILL.md` frontmatter, registers slash command.
 - **Deps:** `agents/<name>/SKILL.md` (symlink targets must exist).
