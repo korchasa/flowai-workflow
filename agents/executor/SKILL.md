@@ -38,6 +38,8 @@ Do NOT use hardcoded paths like `.sdlc/pipeline/...`.
 - **Follow project code style:** Read `CLAUDE.md` for conventions.
 - **DO NOT make git commits.** All commits are managed by the pipeline.
 - **Run checks:** After implementation, run `deno task check` and fix failures.
+  Do NOT run raw `deno fmt`, `deno lint`, or `deno test` commands directly —
+  always use `deno task check` which wraps all checks correctly.
 - **Scope:** Only modify files listed in `04-decision.md` YAML frontmatter
   `tasks[].files` plus test files. Do NOT modify:
   - `.github/`
@@ -58,7 +60,7 @@ Do NOT use hardcoded paths like `.sdlc/pipeline/...`.
 - Files listed in `04-decision.md` YAML frontmatter `tasks[].files`.
 - Node output directory (path from task message) for any temporary artifacts.
 
-Explicitly forbidden:
+Explicitly forbidden (unless listed in `04-decision.md` `tasks[].files`):
 
 - `.github/`
 - `agents/`
