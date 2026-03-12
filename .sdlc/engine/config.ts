@@ -211,6 +211,7 @@ function validateValidationRule(
     "file_not_empty",
     "contains_section",
     "custom_script",
+    "frontmatter_field",
   ];
   if (!validTypes.includes(rule.type as string)) {
     throw new Error(
