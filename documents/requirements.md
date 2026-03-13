@@ -664,15 +664,15 @@
   - Loop body nodes: inherit loop node's `model` unless overridden in inline
     `nodes` config.
 - **Acceptance criteria:**
-  - [ ] `PipelineDefaults` in `types.ts` has `model?: string` field.
-  - [ ] `NodeConfig` in `types.ts` has `model?: string` field.
-  - [ ] `config.ts` parses `model` from defaults and node configs.
-  - [ ] `agent.ts` `buildClaudeArgs()` emits `--model <value>` when model is set.
-  - [ ] `agent.ts` does NOT emit `--model` on `--resume` invocations.
-  - [ ] Loop body nodes resolve model from: own config > loop node config > defaults.
-  - [ ] `pipeline.yaml` updated: default model + per-node overrides for complex stages.
-  - [ ] All existing engine tests pass; new tests cover model flag emission and resolution.
-  - [ ] `deno task check` passes.
+  - [x] `PipelineDefaults` in `types.ts` has `model?: string` field. Evidence: `engine/types.ts:21`
+  - [x] `NodeConfig` in `types.ts` has `model?: string` field. Evidence: `engine/types.ts:39`
+  - [x] `config.ts` parses `model` from defaults and node configs. Evidence: `engine/config.ts:26-33` (YAML pass-through via structural typing; `PipelineDefaults`/`NodeConfig` types carry `model?`)
+  - [x] `agent.ts` `buildClaudeArgs()` emits `--model <value>` when model is set. Evidence: `engine/agent.ts:309-311`
+  - [x] `agent.ts` does NOT emit `--model` on `--resume` invocations. Evidence: `engine/agent.ts:309` (`&& !opts.resumeSessionId` guard)
+  - [x] Loop body nodes resolve model from: own config > loop node config > defaults. Evidence: `engine/loop.ts:76`
+  - [x] `pipeline.yaml` updated: default model + per-node overrides for complex stages. Evidence: `.sdlc/pipeline.yaml:15` (default), `.sdlc/pipeline.yaml:65,84,147` (overrides)
+  - [x] All existing engine tests pass; new tests cover model flag emission and resolution. Evidence: `engine/agent_test.ts:207-233` (3 model tests); 434 tests pass.
+  - [x] `deno task check` passes. Evidence: validated — 434 passed, 0 failed.
 
 ### 3.29 FR-29: Engine-Pipeline Separation Invariant
 
