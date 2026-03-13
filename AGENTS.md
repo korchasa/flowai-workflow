@@ -91,6 +91,11 @@ Executor, QA, Presenter, Meta-Agent).
   contain git, GitHub, branch, PR, or any other domain-specific logic. All
   git/GitHub workflow (branches, commits, PRs, merges, CI gates) is implemented
   exclusively via agent nodes wired in `pipeline.yaml`
+- **Engine is pipeline-independent:** Engine MUST NOT depend on any specific
+  pipeline config. There can be many pipelines, but the engine is one. Engine
+  code must not reference concrete node names, artifact filenames, or pipeline
+  structure. All pipeline-specific knowledge lives in `.sdlc/pipeline.yaml`
+  and agent prompts (`agents/*/SKILL.md`)
 
 ## Planning Rules
 

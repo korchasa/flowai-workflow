@@ -87,7 +87,7 @@ await run("deno", ["lint"], "Linting");
 await run("gitleaks", ["detect", "--no-git"], "Secret Scan", true);
 // Allow test failure when no test files exist yet
 // Scope tests to project dirs (exclude .claude/skills/ which may need network)
-const testDirs = ["scripts", ".sdlc"];
+const testDirs = ["scripts", ".sdlc", "engine"];
 const testableDir = (await Promise.all(
   testDirs.map(async (d) => ({ d, has: await hasTestFiles(d) })),
 )).filter((x) => x.has).map((x) => x.d);

@@ -562,3 +562,97 @@ Deno.test("parseConfig — run_always absent leaves no run_on", () => {
   assertEquals(config.nodes.spec.run_on, undefined);
   assertEquals(config.nodes.spec.run_always, undefined);
 });
+
+// --- validatePromptPaths tests (FR-31) ---
+
+Deno.test("parseConfig — missing prompt file throws with file path", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  a:
+    type: agent
+    label: A
+    prompt: nonexistent/SKILL.md
+`;
+  assertThrows(
+    () => parseConfig(yaml),
+    Error,
+    "nonexistent/SKILL.md",
+  );
+});
+
+Deno.test("parseConfig — existing prompt file passes without error", () => {
+  const config = parseConfig(MINIMAL_AGENT);
+  assertEquals(config.nodes.spec.prompt, "agents/pm/SKILL.md");
+});
+
+Deno.test("parseConfig — template prompt path skipped (no filesystem check)", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  a:
+    type: agent
+    label: A
+    prompt: "{{env.AGENTS_DIR}}/SKILL.md"
+`;
+  // Must not throw — template paths are unresolvable at load time, skipped
+  const config = parseConfig(yaml);
+  assertEquals(config.nodes.a.prompt, "{{env.AGENTS_DIR}}/SKILL.md");
+});
+
+Deno.test("parseConfig — multiple missing prompt files → single error listing all paths", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  a:
+    type: agent
+    label: A
+    prompt: missing/a/SKILL.md
+  b:
+    type: agent
+    label: B
+    inputs: [a]
+    prompt: missing/b/SKILL.md
+`;
+  let caught: Error | undefined;
+  try {
+    parseConfig(yaml);
+  } catch (e) {
+    caught = e as Error;
+  }
+  assertEquals(caught !== undefined, true);
+  assertEquals(caught!.message.includes("missing/a/SKILL.md"), true);
+  assertEquals(caught!.message.includes("missing/b/SKILL.md"), true);
+});
+
+Deno.test("parseConfig — loop body node with missing prompt throws", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  impl-loop:
+    type: loop
+    label: Implementation loop
+    condition_node: qa
+    condition_field: verdict
+    exit_value: PASS
+    nodes:
+      executor:
+        type: agent
+        label: Executor
+        prompt: nonexistent/executor/SKILL.md
+      qa:
+        type: agent
+        label: QA
+        task_template: "verify"
+        inputs: [executor]
+`;
+  assertThrows(
+    () => parseConfig(yaml),
+    Error,
+    "nonexistent/executor/SKILL.md",
+  );
+});

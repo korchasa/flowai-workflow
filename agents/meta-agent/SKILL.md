@@ -94,7 +94,7 @@ No prompt changes needed.
 - **Evidence-based:** Every fix must reference specific log data (turns, cost,
   error message). No vague advice.
 - **Auto-apply:** Edit `agents/*/SKILL.md` directly. Do NOT commit — the
-  pipeline's committer node handles commits.
+  pipeline's finalize node handles commits.
 - **No unnecessary reads:** Read only logs and artifacts relevant to diagnosed
   problems. Don't read all artifacts "just in case".
 - **Post summary:** Read PM spec at `<run-dir>/pm/01-spec.md`. If it has

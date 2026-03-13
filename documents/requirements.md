@@ -707,6 +707,31 @@
   - [ ] Engine unit tests cover dry-run output with `run_on` nodes present.
   - [ ] `deno task check` passes.
 
+### 3.30 FR-31: Prompt Path Validation at Config Load
+
+- **Description:** Pipeline engine validates that all `prompt` file paths declared
+  in `pipeline.yaml` exist on the filesystem before any node executes. Validation
+  runs once at config load time, accumulates all missing paths, and throws a single
+  error listing every missing file. Paths containing `{{` (template variables) are
+  skipped — they cannot be resolved at load time.
+- **Motivation:** Misconfigured `prompt` paths cause silent agent failures 30+ min
+  into a pipeline run (incident: run `20260313T025203`). Early batch validation
+  surfaces all misconfigurations in one error before any API compute is spent.
+- **Acceptance criteria:**
+  - [x] Config load throws an error if any non-template `prompt` path does not exist.
+    Evidence: `engine/config.ts:336` (`validatePromptPaths()`).
+  - [x] Error message lists all missing paths (batch, not fail-on-first).
+    Evidence: `engine/config.ts:365-367` (accumulates into `missing[]`, throws once).
+  - [x] Paths containing `{{` are skipped (unresolvable at load time).
+    Evidence: `engine/config.ts:340` (`!node.prompt.includes("{{")`).
+  - [x] Validation covers loop body node `prompt` paths (recursion into `nodes`).
+    Evidence: `engine/config.ts:350-362` (nested loop over `node.nodes`).
+  - [x] `validatePromptPaths()` called at end of `mergeDefaults()` on fully-resolved config.
+    Evidence: `engine/config.ts:327` (call in `mergeDefaults()` before return).
+  - [x] Tests: missing file, existing file, template skip, multiple missing, loop body miss.
+    Evidence: `engine/config_test.ts:568-659`.
+  - [x] `deno task check` passes.
+
 ## 4. Non-functional requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution is not supported.

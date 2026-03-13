@@ -55,12 +55,6 @@ All diff files must be mentioned. No hallucinated files. Compressed style.
 - Run `gh issue comment <N> --body "<summary>"` where `<N>` is the issue number.
 - If issue comment fails, note it in output. Do NOT fail.
 
-## Step 5: Merge PR and Switch to Main
-
-- Merge PR: `gh pr merge --squash --delete-branch`
-- If merge fails (e.g., checks not passed), note it in output. Do NOT fail.
-- Switch to main: `git checkout main && git pull origin main`
-
 ## Rules
 
 - Do NOT fail the stage on gh CLI errors — log and continue.
