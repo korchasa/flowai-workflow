@@ -81,7 +81,7 @@ export class Engine {
     } else {
       const runLabel = this.options.args.prompt?.slice(0, 20) ?? undefined;
       const runId = this.options.run_id ?? generateRunId(runLabel);
-      const allNodeIds = Object.keys(this.config.nodes);
+      const allNodeIds = collectAllNodeIds(this.config);
       this.state = createRunState(
         runId,
         this.options.config_path,
@@ -575,10 +575,10 @@ export class Engine {
       }
     }
 
-    // Also create dirs for loop body nodes
+    // Also create dirs for loop body nodes (from inline nodes sub-object)
     for (const [_, node] of Object.entries(this.config.nodes)) {
-      if (node.type === "loop" && node.body) {
-        for (const bodyId of node.body) {
+      if (node.type === "loop" && node.nodes) {
+        for (const bodyId of Object.keys(node.nodes)) {
           await Deno.mkdir(getNodeDir(this.state.run_id, bodyId), {
             recursive: true,
           });
@@ -673,6 +673,23 @@ export function sortRunAlwaysNodes(
   }
   const levels = topoSort(deps);
   return levels.flat();
+}
+
+/**
+ * Collect all node IDs including nested body nodes from loop `nodes` sub-objects.
+ * Returns a flat list suitable for `createRunState()`.
+ */
+export function collectAllNodeIds(config: PipelineConfig): string[] {
+  const ids: string[] = [];
+  for (const [id, node] of Object.entries(config.nodes)) {
+    ids.push(id);
+    if (node.type === "loop" && node.nodes) {
+      for (const bodyId of Object.keys(node.nodes)) {
+        ids.push(bodyId);
+      }
+    }
+  }
+  return ids;
 }
 
 /** Recursively copy a directory. */

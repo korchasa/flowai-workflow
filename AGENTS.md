@@ -87,7 +87,10 @@ Executor, QA, Presenter, Meta-Agent).
   parallel, resumable)
 - YAML pipeline config defines node graph; no hardcoded stage order
 - Artifacts stored in `.sdlc/runs/<run-id>/` (per-run isolation)
-- Git commit per successful node (engine-managed)
+- **Engine is domain-agnostic:** Engine is a generic DAG executor. It MUST NOT
+  contain git, GitHub, branch, PR, or any other domain-specific logic. All
+  git/GitHub workflow (branches, commits, PRs, merges, CI gates) is implemented
+  exclusively via agent nodes wired in `pipeline.yaml`
 
 ## Planning Rules
 

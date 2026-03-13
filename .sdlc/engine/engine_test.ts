@@ -1,6 +1,12 @@
 import { assertEquals } from "@std/assert";
-import type { EngineOptions, NodeConfig, RunState } from "./types.ts";
+import type {
+  EngineOptions,
+  NodeConfig,
+  PipelineConfig,
+  RunState,
+} from "./types.ts";
 import {
+  collectAllNodeIds,
   collectRunAlwaysNodes,
   Engine,
   resolveInputArtifacts,
@@ -351,4 +357,55 @@ Deno.test("sortRunAlwaysNodes — no dependencies preserves alphabetical order",
   };
   const sorted = sortRunAlwaysNodes(["cleanup", "meta-agent"], nodes);
   assertEquals(sorted, ["cleanup", "meta-agent"]);
+});
+
+// --- collectAllNodeIds tests ---
+
+Deno.test("collectAllNodeIds — includes top-level and nested body node IDs", () => {
+  const config: PipelineConfig = {
+    name: "test",
+    version: "1",
+    nodes: {
+      pm: { type: "agent", label: "PM", task_template: "spec" },
+      "impl-loop": {
+        type: "loop",
+        label: "Impl loop",
+        condition_node: "qa",
+        condition_field: "verdict",
+        exit_value: "PASS",
+        nodes: {
+          executor: {
+            type: "agent",
+            label: "Executor",
+            task_template: "implement",
+          },
+          qa: {
+            type: "agent",
+            label: "QA",
+            task_template: "verify",
+            inputs: ["executor"],
+          },
+        },
+      },
+    },
+  };
+  const ids = collectAllNodeIds(config);
+  assertEquals(ids.includes("pm"), true);
+  assertEquals(ids.includes("impl-loop"), true);
+  assertEquals(ids.includes("executor"), true);
+  assertEquals(ids.includes("qa"), true);
+  assertEquals(ids.length, 4);
+});
+
+Deno.test("collectAllNodeIds — no loop nodes returns top-level only", () => {
+  const config: PipelineConfig = {
+    name: "test",
+    version: "1",
+    nodes: {
+      a: { type: "agent", label: "A", task_template: "x" },
+      b: { type: "agent", label: "B", task_template: "y" },
+    },
+  };
+  const ids = collectAllNodeIds(config);
+  assertEquals(ids, ["a", "b"]);
 });

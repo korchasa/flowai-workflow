@@ -34,12 +34,17 @@ Do NOT use hardcoded paths like `.sdlc/pipeline/...`.
 
 ## Rules
 
+**CRITICAL — `deno task check` ONLY:** You MUST use `deno task check` for ALL
+checking, testing, formatting, and linting. NEVER run `deno test`, `deno fmt`,
+or `deno lint` directly — not even for a single file. A pre-command hook will
+block direct invocations. Always use `deno task check`.
+
 - **Follow TDD:** Write tests first, then implement to pass them.
 - **Follow project code style:** Read `CLAUDE.md` for conventions.
 - **DO NOT make git commits.** All commits are managed by the pipeline.
-- **Run checks:** After implementation, run `deno task check` and fix failures.
-  Do NOT run raw `deno fmt`, `deno lint`, or `deno test` commands directly —
-  always use `deno task check` which wraps all checks correctly.
+- **Run checks frequently:** Run `deno task check` after each logical group of
+  file edits (not just at the end). This catches formatting issues early and
+  avoids repeated fix-and-recheck cycles.
 - **Scope:** Only modify files listed in `04-decision.md` YAML frontmatter
   `tasks[].files` plus test files. Do NOT modify:
   - `.github/`

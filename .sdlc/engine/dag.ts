@@ -31,12 +31,12 @@ export function buildLevels(config: PipelineConfig): ExecutionLevels {
   return topoSort(deps);
 }
 
-/** Collect all node IDs that appear in any loop body. */
+/** Collect all node IDs defined inline in any loop's `nodes` sub-object. */
 function collectLoopBodyNodes(config: PipelineConfig): Set<string> {
   const bodyNodes = new Set<string>();
   for (const node of Object.values(config.nodes)) {
-    if (node.type === "loop" && node.body) {
-      for (const bodyId of node.body) {
+    if (node.type === "loop" && node.nodes) {
+      for (const bodyId of Object.keys(node.nodes)) {
         bodyNodes.add(bodyId);
       }
     }
@@ -136,22 +136,24 @@ export function topoSort(deps: Map<string, Set<string>>): ExecutionLevels {
   return levels;
 }
 
-/** Get the order of body nodes for a loop, resolving internal dependencies. */
+/** Get the order of body nodes for a loop, resolving internal dependencies.
+ * Reads from the loop's inline `nodes` sub-object, topo-sorts by `inputs`. */
 export function buildLoopBodyOrder(
   config: PipelineConfig,
   loopNodeId: string,
 ): string[] {
   const loopNode = config.nodes[loopNodeId];
-  if (loopNode.type !== "loop" || !loopNode.body) {
+  if (loopNode.type !== "loop" || !loopNode.nodes) {
     throw new Error(`Node '${loopNodeId}' is not a loop node`);
   }
 
-  const bodySet = new Set(loopNode.body);
+  const bodyNodeIds = Object.keys(loopNode.nodes);
+  const bodySet = new Set(bodyNodeIds);
   const deps = new Map<string, Set<string>>();
 
-  for (const id of loopNode.body) {
-    const node = config.nodes[id];
-    // Only consider inputs that are within the loop body
+  for (const id of bodyNodeIds) {
+    const node = loopNode.nodes[id];
+    // Only consider inputs that are within the loop body for ordering
     const internalInputs = (node.inputs ?? []).filter((inp) =>
       bodySet.has(inp)
     );
