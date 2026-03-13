@@ -152,11 +152,15 @@ graph TD
   shell script orchestration with YAML-driven node graph.
 - **Modules:**
   - `types.ts` — type declarations (incl. `ValidationRule.type` union,
-    `NodeConfig.run_always`, `NodeConfig.phase`, `NodeConfig.env`,
-    `LoopNodeConfig.nodes` (inline body node definitions),
+    `NodeConfig.run_on` (`"always"|"success"|"failure"`), `NodeConfig.phase`,
+    `NodeConfig.env`, `LoopNodeConfig.nodes` (inline body node definitions),
     `LoopResult.bodyResults`)
   - `template.ts` — `{{var}}` interpolation for prompts/paths
-  - `config.ts` — YAML parsing, schema validation, defaults merge.
+  - `config.ts` — YAML parsing, schema validation, defaults merge,
+    `run_on` normalization. `normalizeRunOn()` pass (in `mergeDefaults()`):
+    if `node.run_always === true && !node.run_on` → sets `run_on = "always"`;
+    if both present, `run_on` wins; deletes `run_always` from config
+    post-normalization (downstream code only sees `run_on`).
     Loop nodes: parses `nodes` sub-object, validates body node ordering
     (>1 entry requires `inputs` declarations), validates `condition_node`
     references valid key in `nodes`. Skips top-level existence check for
@@ -193,14 +197,14 @@ graph TD
     (`runHitlLoop`); injectable `scriptRunner`/`claudeRunner` for testing
   - `human.ts` — terminal user input, abort logic
   - `git.ts` — commit helper (used by committer agent nodes), branch query,
-    `rollbackUncommitted()` for pre-run_always cleanup
+    `rollbackUncommitted()` for pre-post-pipeline cleanup
   - `output.ts` — terminal output manager (quiet/normal/verbose), verbose
     methods for detailed agent-node diagnostics
   - `engine.ts` — main executor: level iteration, parallel dispatch, verbose
     input resolution, loop-node log saving via `onNodeComplete` callback,
     phase registry init (`setPhaseRegistry()` before `ensureRunDirs()` in both
     fresh and resume paths), phase subdir creation in `ensureRunDirs()`,
-    pre-run_always rollback + failed-node-id extraction.
+    pre-post-pipeline rollback + failed-node-id extraction.
     On config load: iterates all nodes; for loop nodes with `nodes`
     sub-object, flattens nested body node IDs into master ID list passed
     to `createRunState()` (ensures state.json tracks both top-level and
@@ -218,9 +222,16 @@ graph TD
 - **Node types:** `agent`, `merge`, `loop` (with inline `nodes` sub-object
     for body node definitions), `human`
 - **Node flags:**
-  - `run_always?: boolean` — when `true`, node executes in a post-levels step
-    after all DAG levels complete (including on pipeline failure). Used for
-    Meta-Agent and `commit-meta`.
+  - `run_on?: "always" | "success" | "failure"` — execution condition for
+    post-pipeline nodes. When set, node is excluded from DAG levels and executes
+    in a post-pipeline step after all DAG levels complete:
+    - `"always"` — execute regardless of pipeline outcome. Used for meta-agent.
+    - `"success"` — execute only if pipeline succeeded. Used for commit nodes.
+    - `"failure"` — execute only if pipeline failed. Skipped nodes get
+      `markNodeSkipped()` status.
+    Backward compat: `run_always: true` in YAML normalized to `run_on: "always"`
+    by config loader (see `config.ts` normalization). `run_always` deleted
+    post-normalization — not visible to engine runtime.
   - `phase?: string` — optional phase grouping label (e.g., `plan`, `impl`,
     `report`). When set, node artifacts are stored under
     `<run-dir>/<phase>/<node-id>/` instead of `<run-dir>/<node-id>/`. User-
@@ -260,7 +271,7 @@ graph TD
     name via `git branch --show-current`. `rollbackUncommitted()`: executes
     `git checkout -- .` + `git reset HEAD`. No `git clean` — preserves
     untracked files (safe rollback). Used by engine pre-step before
-    `run_always` nodes on pipeline failure. Verbose calls for safety/commit
+    post-pipeline nodes on pipeline failure. Verbose calls for safety/commit
     stay in engine.
   - `engine.ts`: `executeAgentNode()` resolves input artifact paths+sizes by
     walking `ctx.input` directories via `Deno.stat()`; calls
@@ -350,9 +361,10 @@ graph TD
     a key in `nodes`. Body node ordering derived from `inputs` declarations
     via topo-sort (>1 entry requires at least one `inputs` reference to
     prevent disconnected graph with arbitrary order).
-  - NodeConfig: `{ ..., run_always?: boolean, phase?: string,
-    env?: Record<string, string> }` — `run_always` for post-levels execution;
-    `phase` for artifact directory grouping; `env` for node-level env vars
+  - NodeConfig: `{ ..., run_on?: "always"|"success"|"failure", phase?: string,
+    env?: Record<string, string> }` — `run_on` for conditional post-pipeline
+    execution; `phase` for artifact directory grouping; `env` for node-level
+    env vars
 - **ERD:** N/A (file-based, no database).
 - **Migration:** N/A.
 
@@ -393,7 +405,7 @@ graph TD
   committer agent nodes (`agents/committer/SKILL.md`) placed at 4 points:
   `commit-plan` (after SDS update), `commit-impl` (after executor+QA loop),
   `commit-present` (after presenter), `commit-meta` (after meta-agent,
-  `run_always: true`).
+  `run_on: success`).
 - **Commit format:** `sdlc(<phase>): <summary>` (phase from `SDLC_PHASE` env).
 - **Executor:** Instructed NOT to make git commits (pipeline-managed).
 - **Failure behavior:** Failed nodes produce no commits. On_error: "fail" stops
@@ -451,27 +463,37 @@ graph TD
     - `impl`: impl-loop (body nodes `executor`, `qa` defined inline via
       `nodes` sub-object), commit-impl
     - `report`: presenter, commit-present, meta-agent, commit-meta
-  - **Rollback Before run_always**: When `pipelineSuccess === false`, engine
-    calls `rollbackUncommitted()` before executing `run_always` nodes. Reverts
-    staged/unstaged modifications (`git checkout -- .` + `git reset HEAD`).
-    Does NOT `git clean` — preserves untracked files. Extracts failed node ID
-    via `getNodesByStatus(state, "failed")[0]`, writes to
-    `{{run_dir}}/failed-node.txt` for meta-agent consumption.
-  - **run_always Node Ordering**: After collecting `run_always` nodes, engine
-    sorts them topologically using their `inputs` field (reuses `toposort()`
-    from `dag.ts`). Guarantees `commit-meta` (which declares
-    `inputs: [meta-agent]`) executes after meta-agent.
-  - **Meta-Agent Trigger**: Engine executes meta-agent via `run_always: true`
-    mechanism. After all DAG levels complete (success or failure), engine
-    collects nodes with `run_always: true`, sorts them topologically (see
-    above), and executes in order. Meta-agent reads `failed-node.txt` for
-    failure context. Produces `07-meta-report.md` with "Fixes Applied" section
+  - **Rollback Before Post-Pipeline Nodes**: When `pipelineSuccess === false`,
+    engine calls `rollbackUncommitted()` before executing post-pipeline nodes.
+    Reverts staged/unstaged modifications (`git checkout -- .` +
+    `git reset HEAD`). Does NOT `git clean` — preserves untracked files.
+    Extracts failed node ID via `getNodesByStatus(state, "failed")[0]`, writes
+    to `{{run_dir}}/failed-node.txt` for meta-agent consumption.
+  - **Post-Pipeline Node Collection & Ordering**: `collectPostPipelineNodes()`
+    collects nodes where `run_on !== undefined` (replaces `run_always`-based
+    collection). `sortPostPipelineNodes()` sorts them topologically using
+    `inputs` field (reuses `toposort()` from `dag.ts`). Guarantees
+    `commit-meta` (which declares `inputs: [meta-agent]`) executes after
+    meta-agent.
+  - **Post-Pipeline Node Filtering**: Before executing each post-pipeline node,
+    engine applies per-node filter based on `run_on` value and
+    `pipelineSuccess`:
+    - `run_on: "always"` → execute unconditionally.
+    - `run_on: "success"` → skip if `!pipelineSuccess`, call
+      `markNodeSkipped()`.
+    - `run_on: "failure"` → skip if `pipelineSuccess`, call
+      `markNodeSkipped()`.
+  - **Meta-Agent Trigger**: Engine executes meta-agent via `run_on: "always"`.
+    After all DAG levels complete (success or failure), engine collects
+    post-pipeline nodes, sorts topologically, filters by condition (see above),
+    and executes in order. Meta-agent reads `failed-node.txt` for failure
+    context. Produces `07-meta-report.md` with "Fixes Applied" section
     (structured: what broke, what changed, why). Posts run report *summary* to
     GitHub issue (not full report). Does NOT self-commit — `commit-meta` node
     handles commit.
   - **commit-meta Node**: Dedicated committer agent node for meta-agent output.
     Config: `type: agent`, `prompt: agents/committer/SKILL.md`,
-    `inputs: [meta-agent]`, `run_always: true`, `env: { SDLC_PHASE: meta }`.
+    `inputs: [meta-agent]`, `run_on: success`, `env: { SDLC_PHASE: meta }`.
     Ensures FR-14 "engine never commits" invariant: commit responsibility stays
     with committer agent nodes.
   - **HITL via AskUserQuestion Interception** (FR-21):

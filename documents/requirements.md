@@ -209,7 +209,7 @@
     4. [x] Repeat until validation passes or the continuation limit is reached. Evidence: `.sdlc/engine/agent.ts:75-91` (loop with `continuations < settings.max_continuations`)
   - **Continuation limits:**
     - [x] Maximum continuations per stage: configurable (default 3). Evidence: `.sdlc/pipeline.yaml:9` (`max_continuations: 3`), `.sdlc/engine/agent.ts:82-91`
-    - [x] If limit reached: stage is marked as failed, pipeline stops, Meta-Agent is triggered (FR-11). Evidence: `.sdlc/engine/engine.ts:96-109,613-619` (`collectRunAlwaysNodes()`), `.sdlc/engine/types.ts:56-57` (`run_always` field), `.sdlc/engine/agent.ts:110-120` (continuation limit check)
+    - [x] If limit reached: stage is marked as failed, pipeline stops, Meta-Agent is triggered (FR-11, FR-25). Evidence: `.sdlc/engine/engine.ts:96-109,613-619` (`collectRunOnNodes()`), `.sdlc/engine/types.ts:56-57` (`run_on` field), `.sdlc/engine/agent.ts:110-120` (continuation limit check)
   - **Session persistence:**
     - [x] The `--resume` flag ensures the agent retains full conversation context from the initial invocation. Evidence: `.sdlc/engine/agent.ts:208-230` (`--resume` flag in `buildClaudeArgs`)
     - [x] Each continuation adds only the validation error to the context, not the full prompt. Evidence: `.sdlc/engine/agent.ts:94-97` (resume prompt = failures only)
@@ -270,7 +270,7 @@
 - **Trigger conditions:**
   - **On pipeline success:** runs as the final stage after Presenter (Stage 9).
   - **On pipeline failure:** runs automatically when any stage fails after exhausting its continuation limit.
-- **Trigger mechanism:** Engine executes meta-agent node as the last DAG node. In `pipeline.yaml`, the meta-agent node depends on all other nodes and is configured to run regardless of upstream success/failure (engine handles this via `run_always: true` or equivalent). Failed node ID is available in `state.json`.
+- **Trigger mechanism:** Engine executes meta-agent node as a post-pipeline node. In `pipeline.yaml`, the meta-agent node is configured with `run_on: always` (FR-25) to run regardless of upstream success/failure. Failed node ID is available in `state.json`.
 - **Input:**
   - All logs from `.sdlc/pipeline/<issue-number>/logs/`.
   - All handoff artifacts produced before the failure (if failed).
@@ -335,7 +335,7 @@
 - **Commit strategy:**
   - All pipeline work happens on a dedicated feature branch `agent/<run-id>`.
   - Engine does NOT auto-commit after nodes. Commits happen at explicit committer agent nodes (`agents/committer/SKILL.md`).
-  - Three committer nodes in pipeline: `commit-plan` (after planning stages), `commit-impl` (after executor+QA loop), `commit-present` (after presenter).
+  - Three committer nodes in pipeline: `commit-plan` (after planning stages), `commit-impl` (after executor+QA loop), `commit-present` (after presenter). Committer nodes use `run_on: success` (FR-25) to prevent commits/PRs on pipeline failure.
   - Each commit message follows the format: `sdlc(<phase>): <summary of changes>`.
   - Executor agent is instructed NOT to make git commits.
   - Legacy scripts commit + push after each stage (unchanged).
@@ -542,6 +542,37 @@
   - [ ] `pipeline.yaml` and any other pipeline configs updated to use nested
     body node definitions.
   - [ ] All existing engine tests pass after restructuring.
+  - [ ] `deno task check` passes.
+
+### 3.25 FR-25: Conditional Post-Pipeline Node Execution (`run_on`)
+
+- **Description:** Replace the binary `run_always: boolean` flag with a
+  `run_on: always | success | failure` enum on `NodeConfig`. Engine collects
+  post-pipeline nodes (those with `run_on` set) and executes them after all DAG
+  levels complete, filtering by pipeline outcome. This prevents committer nodes
+  from creating PRs/merging when the pipeline failed, while allowing meta-agent
+  to always run.
+- **Motivation:** `run_always: true` causes committer nodes to run on failure,
+  creating PRs with `Closes #N` that merge broken code. Prompt-level guards are
+  unreliable (LLM can ignore them). Engine-level gating is required.
+- **Enum semantics:**
+  - `run_on: always` — execute regardless of pipeline outcome (current
+    `run_always: true` behavior).
+  - `run_on: success` — execute only when all regular DAG nodes passed.
+  - `run_on: failure` — execute only when pipeline failed.
+  - Nodes without `run_on` execute in normal DAG order (no change).
+- **Backward compatibility:** `run_always: true` in config is normalized to
+  `run_on: "always"` during config loading. `run_always: false` (or absent) is
+  unchanged (no `run_on` set).
+- **Acceptance criteria:**
+  - [ ] `NodeConfig` in `types.ts` has `run_on?: "always" | "success" | "failure"` field. `run_always` deprecated.
+  - [ ] `config.ts` normalizes `run_always: true` → `run_on: "always"` for backward compat.
+  - [ ] Engine filters post-pipeline nodes: skips `run_on: success` nodes when pipeline failed, skips `run_on: failure` nodes when pipeline succeeded.
+  - [ ] Committer nodes (`commit-present`, `commit-meta`) do NOT run when pipeline fails (configured as `run_on: success`).
+  - [ ] Meta-agent runs on every outcome (`run_on: always`).
+  - [ ] `pipeline.yaml` migrated from `run_always: true` to appropriate `run_on` values.
+  - [ ] Engine remains domain-agnostic — no git/PR/GitHub logic in engine code.
+  - [ ] All existing engine tests pass; new tests cover `run_on` filtering logic.
   - [ ] `deno task check` passes.
 
 ## 4. Non-functional requirements

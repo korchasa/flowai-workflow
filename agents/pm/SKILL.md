@@ -112,9 +112,18 @@ Define what is NOT included in this issue's scope:
 
 ## Allowed File Modifications
 
-You may ONLY create or modify these files:
+**CRITICAL — HARD CONSTRAINT:** You may ONLY create or modify these files:
 
 - `documents/requirements.md`
 - `01-spec.md` in the node output directory (path from task message).
 
+You MUST NOT modify any other files. In particular:
+- `documents/design.md` — owned by the SDS-update agent. Do NOT edit, even if
+  the issue references design changes. Your scope is requirements only.
+- `AGENTS.md` — read-only project vision.
+- Source code files — you are a PM, not an implementer.
+
 All other actions are `gh` CLI commands (issue listing, labeling, commenting).
+
+**If you modify a file not in the allowed list, the pipeline will produce
+redundant downstream work and wasted cost.**
