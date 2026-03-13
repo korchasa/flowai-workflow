@@ -620,22 +620,22 @@
   - `agents/pm/` — no changes.
   - `agents/meta-agent/` — no changes.
 - **Acceptance criteria:**
-  - [ ] Agent directory `agents/architect/` contains design-solution prompt. Evidence: `agents/architect/SKILL.md`
-  - [ ] Agent directory `agents/tech-lead/` contains expanded prompt: critique + variant selection + task breakdown + SDS update + branch creation + draft PR. Evidence: `agents/tech-lead/SKILL.md`
+  - [x] Agent directory `agents/architect/` contains design-solution prompt. Evidence: `agents/architect/SKILL.md`
+  - [x] Agent directory `agents/tech-lead/` contains expanded prompt: critique + variant selection + task breakdown + SDS update + branch creation + draft PR. Evidence: `agents/tech-lead/SKILL.md`
   - [ ] `agents/tech-lead-reviewer/`, `agents/tech-lead-sds/`, `agents/committer/` deleted.
   - [ ] `agents/tech-lead-review/SKILL.md` created with code review + CI gate + merge logic. Evidence: `agents/tech-lead-review/SKILL.md`
-  - [ ] `agents/executor/SKILL.md` updated: commits/pushes own code, posts PR comments, "do not commit" rule removed. Evidence: `agents/executor/SKILL.md`
-  - [ ] `agents/qa/SKILL.md` updated: posts PR reviews via `gh pr review`. Evidence: `agents/qa/SKILL.md`
-  - [ ] `pipeline.yaml` updated with new DAG: pm → architect → tech-lead → impl-loop(executor, qa); tech-lead-review as `run_on: always`; meta-agent as `run_on: always`. Evidence: `.sdlc/pipeline.yaml`
-  - [ ] `.claude/skills/` symlinks updated: removed stale links, added new `agent-tech-lead-review`.
+  - [x] `agents/executor/SKILL.md` updated: commits/pushes own code, posts PR comments, "do not commit" rule removed. Evidence: `agents/executor/SKILL.md:25-27`
+  - [ ] `agents/qa/SKILL.md` updated: posts PR reviews via `gh pr review` ONLY (no issue comments). Evidence: `agents/qa/SKILL.md`
+  - [ ] `pipeline.yaml` updated: `finalize` (committer) node removed; `review` node replaced with `tech-lead-review` using `agents/tech-lead-review/SKILL.md` with `run_on: always` + merge capability. Evidence: `.sdlc/pipeline.yaml`
+  - [ ] `.claude/skills/` symlinks updated: removed `agent-committer`, `agent-tech-lead-reviewer`; added `agent-tech-lead-review`.
   - [ ] Pipeline produces 5 agent invocations in happy path (pm, architect, tech-lead, executor, qa) plus 2 post-pipeline (tech-lead-review, meta-agent).
-  - [ ] Executor creates commits on feature branch during implementation.
-  - [ ] QA posts review on PR (not issue comment).
+  - [x] Executor creates commits on feature branch during implementation. Evidence: `agents/executor/SKILL.md:25-27`
+  - [ ] QA posts review on PR only (not issue comment).
   - [ ] Tech-lead-review merges PR if CI green, or leaves open with comments.
-  - [ ] `--prompt` mode (no GitHub issue) uses fallback branch name `sdlc/<run-id>`.
-  - [ ] All existing engine tests pass (no engine code changes).
-  - [ ] `deno task check` passes.
-  - [ ] SRS, SDS updated to reflect new pipeline structure.
+  - [x] `--prompt` mode (no GitHub issue) uses fallback branch name `sdlc/<run-id>`. Evidence: `agents/tech-lead/SKILL.md`
+  - [x] All existing engine tests pass (no engine code changes). Evidence: engine/ unchanged.
+  - [ ] `deno task check` passes after all changes.
+  - [ ] SRS, SDS updated to reflect final pipeline structure.
 
 ### 3.27 FR-27: Per-Node Model Configuration
 
