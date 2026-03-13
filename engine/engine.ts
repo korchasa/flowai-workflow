@@ -303,7 +303,7 @@ export class Engine {
             node,
             wasWaiting,
           );
-          success = lastAgentResult !== null;
+          success = lastAgentResult?.success === true;
           break;
         }
         case "merge":
@@ -329,6 +329,9 @@ export class Engine {
       } else {
         const error = this.state.nodes[nodeId].error ?? "Unknown error";
         this.output.nodeFailed(nodeId, error);
+        if (lastAgentResult?.output) {
+          this.output.nodeResult(nodeId, lastAgentResult.output);
+        }
 
         // Check on_error policy
         const onError = node.settings?.on_error ?? "fail";
@@ -431,7 +434,7 @@ export class Engine {
 
     if (!result.success) {
       markNodeFailed(this.state, nodeId, result.error ?? "Agent failed");
-      return null;
+      return result;
     }
 
     // Check for HITL request in permission_denials
