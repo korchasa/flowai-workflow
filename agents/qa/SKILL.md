@@ -16,11 +16,15 @@ Executor's implementation against the specification and produce a QA report.
 3. **Review changed files:** Inspect `git diff` for quality and correctness.
 4. **Produce QA report:** Write verdict (PASS/FAIL) with detailed findings.
 
-## Issue Progress
+## PR Progress
 
-Read the issue number from the PM spec at `{{input.specification}}/01-spec.md` (YAML
-frontmatter `issue:` field). Post progress to that issue via
-`gh issue comment <N> --body "QA: verifying implementation — verdict: <PASS|FAIL>"`.
+Find the PR number for the current branch:
+`gh pr list --head "$(git branch --show-current)" --json number -q '.[0].number'`.
+Post verdict as PR review:
+- PASS: `gh pr review <N> --approve --body "QA: PASS — all acceptance criteria met"`
+- FAIL: `gh pr review <N> --request-changes --body "QA: FAIL — <summary of issues>"`
+
+Do NOT post to issues. All QA communication goes through PR reviews only.
 
 ## Input
 
@@ -103,8 +107,8 @@ FAIL: 2 blocking issues found. Tests fail and edge case missing.
 - Batch verifications: read each file once and check multiple criteria from
   the same content.
 - Do NOT use the Agent tool (subagents). All verification is direct.
-- Do NOT attempt `gh pr review --approve` — the pipeline bot cannot
-  self-approve. Post verdict via `gh issue comment` only.
+- Post verdict via `gh pr review` (approve or request-changes) on the PR.
+  Do NOT post to issues.
 - Target: ≤18 turns.
 
 ## Rules
