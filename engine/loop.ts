@@ -73,7 +73,8 @@ export async function runLoop(opts: LoopRunOptions): Promise<LoopResult> {
       const bodyNode = loopNode.nodes![bodyNodeId];
       const settings = bodyNode.settings as Required<NodeSettings>;
       const ctx = opts.buildCtx(bodyNodeId, iteration);
-      const effectiveModel = bodyNode.model ?? config.defaults?.model;
+      const effectiveModel = bodyNode.model ?? loopNode.model ??
+        config.defaults?.model;
 
       opts.onNodeStart?.(bodyNodeId, iteration);
       markNodeStarted(state, bodyNodeId);

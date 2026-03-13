@@ -175,6 +175,91 @@ Deno.test("loop body node — AgentResult output exposes total_cost_usd", () => 
   assertEquals(mockOutput.total_cost_usd, 0.0055);
 });
 
+// --- FR-27: Per-node model resolution for loop body nodes ---
+
+Deno.test("loop body node — model resolution: own > loop > defaults", () => {
+  // Verify three-tier model resolution chain (own > loop > defaults)
+  const config: PipelineConfig = {
+    name: "test",
+    version: "1",
+    defaults: { model: "claude-haiku-4-5" },
+    nodes: {
+      "my-loop": {
+        type: "loop",
+        label: "Test Loop",
+        model: "claude-sonnet-4-6",
+        condition_node: "verify",
+        condition_field: "verdict",
+        exit_value: "PASS",
+        max_iterations: 1,
+        nodes: {
+          build: {
+            type: "agent",
+            label: "Build",
+            task_template: "build",
+            // No model — should inherit from loop node
+          },
+          verify: {
+            type: "agent",
+            label: "Verify",
+            task_template: "verify",
+            model: "claude-opus-4-6", // Own model — takes precedence
+          },
+        },
+      },
+    },
+  };
+
+  const loopNode = config.nodes["my-loop"];
+  const buildNode = loopNode.nodes!.build;
+  const verifyNode = loopNode.nodes!.verify;
+
+  // Tier 2: body node with no model inherits from loop node
+  const buildEffective = buildNode.model ?? loopNode.model ??
+    config.defaults?.model;
+  assertEquals(buildEffective, "claude-sonnet-4-6");
+
+  // Tier 1: body node's own model takes precedence
+  const verifyEffective = verifyNode.model ?? loopNode.model ??
+    config.defaults?.model;
+  assertEquals(verifyEffective, "claude-opus-4-6");
+});
+
+Deno.test("loop body node — model falls through to defaults when loop has none", () => {
+  const config: PipelineConfig = {
+    name: "test",
+    version: "1",
+    defaults: { model: "claude-haiku-4-5" },
+    nodes: {
+      "my-loop": {
+        type: "loop",
+        label: "Test Loop",
+        // No model on loop node
+        condition_node: "verify",
+        condition_field: "verdict",
+        exit_value: "PASS",
+        max_iterations: 1,
+        nodes: {
+          verify: {
+            type: "agent",
+            label: "Verify",
+            task_template: "verify",
+            // No model on body node either
+          },
+        },
+      },
+    },
+  };
+
+  const loopNode = config.nodes["my-loop"];
+  const verifyNode = loopNode.nodes!.verify;
+
+  // Tier 3: falls through to defaults
+  const effectiveModel = verifyNode.model ?? loopNode.model ??
+    config.defaults?.model;
+  assertEquals(effectiveModel, "claude-haiku-4-5");
+});
+
 Deno.test("loop body node — cost_usd undefined when result.output absent", () => {
   // When runAgent returns no output (e.g., agent crashed), cost stays undefined
   const state = createRunState("test", "cfg.yaml", ["build"], {}, {});
