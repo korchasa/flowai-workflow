@@ -347,7 +347,7 @@ graph TD
 ## 4. Data
 
 - **Entities:**
-  - Handoff Artifact: Structured Markdown (01-spec.md through 07-meta-report.md)
+  - Handoff Artifact: Structured Markdown (01-spec.md through 07-changelog.md)
   - Agent Log: Claude CLI JSON output (`.sdlc/runs/<run-id>/logs/<node-id>.json`)
   - Agent Prompt: SKILL.md with YAML frontmatter (`agents/<name>/SKILL.md`)
   - Run State: JSON (`.sdlc/runs/<run-id>/state.json`)
@@ -490,10 +490,10 @@ graph TD
     After all DAG levels complete (success or failure), engine collects
     post-pipeline nodes, sorts topologically, filters by condition (see above),
     and executes in order. Meta-agent reads `failed-node.txt` for failure
-    context. Produces `07-meta-report.md` with "Fixes Applied" section
-    (structured: what broke, what changed, why). Posts run report *summary* to
-    GitHub issue (not full report). Does NOT self-commit — `commit-meta` node
-    handles commit.
+    context. Edits `agents/*/SKILL.md` to fix diagnosed problems. Produces
+    minimal `07-changelog.md` listing applied fixes. Updates persistent memory
+    in `documents/meta.md`. Posts 2-3 line summary to GitHub issue.
+    Does NOT self-commit — committer node handles commit.
   - **commit-meta Node**: Dedicated committer agent node for meta-agent output.
     Config: `type: agent`, `prompt: agents/committer/SKILL.md`,
     `inputs: [meta-agent]`, `run_on: success`, `env: { SDLC_PHASE: meta }`.

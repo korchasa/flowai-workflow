@@ -152,21 +152,22 @@ nodes:
   # Stage 8: Meta-Agent — prompt optimization
   meta-agent:
     type: agent
-    label: "Meta-Agent — Prompt Analysis"
+    label: "Meta-Agent — Prompt Optimization"
     prompt: "agents/meta-agent/SKILL.md"
     task_template: |
-      Analyze all logs and artifacts from run {{run_id}} at {{run_dir}}.
-      Produce a meta-report with prompt improvement suggestions.
-      Output: {{node_dir}}/07-meta-report.md
+      Read your memory at documents/meta.md first.
+      Analyze logs from run {{run_id}} at {{run_dir}}.
+      Diagnose problems in agent behavior and fix their prompts in agents/*/SKILL.md.
+      Update documents/meta.md with findings and fix outcomes.
+      Write minimal changelog: {{node_dir}}/07-changelog.md
     run_on: always
     settings:
       on_error: continue
     validate:
       - type: file_exists
-        path: "{{node_dir}}/07-meta-report.md"
-      - type: contains_section
-        path: "{{node_dir}}/07-meta-report.md"
-        value: "Fixes Applied"
+        path: "{{node_dir}}/07-changelog.md"
+      - type: file_not_empty
+        path: "{{node_dir}}/07-changelog.md"
 
   # Final commit — all pipeline artifacts
   commit:
