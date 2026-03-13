@@ -26,6 +26,10 @@ Do NOT use hardcoded paths like `.sdlc/pipeline/...`.
 - Revised plan artifact — path from task message.
 - `documents/design.md` — current SDS.
 
+**Path verification:** Before reading input artifacts, verify each path exists.
+If a path from the task message is unreadable, stop and report the error —
+do NOT guess or construct alternative paths.
+
 ## Output
 
 - Updated `documents/design.md`.

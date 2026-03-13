@@ -38,7 +38,8 @@ export interface NodeConfig {
   after?: string;
 
   // loop-specific
-  body?: string[];
+  /** Inline body node definitions for loop nodes. Keys are body node IDs. */
+  nodes?: Record<string, NodeConfig>;
   condition_node?: string;
   condition_field?: string;
   exit_value?: string;

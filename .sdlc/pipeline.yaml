@@ -110,100 +110,46 @@ nodes:
       Output: updated documents/design.md
     after: "git diff HEAD -- documents/design.md > {{node_dir}}/04a-sds-diff.md; [ -s {{node_dir}}/04a-sds-diff.md ] || echo 'No changes to documents/design.md' > {{node_dir}}/04a-sds-diff.md || true"
 
-  # Commit planning artifacts
-  commit-plan:
-    type: agent
-    label: "Commit planning artifacts"
-    prompt: agents/committer/SKILL.md
-    inputs: [sds-update]
-    task_template: |
-      Stage and commit all changes for the plan phase.
-    env:
-      SDLC_PHASE: plan
-
-  # Stages 6-7: Executor + QA loop
-  executor:
-    type: agent
-    label: "Executor — Implementation"
-    inputs: [architect, sds-update]
-    prompt: "agents/executor/SKILL.md"
-    task_template: |
-      Read the decision at {{input.architect}}/04-decision.md.
-      Read documents/requirements.md and documents/design.md.
-      Implement the changes following the task breakdown.
-      This is iteration {{loop.iteration}}.
-    validate:
-      - type: custom_script
-        path: "deno task check"
-
-  qa:
-    type: agent
-    label: "QA — Verification"
-    inputs: [pm, architect, executor]
-    prompt: "agents/qa/SKILL.md"
-    task_template: |
-      Verify the implementation against the spec at {{input.pm}}/01-spec.md.
-      Check the decision at {{input.architect}}/04-decision.md.
-      Run deno task check and verify all acceptance criteria.
-      Output: {{node_dir}}/05-qa-report.md with YAML frontmatter containing verdict: PASS or FAIL
-    validate:
-      - type: file_exists
-        path: "{{node_dir}}/05-qa-report.md"
-      - type: file_not_empty
-        path: "{{node_dir}}/05-qa-report.md"
-
+  # Stages 6-7: Executor + QA loop (body nodes defined inline)
   impl-loop:
     type: loop
     label: "Executor+QA Implementation Loop"
-    inputs: [commit-plan]
-    body: [executor, qa]
+    inputs: [sds-update]
     condition_node: qa
     condition_field: verdict
     exit_value: PASS
     max_iterations: 3
+    nodes:
+      executor:
+        type: agent
+        label: "Executor — Implementation"
+        inputs: [architect, sds-update]
+        prompt: "agents/executor/SKILL.md"
+        task_template: |
+          Read the decision at {{input.architect}}/04-decision.md.
+          Read documents/requirements.md and documents/design.md.
+          Implement the changes following the task breakdown.
+          This is iteration {{loop.iteration}}.
+        validate:
+          - type: custom_script
+            path: "deno task check"
+      qa:
+        type: agent
+        label: "QA — Verification"
+        inputs: [pm, architect, executor]
+        prompt: "agents/qa/SKILL.md"
+        task_template: |
+          Verify the implementation against the spec at {{input.pm}}/01-spec.md.
+          Check the decision at {{input.architect}}/04-decision.md.
+          Run deno task check and verify all acceptance criteria.
+          Output: {{node_dir}}/05-qa-report.md with YAML frontmatter containing verdict: PASS or FAIL
+        validate:
+          - type: file_exists
+            path: "{{node_dir}}/05-qa-report.md"
+          - type: file_not_empty
+            path: "{{node_dir}}/05-qa-report.md"
 
-  # Commit implementation
-  commit-impl:
-    type: agent
-    label: "Commit implementation"
-    prompt: agents/committer/SKILL.md
-    inputs: [impl-loop]
-    task_template: |
-      Stage and commit all changes for the impl phase.
-    env:
-      SDLC_PHASE: impl
-
-  # Stage 8: Presenter — change summary
-  presenter:
-    type: agent
-    label: "Presenter — Change Summary"
-    inputs: [pm, architect, commit-impl]
-    prompt: "agents/presenter/SKILL.md"
-    task_template: |
-      Create a summary of all changes made during the pipeline.
-      Read the spec at {{input.pm}}/01-spec.md.
-      Read the decision at {{input.architect}}/04-decision.md.
-      Read issue number from {{input.pm}}/01-spec.md frontmatter.
-      Create a PR targeting main and post a summary comment on that issue.
-      Output: {{node_dir}}/06-summary.md
-    validate:
-      - type: file_exists
-        path: "{{node_dir}}/06-summary.md"
-      - type: file_not_empty
-        path: "{{node_dir}}/06-summary.md"
-
-  # Commit presentation artifacts
-  commit-present:
-    type: agent
-    label: "Commit presentation artifacts"
-    prompt: agents/committer/SKILL.md
-    inputs: [presenter]
-    task_template: |
-      Stage and commit all changes for the present phase.
-    env:
-      SDLC_PHASE: present
-
-  # Stage 9: Meta-Agent — prompt optimization
+  # Stage 8: Meta-Agent — prompt optimization
   meta-agent:
     type: agent
     label: "Meta-Agent — Prompt Analysis"
@@ -222,16 +168,25 @@ nodes:
         path: "{{node_dir}}/07-meta-report.md"
         value: "Fixes Applied"
 
-  # Commit meta-agent artifacts
-  commit-meta:
+  # Final commit — all pipeline artifacts
+  commit:
     type: agent
-    label: "Commit meta-agent artifacts"
+    label: "Commit all pipeline artifacts"
     prompt: agents/committer/SKILL.md
-    inputs: [meta-agent]
+    inputs:
+      [
+        pm,
+        tech-lead,
+        reviewer,
+        architect,
+        sds-update,
+        impl-loop,
+        meta-agent,
+      ]
     run_always: true
     task_template: |
-      Stage and commit all changes for the meta phase.
-    env:
-      SDLC_PHASE: meta
-    settings:
-      on_error: continue
+      Stage and commit ALL changes from the entire pipeline run.
+      Use `git add -A` to include everything.
+      Read the spec at {{input.pm}}/01-spec.md.
+      Read the decision at {{input.architect}}/04-decision.md.
+      Create summary, PR, and post issue comment.

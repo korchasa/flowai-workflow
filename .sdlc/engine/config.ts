@@ -122,8 +122,13 @@ function validateNode(
   }
 
   if (type === "loop") {
-    if (!node.body || !Array.isArray(node.body) || node.body.length === 0) {
-      throw new Error(`Loop node '${id}' requires a non-empty 'body' array`);
+    if (
+      !node.nodes || typeof node.nodes !== "object" ||
+      Array.isArray(node.nodes) || Object.keys(node.nodes).length === 0
+    ) {
+      throw new Error(
+        `Loop node '${id}' requires a non-empty 'nodes' sub-object`,
+      );
     }
     if (typeof node.condition_node !== "string") {
       throw new Error(`Loop node '${id}' requires 'condition_node'`);
@@ -134,18 +139,49 @@ function validateNode(
     if (typeof node.exit_value !== "string") {
       throw new Error(`Loop node '${id}' requires 'exit_value'`);
     }
-    // body nodes must be in allNodeIds
-    for (const bodyId of node.body as string[]) {
-      if (!allNodeIds.includes(bodyId)) {
+
+    const bodyNodes = node.nodes as Record<string, unknown>;
+    const bodyNodeIds = Object.keys(bodyNodes);
+
+    // condition_node must reference a key in nodes
+    if (!bodyNodeIds.includes(node.condition_node as string)) {
+      throw new Error(
+        `Loop node '${id}' condition_node '${node.condition_node}' must be a key in 'nodes'`,
+      );
+    }
+
+    // Validate body nodes: if >1 entry, at least one must declare inputs referencing another body node
+    if (bodyNodeIds.length > 1) {
+      let hasInternalInput = false;
+      for (const bodyId of bodyNodeIds) {
+        const bodyNode = bodyNodes[bodyId] as Record<string, unknown>;
+        if (Array.isArray(bodyNode.inputs)) {
+          for (const inp of bodyNode.inputs) {
+            if (bodyNodeIds.includes(inp as string)) {
+              hasInternalInput = true;
+            }
+          }
+        }
+      }
+      if (!hasInternalInput) {
         throw new Error(
-          `Loop node '${id}' body references unknown node '${bodyId}'`,
+          `Loop node '${id}' has >1 body node: at least one body node must declare 'inputs' referencing another body node for ordering`,
         );
       }
     }
-    if (!node.body.includes(node.condition_node)) {
-      throw new Error(
-        `Loop node '${id}' condition_node '${node.condition_node}' must be in body`,
-      );
+
+    // Validate each body node (using combined top-level + body node IDs for input resolution)
+    const validInputIds = [...allNodeIds, ...bodyNodeIds];
+    for (const [bodyId, rawBody] of Object.entries(bodyNodes)) {
+      if (
+        !rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)
+      ) {
+        throw new Error(
+          `Loop node '${id}' body node '${bodyId}' must be an object`,
+        );
+      }
+      const bodyNode = rawBody as Record<string, unknown>;
+      validateNode(bodyId, bodyNode, validInputIds);
     }
   }
 
@@ -232,16 +268,36 @@ function mergeDefaults(config: PipelineConfig): PipelineConfig {
     ...config.defaults,
   };
 
+  const nodeDefaults = extractNodeSettings(pipelineDefaults);
+
   const mergedNodes: Record<string, NodeConfig> = {};
   for (const [id, node] of Object.entries(config.nodes)) {
-    mergedNodes[id] = {
+    const merged: NodeConfig = {
       ...node,
       settings: {
         ...DEFAULT_SETTINGS,
-        ...extractNodeSettings(pipelineDefaults),
+        ...nodeDefaults,
         ...node.settings,
       },
     };
+
+    // Also merge defaults into inline loop body nodes
+    if (node.type === "loop" && node.nodes) {
+      const mergedBodyNodes: Record<string, NodeConfig> = {};
+      for (const [bodyId, bodyNode] of Object.entries(node.nodes)) {
+        mergedBodyNodes[bodyId] = {
+          ...bodyNode,
+          settings: {
+            ...DEFAULT_SETTINGS,
+            ...nodeDefaults,
+            ...bodyNode.settings,
+          },
+        };
+      }
+      merged.nodes = mergedBodyNodes;
+    }
+
+    mergedNodes[id] = merged;
   }
 
   return {

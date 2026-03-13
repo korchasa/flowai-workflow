@@ -126,23 +126,23 @@ nodes:
     type: agent
     label: Spec
     task_template: "spec"
-  executor:
-    type: agent
-    label: Executor
-    task_template: "implement"
-  qa:
-    type: agent
-    label: QA
-    task_template: "verify"
-    inputs: [executor]
   impl-loop:
     type: loop
     label: Impl loop
     inputs: [spec]
-    body: [executor, qa]
     condition_node: qa
     condition_field: verdict
     exit_value: PASS
+    nodes:
+      executor:
+        type: agent
+        label: Executor
+        task_template: "implement"
+      qa:
+        type: agent
+        label: QA
+        task_template: "verify"
+        inputs: [executor]
 `);
   const levels = buildLevels(config);
   // executor and qa should NOT appear in main levels
@@ -213,51 +213,46 @@ Deno.test("buildLoopBodyOrder — sequential body nodes", () => {
 name: test
 version: "1"
 nodes:
-  executor:
-    type: agent
-    label: Executor
-    task_template: "implement"
-  qa:
-    type: agent
-    label: QA
-    task_template: "verify"
-    inputs: [executor]
   impl-loop:
     type: loop
     label: Impl loop
-    body: [executor, qa]
     condition_node: qa
     condition_field: verdict
     exit_value: PASS
+    nodes:
+      executor:
+        type: agent
+        label: Executor
+        task_template: "implement"
+      qa:
+        type: agent
+        label: QA
+        task_template: "verify"
+        inputs: [executor]
 `);
   const order = buildLoopBodyOrder(config, "impl-loop");
   assertEquals(order, ["executor", "qa"]);
 });
 
-Deno.test("buildLoopBodyOrder — parallel body nodes", () => {
+Deno.test("buildLoopBodyOrder — single body node", () => {
   const config = cfg(`
 name: test
 version: "1"
 nodes:
-  review-quality:
-    type: agent
-    label: Quality
-    task_template: "review quality"
-  review-testing:
-    type: agent
-    label: Testing
-    task_template: "review tests"
   review-loop:
     type: loop
     label: Review loop
-    body: [review-quality, review-testing]
-    condition_node: review-quality
+    condition_node: reviewer
     condition_field: status
     exit_value: OK
+    nodes:
+      reviewer:
+        type: agent
+        label: Reviewer
+        task_template: "review"
 `);
   const order = buildLoopBodyOrder(config, "review-loop");
-  // Both have no internal deps, so alphabetical
-  assertEquals(order, ["review-quality", "review-testing"]);
+  assertEquals(order, ["reviewer"]);
 });
 
 Deno.test("buildLoopBodyOrder — non-loop node throws", () => {

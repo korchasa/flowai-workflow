@@ -66,9 +66,9 @@ export async function runLoop(opts: LoopRunOptions): Promise<LoopResult> {
   for (let iteration = 1; iteration <= maxIterations; iteration++) {
     opts.onIteration?.(iteration, maxIterations);
 
-    // Run each body node in order
+    // Run each body node in order (from inline nodes sub-object)
     for (const bodyNodeId of bodyOrder) {
-      const bodyNode = config.nodes[bodyNodeId];
+      const bodyNode = loopNode.nodes![bodyNodeId];
       const settings = bodyNode.settings as Required<NodeSettings>;
       const ctx = opts.buildCtx(bodyNodeId, iteration);
 
@@ -107,10 +107,10 @@ export async function runLoop(opts: LoopRunOptions): Promise<LoopResult> {
       }
     }
 
-    // Check exit condition
+    // Check exit condition (condition node is in inline nodes sub-object)
     const conditionValue = await extractConditionValue(
       opts.buildCtx(conditionNode, iteration),
-      config.nodes[conditionNode],
+      loopNode.nodes![conditionNode],
       conditionField,
     );
     lastConditionValue = conditionValue;

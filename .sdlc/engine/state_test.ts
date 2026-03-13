@@ -236,3 +236,14 @@ Deno.test("getResumableNodes — includes waiting nodes", () => {
   const resumable = getResumableNodes(state);
   assertEquals(resumable.sort(), ["b", "c"]);
 });
+
+Deno.test("createRunState — tracks nested body node IDs from flat list", () => {
+  // Engine passes flattened IDs including loop body nodes to createRunState
+  const allIds = ["pm", "impl-loop", "executor", "qa"];
+  const state = createRunState("test", "cfg.yaml", allIds, {}, {});
+  assertEquals(Object.keys(state.nodes).length, 4);
+  assertEquals(state.nodes.executor.status, "pending");
+  assertEquals(state.nodes.qa.status, "pending");
+  assertEquals(state.nodes["impl-loop"].status, "pending");
+  assertEquals(state.nodes.pm.status, "pending");
+});

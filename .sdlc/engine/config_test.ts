@@ -81,33 +81,91 @@ nodes:
   assertEquals(config.nodes.a.settings!.max_continuations, 10);
 });
 
-Deno.test("parseConfig — loop node with body", () => {
+Deno.test("parseConfig — loop node with inline nodes", () => {
   const yaml = `
 name: test
 version: "1"
 nodes:
-  executor:
-    type: agent
-    label: Executor
-    task_template: "implement"
-  qa:
-    type: agent
-    label: QA
-    task_template: "verify"
   impl-loop:
     type: loop
     label: Implementation loop
-    body: [executor, qa]
     condition_node: qa
     condition_field: verdict
     exit_value: PASS
     max_iterations: 3
+    nodes:
+      executor:
+        type: agent
+        label: Executor
+        task_template: "implement"
+      qa:
+        type: agent
+        label: QA
+        task_template: "verify"
+        inputs: [executor]
 `;
   const config = parseConfig(yaml);
   assertEquals(config.nodes["impl-loop"].type, "loop");
-  assertEquals(config.nodes["impl-loop"].body, ["executor", "qa"]);
+  assertEquals(config.nodes["impl-loop"].nodes != null, true);
+  assertEquals(Object.keys(config.nodes["impl-loop"].nodes!).length, 2);
+  assertEquals(config.nodes["impl-loop"].nodes!.executor.type, "agent");
+  assertEquals(config.nodes["impl-loop"].nodes!.qa.inputs, ["executor"]);
   assertEquals(config.nodes["impl-loop"].condition_node, "qa");
   assertEquals(config.nodes["impl-loop"].exit_value, "PASS");
+});
+
+Deno.test("parseConfig — loop node single body node (no inputs required)", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  my-loop:
+    type: loop
+    label: Single body loop
+    condition_node: worker
+    condition_field: status
+    exit_value: DONE
+    nodes:
+      worker:
+        type: agent
+        label: Worker
+        task_template: "do work"
+`;
+  const config = parseConfig(yaml);
+  assertEquals(Object.keys(config.nodes["my-loop"].nodes!).length, 1);
+});
+
+Deno.test("parseConfig — loop body node inputs reference external top-level node", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    task_template: "write spec"
+  impl-loop:
+    type: loop
+    label: Impl loop
+    inputs: [spec]
+    condition_node: qa
+    condition_field: verdict
+    exit_value: PASS
+    nodes:
+      executor:
+        type: agent
+        label: Executor
+        task_template: "implement"
+        inputs: [spec]
+      qa:
+        type: agent
+        label: QA
+        task_template: "verify"
+        inputs: [executor]
+`;
+  // Should not throw — body node inputs referencing external top-level nodes are valid
+  const config = parseConfig(yaml);
+  assertEquals(config.nodes["impl-loop"].nodes!.executor.inputs, ["spec"]);
 });
 
 Deno.test("parseConfig — human node", () => {
@@ -289,25 +347,66 @@ Deno.test("parseConfig — self-referencing input throws", () => {
   );
 });
 
-Deno.test("parseConfig — loop without body throws", () => {
+Deno.test("parseConfig — loop without nodes throws", () => {
   assertThrows(
     () =>
       parseConfig(
         `name: test\nversion: "1"\nnodes:\n  a:\n    type: loop\n    label: L\n    condition_node: x\n    condition_field: f\n    exit_value: v`,
       ),
     Error,
-    "non-empty 'body'",
+    "non-empty 'nodes'",
   );
 });
 
-Deno.test("parseConfig — loop condition_node not in body throws", () => {
+Deno.test("parseConfig — loop condition_node not in nodes throws", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  loop:
+    type: loop
+    label: L
+    condition_node: qa
+    condition_field: verdict
+    exit_value: PASS
+    nodes:
+      executor:
+        type: agent
+        label: E
+        task_template: x
+`;
   assertThrows(
-    () =>
-      parseConfig(
-        `name: test\nversion: "1"\nnodes:\n  executor:\n    type: agent\n    label: E\n    task_template: x\n  qa:\n    type: agent\n    label: Q\n    task_template: x\n  loop:\n    type: loop\n    label: L\n    body: [executor]\n    condition_node: qa\n    condition_field: verdict\n    exit_value: PASS`,
-      ),
+    () => parseConfig(yaml),
     Error,
-    "must be in body",
+    "must be a key in 'nodes'",
+  );
+});
+
+Deno.test("parseConfig — loop multiple body nodes without inputs ordering throws", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  loop:
+    type: loop
+    label: L
+    condition_node: qa
+    condition_field: verdict
+    exit_value: PASS
+    nodes:
+      executor:
+        type: agent
+        label: E
+        task_template: x
+      qa:
+        type: agent
+        label: Q
+        task_template: x
+`;
+  assertThrows(
+    () => parseConfig(yaml),
+    Error,
+    "at least one body node must declare",
   );
 });
 

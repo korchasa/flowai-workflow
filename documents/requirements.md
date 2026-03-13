@@ -182,6 +182,10 @@
       - Verdict details (human-readable explanation).
     - If `PASS`: loop ends, proceeds to next stage.
     - If `FAIL`: loop repeats with the next Executor iteration.
+  - **Loop config structure:**
+    - [ ] Loop body nodes (`executor`, `qa`) MUST be defined inline within the loop node config, not as top-level pipeline nodes. Body node IDs are loop-scoped.
+    - [ ] Body nodes can declare `inputs` referencing both sibling body nodes (within the same loop) and external top-level nodes.
+    - [ ] `{{loop.iteration}}` template variable is only available in loop body node contexts.
   - **Loop constraints:**
     - Maximum iterations: configurable (default 3).
     - If limit reached without `PASS`: pipeline stops and reports failure on the issue. Meta-Agent is triggered (see FR-10).
@@ -483,6 +487,62 @@
   - [ ] Existing pipeline.yaml node definitions require minimal changes (phase
     grouping derived from config or convention, not hardcoded per-node paths).
   - [ ] All existing engine tests pass after restructuring.
+
+### 3.24 FR-24: Loop Body Node Nesting
+
+- **Description:** Loop nodes in `pipeline.yaml` must define their body nodes
+  inline as nested objects, not reference top-level node IDs. This makes the
+  parent-child relationship explicit, prevents body nodes from being executed
+  outside their loop context, and aligns config structure with execution model.
+- **Motivation:** Current config declares loop body nodes (`executor`, `qa`) at
+  the top level alongside pipeline-level nodes. Body nodes use loop-scoped
+  template variables (`{{loop.iteration}}`) but nothing in their declaration
+  indicates loop scope. This creates namespace pollution, implicit coupling,
+  and misconfiguration risk.
+- **Config structure:** Loop node gains a `nodes` sub-object containing inline
+  body node definitions. The `body` field references IDs within `nodes`.
+  Example:
+  ```yaml
+  impl-loop:
+    type: loop
+    body: [executor, qa]
+    condition_node: qa
+    condition_field: verdict
+    exit_value: PASS
+    max_iterations: 3
+    nodes:
+      executor:
+        type: agent
+        prompt: "agents/executor/SKILL.md"
+        inputs: [architect, sds-update]
+        ...
+      qa:
+        type: agent
+        prompt: "agents/qa/SKILL.md"
+        inputs: [pm, architect, executor]
+        ...
+  ```
+- **Acceptance criteria:**
+  - [ ] Loop nodes define body nodes inline via `nodes` sub-object in
+    `pipeline.yaml`.
+  - [ ] Body node IDs in `nodes` are not registered as top-level DAG nodes.
+  - [ ] Body nodes can reference external (top-level) nodes in their `inputs`.
+  - [ ] Body nodes can reference sibling body nodes (within the same loop) in
+    their `inputs`.
+  - [ ] `{{loop.iteration}}` template variable resolves only inside loop body
+    node contexts.
+  - [ ] Engine config loader (`config.ts`) parses nested node definitions from
+    loop nodes.
+  - [ ] Engine DAG builder (`dag.ts`) excludes loop body nodes from top-level
+    topological sort.
+  - [ ] Engine loop executor (`loop.ts`) resolves body node configs from the
+    loop node's `nodes` sub-object.
+  - [ ] Template resolver handles `{{input.<node-id>}}` for both body-to-body
+    and body-to-external references.
+  - [ ] `pipeline.yaml` and any other pipeline configs updated to use nested
+    body node definitions.
+  - [ ] All existing engine tests pass after restructuring.
+  - [ ] `deno task check` passes.
 
 ## 4. Non-functional requirements
 

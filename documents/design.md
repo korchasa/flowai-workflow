@@ -153,10 +153,17 @@ graph TD
 - **Modules:**
   - `types.ts` — type declarations (incl. `ValidationRule.type` union,
     `NodeConfig.run_always`, `NodeConfig.phase`, `NodeConfig.env`,
+    `LoopNodeConfig.nodes` (inline body node definitions),
     `LoopResult.bodyResults`)
   - `template.ts` — `{{var}}` interpolation for prompts/paths
-  - `config.ts` — YAML parsing, schema validation, defaults merge
-  - `dag.ts` — topological sort, cycle detection, level grouping
+  - `config.ts` — YAML parsing, schema validation, defaults merge.
+    Loop nodes: parses `nodes` sub-object, validates body node ordering
+    (>1 entry requires `inputs` declarations), validates `condition_node`
+    references valid key in `nodes`. Skips top-level existence check for
+    body node IDs referenced in `inputs`.
+  - `dag.ts` — topological sort, cycle detection, level grouping.
+    Excludes loop body nodes (from `nodes` sub-object) from top-level
+    graph; loop node itself remains in DAG with its declared `inputs`.
   - `validate.ts` — artifact validation rules (file_exists, not_empty,
     contains_section, custom_script, frontmatter_field)
   - `state.ts` — RunState persistence to `state.json`, resume logic,
@@ -164,7 +171,11 @@ graph TD
     `getPhaseForNode()`)
   - `agent.ts` — Claude CLI invocation, continuation loop, retry
   - `loop.ts` — loop node execution with condition extraction, per-iteration
-    `AgentResult` accumulation into `LoopResult.bodyResults`
+    `AgentResult` accumulation into `LoopResult.bodyResults`.
+    `buildLoopBodyOrder()` reads from inline `nodes` sub-object (replaces
+    `body` array), topo-sorts body nodes by their `inputs` declarations.
+    `buildContext()` resolves `inputs` against both sibling body nodes and
+    top-level nodes.
   - `hitl.ts` — HITL detection (`detectHitlRequest`) and poll loop
     (`runHitlLoop`); injectable `scriptRunner`/`claudeRunner` for testing
   - `human.ts` — terminal user input, abort logic
@@ -176,7 +187,11 @@ graph TD
     input resolution, loop-node log saving via `onNodeComplete` callback,
     phase registry init (`setPhaseRegistry()` before `ensureRunDirs()` in both
     fresh and resume paths), phase subdir creation in `ensureRunDirs()`,
-    pre-run_always rollback + failed-node-id extraction
+    pre-run_always rollback + failed-node-id extraction.
+    On config load: iterates all nodes; for loop nodes with `nodes`
+    sub-object, flattens nested body node IDs into master ID list passed
+    to `createRunState()` (ensures state.json tracks both top-level and
+    nested body node IDs).
   - `cli.ts` — CLI entry point: argument parsing, .env loading
   - `mod.ts` — public API re-exports
 - **Interfaces:**
@@ -184,7 +199,8 @@ graph TD
     [--dry-run] [-v|-q] [--env KEY=VAL] [--skip nodes] [--only nodes]`
   - Config: `.sdlc/pipeline.yaml` (YAML, version "1")
   - State: `.sdlc/runs/<run-id>/state.json` (JSON)
-- **Node types:** `agent`, `merge`, `loop`, `human`
+- **Node types:** `agent`, `merge`, `loop` (with inline `nodes` sub-object
+    for body node definitions), `human`
 - **Node flags:**
   - `run_always?: boolean` — when `true`, node executes in a post-levels step
     after all DAG levels complete (including on pipeline failure). Used for
@@ -312,6 +328,12 @@ graph TD
     "custom_script"|"frontmatter_field", path?, field?, allowed?, ... }`
   - LoopResult: `{ ..., bodyResults: AgentResult[] }` — accumulated per-iteration
     agent results; consumed by `executeLoopNode()` callback for log saving
+  - LoopNodeConfig: `{ ..., nodes: Record<string, NodeConfig> }` — inline
+    body node definitions replacing `body: string[]`. Each key is a body
+    node ID, value is its full node config. `condition_node` must reference
+    a key in `nodes`. Body node ordering derived from `inputs` declarations
+    via topo-sort (>1 entry requires at least one `inputs` reference to
+    prevent disconnected graph with arbitrary order).
   - NodeConfig: `{ ..., run_always?: boolean, phase?: string,
     env?: Record<string, string> }` — `run_always` for post-levels execution;
     `phase` for artifact directory grouping; `env` for node-level env vars
@@ -369,7 +391,9 @@ graph TD
     error context -> repeat (max N). If limit reached: fail node, trigger
     Meta-Agent.
   - **Executor+QA Loop**: Executor implements -> QA verifies -> if FAIL:
-    Executor reads QA report, fixes -> repeat (max 3).
+    Executor reads QA report, fixes -> repeat (max 3). Body nodes defined
+    inline via loop's `nodes` sub-object (not top-level). Execution order
+    determined by topo-sort of body nodes' `inputs` declarations.
   - **Secret Detection**: `gitleaks detect --no-git` runs as part of
     `deno task check` (`scripts/check.ts`). `allowFailure=true` — skips if
     gitleaks binary not found. Engine-level `safetyCheckDiff()` removed.
@@ -408,7 +432,8 @@ graph TD
     phase subdirs (e.g., `plan/`, `impl/`, `report/`) when phases present.
     Phase assignment (default pipeline):
     - `plan`: pm, tech-lead, reviewer, architect, sds-update, commit-plan
-    - `impl`: executor, qa, impl-loop, commit-impl
+    - `impl`: impl-loop (body nodes `executor`, `qa` defined inline via
+      `nodes` sub-object), commit-impl
     - `report`: presenter, commit-present, meta-agent, commit-meta
   - **Rollback Before run_always**: When `pipelineSuccess === false`, engine
     calls `rollbackUncommitted()` before executing `run_always` nodes. Reverts
