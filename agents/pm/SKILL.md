@@ -22,6 +22,10 @@ produce a specification artifact, updating the project's SRS.
 4. **Review existing docs:** Read `documents/requirements.md` (SRS),
    `documents/design.md` (SDS — read-only reference), and `AGENTS.md` (project
    vision — read-only reference).
+   **Efficiency:** Complete steps 1-3 (issue selection + claim + read) before
+   any codebase exploration. Only read source files that are directly referenced
+   in the issue body or needed to understand affected requirements. Avoid broad
+   codebase scans.
 5. **Update the SRS:** Add or modify requirements in `documents/requirements.md`
    to reflect the issue. Every new requirement gets a status marker `[ ]`
    (pending).

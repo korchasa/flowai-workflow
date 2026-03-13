@@ -169,13 +169,26 @@ graph TD
   - `state.ts` — RunState persistence to `state.json`, resume logic,
     phase registry (`setPhaseRegistry()`, `clearPhaseRegistry()`,
     `getPhaseForNode()`)
-  - `agent.ts` — Claude CLI invocation, continuation loop, retry
+  - `agent.ts` — Claude CLI invocation, continuation loop, retry.
+    `executeClaudeProcess()` uses `--output-format stream-json` and reads
+    stdout line-by-line. Each JSON line appended to `streamLogPath` file
+    (crash-resilient incremental write via `Deno.writeFile({ append: true })`).
+    On `result` event: extracts `ClaudeCliOutput` fields (`result`,
+    `session_id`, `is_error`, `total_cost_usd`, `duration_ms`,
+    `duration_api_ms`, `num_turns`, `permission_denials`). `is_error` derived
+    from `subtype !== "success"`. No `result` event → throws descriptive error.
+    `streamLogPath` accepted as required parameter in `executeClaudeProcess()`.
+    Append semantics: multiple invocations (continuation) with same path
+    produce concatenated JSONL. `--verbose` flag removed from
+    `buildClaudeArgs()` (unrelated to streaming, changes stderr globally)
   - `loop.ts` — loop node execution with condition extraction, per-iteration
     `AgentResult` accumulation into `LoopResult.bodyResults`.
     `buildLoopBodyOrder()` reads from inline `nodes` sub-object (replaces
     `body` array), topo-sorts body nodes by their `inputs` declarations.
     `buildContext()` resolves `inputs` against both sibling body nodes and
-    top-level nodes.
+    top-level nodes. Accepts `streamLogPath` pattern from engine; computes
+    iteration-qualified path `${nodeId}-iter-${i}.jsonl` per body node
+    invocation; forwards to inner `runAgent()` calls
   - `hitl.ts` — HITL detection (`detectHitlRequest`) and poll loop
     (`runHitlLoop`); injectable `scriptRunner`/`claudeRunner` for testing
   - `human.ts` — terminal user input, abort logic
@@ -192,6 +205,9 @@ graph TD
     sub-object, flattens nested body node IDs into master ID list passed
     to `createRunState()` (ensures state.json tracks both top-level and
     nested body node IDs).
+    Computes `streamLogPath = ${runDir}/logs/${nodeId}.jsonl` for each agent
+    node; passes to `runAgent()`. For loop nodes: passes path pattern to
+    loop executor for iteration-qualified derivation
   - `cli.ts` — CLI entry point: argument parsing, .env loading
   - `mod.ts` — public API re-exports
 - **Interfaces:**

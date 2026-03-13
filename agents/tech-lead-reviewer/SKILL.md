@@ -58,6 +58,9 @@ like `## Variant A: ...`). For each variant:
 
 - State what changed and why (reference critique points).
 - Keep: affected files (backtick-quoted paths), effort (S/M/L), risks.
+- **Be incremental:** Only describe what changed from the original plan. Do NOT
+  rewrite unchanged parts of variants. Reference the original plan for
+  unchanged details (e.g., "Affected files: same as original + `config.ts`").
 
 ### 3. `## Recommendation`
 

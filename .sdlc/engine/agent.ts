@@ -34,6 +34,8 @@ export interface AgentRunOptions {
   output?: OutputManager;
   /** Node ID for verbose output tagging. */
   nodeId?: string;
+  /** Path to write real-time stream-json log file. */
+  streamLogPath?: string;
 }
 
 /**
@@ -47,7 +49,8 @@ export interface AgentRunOptions {
  * 5. Run `after` hook if configured
  */
 export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
-  const { node, ctx, settings, claudeArgs, output, nodeId } = opts;
+  const { node, ctx, settings, claudeArgs, output, nodeId, streamLogPath } =
+    opts;
 
   // Derive onOutput callback from OutputManager
   const onOutput = output && nodeId
@@ -79,6 +82,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
     maxRetries: settings.max_retries,
     retryDelaySeconds: settings.retry_delay_seconds,
     onOutput,
+    streamLogPath,
   });
 
   let continuations = 0;
@@ -156,6 +160,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
       maxRetries: settings.max_retries,
       retryDelaySeconds: settings.retry_delay_seconds,
       onOutput,
+      streamLogPath,
     });
   }
 
@@ -205,6 +210,8 @@ export interface InvokeOptions {
   maxRetries: number;
   retryDelaySeconds: number;
   onOutput?: (line: string) => void;
+  /** Path to write real-time stream-json log file. */
+  streamLogPath?: string;
 }
 
 interface InvokeResult {
@@ -225,6 +232,7 @@ export async function invokeClaudeCli(
         args,
         opts.timeoutSeconds,
         opts.onOutput,
+        opts.streamLogPath,
       );
       if (output.is_error) {
         lastError = `Claude CLI returned error: ${output.result}`;
@@ -270,16 +278,22 @@ export function buildClaudeArgs(opts: InvokeOptions): string[] {
     args.push("--append-system-prompt-file", opts.promptFile);
   }
 
-  args.push("--output-format", "json");
+  args.push("--output-format", "stream-json", "--verbose");
 
   return args;
 }
 
-/** Execute the claude CLI process and capture JSON output. */
+/**
+ * Execute the claude CLI process with stream-json output.
+ * Processes NDJSON events in real-time: writes each line to streamLogPath,
+ * forwards formatted summaries to onOutput, and extracts ClaudeCliOutput
+ * from the final "result" event.
+ */
 async function executeClaudeProcess(
   args: string[],
   timeoutSeconds: number,
   onOutput?: (line: string) => void,
+  streamLogPath?: string,
 ): Promise<ClaudeCliOutput> {
   // Unset CLAUDECODE to allow nested claude CLI invocations.
   // Claude Code checks this variable and refuses to launch inside another session.
@@ -303,41 +317,97 @@ async function executeClaudeProcess(
     }
   }, timeoutSeconds * 1000);
 
-  // Collect stdout fully
-  const stdoutChunks: Uint8Array[] = [];
+  // Open stream log file for real-time writing (append mode)
+  let logFile: Deno.FsFile | undefined;
+  if (streamLogPath) {
+    const dir = streamLogPath.replace(/\/[^/]+$/, "");
+    await Deno.mkdir(dir, { recursive: true });
+    logFile = await Deno.open(streamLogPath, {
+      write: true,
+      create: true,
+      append: true,
+    });
+  }
+
+  // Process stdout as stream-json NDJSON
+  let resultEvent: ClaudeCliOutput | undefined;
+  const stdoutDecoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buffer = "";
+
   const stdoutReader = process.stdout.getReader();
-  (async () => {
+  const stdoutDone = (async () => {
     try {
       while (true) {
         const { done, value } = await stdoutReader.read();
         if (done) break;
-        stdoutChunks.push(value);
+        buffer += stdoutDecoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop()!;
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          // Write raw line to log file in real-time
+          if (logFile) {
+            await logFile.write(encoder.encode(line + "\n"));
+          }
+          // Parse and extract result event
+          try {
+            // deno-lint-ignore no-explicit-any
+            const event = JSON.parse(line) as Record<string, any>;
+            if (event.type === "result") {
+              resultEvent = extractClaudeOutput(event);
+            }
+            // Forward formatted summary to onOutput
+            if (onOutput) {
+              const summary = formatEventForOutput(event);
+              if (summary) onOutput(summary);
+            }
+          } catch {
+            // Skip malformed JSON lines
+          }
+        }
+      }
+      // Process remaining buffer
+      if (buffer.trim()) {
+        if (logFile) {
+          await logFile.write(encoder.encode(buffer + "\n"));
+        }
+        try {
+          // deno-lint-ignore no-explicit-any
+          const event = JSON.parse(buffer) as Record<string, any>;
+          if (event.type === "result") {
+            resultEvent = extractClaudeOutput(event);
+          }
+          if (onOutput) {
+            const summary = formatEventForOutput(event);
+            if (summary) onOutput(summary);
+          }
+        } catch { /* skip */ }
       }
     } catch { /* stream closed */ }
   })();
 
-  // Collect stderr, optionally streaming lines to onOutput
+  // Collect stderr for error reporting
   const stderrChunks: Uint8Array[] = [];
   const stderrReader = process.stderr.getReader();
-  const stderrDecoder = new TextDecoder();
-  (async () => {
+  const stderrDone = (async () => {
     try {
       while (true) {
         const { done, value } = await stderrReader.read();
         if (done) break;
         stderrChunks.push(value);
-        if (onOutput) {
-          const text = stderrDecoder.decode(value, { stream: true });
-          for (const line of text.split("\n").filter(Boolean)) {
-            onOutput(line);
-          }
-        }
       }
     } catch { /* stream closed */ }
   })();
 
+  await Promise.all([stdoutDone, stderrDone]);
   const status = await process.status;
   clearTimeout(timeoutId);
+
+  // Close log file
+  if (logFile) {
+    logFile.close();
+  }
 
   const concat = (chunks: Uint8Array[]) => {
     const total = chunks.reduce((n, c) => n + c.length, 0);
@@ -349,10 +419,13 @@ async function executeClaudeProcess(
     }
     return buf;
   };
-  const stdout = new TextDecoder().decode(concat(stdoutChunks)).trim();
   const stderr = new TextDecoder().decode(concat(stderrChunks)).trim();
 
-  if (!status.success && !stdout) {
+  if (resultEvent) {
+    return resultEvent;
+  }
+
+  if (!status.success) {
     throw new Error(
       `Claude CLI exited with code ${status.code}${
         stderr ? `: ${stderr}` : ""
@@ -360,12 +433,59 @@ async function executeClaudeProcess(
     );
   }
 
-  try {
-    return JSON.parse(stdout) as ClaudeCliOutput;
-  } catch {
-    throw new Error(
-      `Failed to parse Claude CLI JSON output: ${stdout.substring(0, 200)}`,
-    );
+  throw new Error(
+    "Claude CLI stream-json output contained no result event",
+  );
+}
+
+/** Extract ClaudeCliOutput fields from a stream-json result event. */
+// deno-lint-ignore no-explicit-any
+export function extractClaudeOutput(
+  event: Record<string, any>,
+): ClaudeCliOutput {
+  return {
+    result: event.result ?? "",
+    session_id: event.session_id ?? "",
+    total_cost_usd: event.total_cost_usd ?? 0,
+    duration_ms: event.duration_ms ?? 0,
+    duration_api_ms: event.duration_api_ms ?? 0,
+    num_turns: event.num_turns ?? 0,
+    is_error: event.is_error ?? event.subtype !== "success",
+    permission_denials: event.permission_denials,
+  };
+}
+
+/** Format a stream event as a one-line summary for verbose output. */
+// deno-lint-ignore no-explicit-any
+function formatEventForOutput(event: Record<string, any>): string {
+  switch (event.type) {
+    case "system":
+      if (event.subtype === "init") {
+        return `[stream] init model=${event.model ?? "?"}`;
+      }
+      return "";
+    case "assistant": {
+      const contents = event.message?.content;
+      if (!Array.isArray(contents)) return "";
+      const parts: string[] = [];
+      for (const block of contents) {
+        if (block.type === "text" && block.text) {
+          const preview = block.text.length > 120
+            ? block.text.slice(0, 120) + "…"
+            : block.text;
+          parts.push(`[stream] text: ${preview.replaceAll("\n", "↵")}`);
+        } else if (block.type === "tool_use") {
+          parts.push(`[stream] tool: ${block.name ?? "?"}`);
+        }
+      }
+      return parts.join("\n");
+    }
+    case "result":
+      return `[stream] result: ${event.subtype} (${
+        event.duration_ms ?? 0
+      }ms, $${(event.total_cost_usd ?? 0).toFixed(4)})`;
+    default:
+      return "";
   }
 }
 
