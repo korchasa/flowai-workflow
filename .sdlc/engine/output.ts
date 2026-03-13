@@ -188,7 +188,12 @@ export class OutputManager {
   }
 
   /** Print the dry-run execution plan. */
-  dryRunPlan(levels: string[][], labels: Record<string, string>): void {
+  dryRunPlan(
+    levels: string[][],
+    labels: Record<string, string>,
+    postPipelineNodeIds?: string[],
+    runOnMap?: Record<string, string>,
+  ): void {
     this.write("\nExecution Plan (dry run):\n");
     this.write(`${"─".repeat(40)}\n`);
     for (let i = 0; i < levels.length; i++) {
@@ -198,6 +203,14 @@ export class OutputManager {
       for (const nodeId of level) {
         const label = labels[nodeId] ?? nodeId;
         this.write(`  - ${nodeId}: ${label}\n`);
+      }
+    }
+    if (postPipelineNodeIds && postPipelineNodeIds.length > 0) {
+      this.write(`Post-pipeline:\n`);
+      for (const nodeId of postPipelineNodeIds) {
+        const label = labels[nodeId] ?? nodeId;
+        const condition = runOnMap?.[nodeId] ?? "always";
+        this.write(`  - ${nodeId}: ${label} (run_on: ${condition})\n`);
       }
     }
     this.write(`${"─".repeat(40)}\n`);

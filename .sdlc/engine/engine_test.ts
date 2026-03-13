@@ -490,3 +490,81 @@ Deno.test("findNodeConfig — returns undefined for unknown node", () => {
   const node = findNodeConfig(config, "nonexistent");
   assertEquals(node, undefined);
 });
+
+// --- dryRunPlan post-pipeline section tests ---
+
+Deno.test("dryRunPlan — renders Post-pipeline section when postPipelineNodeIds provided", () => {
+  const cap = createCapture();
+  const out = new OutputManager("normal", cap.writer);
+  const levels = [["pm", "architect"], ["tech-lead"]];
+  const labels: Record<string, string> = {
+    pm: "PM Agent",
+    architect: "Architect",
+    "tech-lead": "Tech Lead",
+    "meta-agent": "Meta Agent",
+    "tech-lead-review": "Tech Lead Review",
+  };
+  const postPipelineNodeIds = ["meta-agent", "tech-lead-review"];
+  const runOnMap: Record<string, string> = {
+    "meta-agent": "always",
+    "tech-lead-review": "always",
+  };
+  out.dryRunPlan(levels, labels, postPipelineNodeIds, runOnMap);
+  const output = cap.lines.join("");
+  assertEquals(output.includes("Level 1"), true);
+  assertEquals(output.includes("pm"), true);
+  assertEquals(output.includes("Post-pipeline:"), true);
+  assertEquals(output.includes("meta-agent"), true);
+  assertEquals(output.includes("always"), true);
+  assertEquals(output.includes("tech-lead-review"), true);
+});
+
+Deno.test("dryRunPlan — no Post-pipeline section when postPipelineNodeIds is empty", () => {
+  const cap = createCapture();
+  const out = new OutputManager("normal", cap.writer);
+  const levels = [["pm"]];
+  const labels: Record<string, string> = { pm: "PM Agent" };
+  out.dryRunPlan(levels, labels, [], {});
+  const output = cap.lines.join("");
+  assertEquals(output.includes("Post-pipeline:"), false);
+});
+
+Deno.test("dryRunPlan — no Post-pipeline section when params omitted (backward compat)", () => {
+  const cap = createCapture();
+  const out = new OutputManager("normal", cap.writer);
+  const levels = [["pm"]];
+  const labels: Record<string, string> = { pm: "PM Agent" };
+  out.dryRunPlan(levels, labels);
+  const output = cap.lines.join("");
+  assertEquals(output.includes("Post-pipeline:"), false);
+  assertEquals(output.includes("Level 1"), true);
+});
+
+Deno.test("dry-run — post-pipeline nodes excluded from regular levels filtering logic", () => {
+  const nodes: Record<string, NodeConfig> = {
+    pm: { type: "agent", label: "PM" },
+    architect: { type: "agent", label: "Architect", inputs: ["pm"] },
+    "meta-agent": { type: "agent", label: "Meta-Agent", run_on: "always" },
+    "tech-lead-review": {
+      type: "agent",
+      label: "TL Review",
+      run_on: "always",
+    },
+  };
+  const levels = [["pm"], ["architect"], ["meta-agent", "tech-lead-review"]];
+  const postPipelineIds = collectPostPipelineNodes(nodes);
+  const filteredLevels = levels
+    .map((l) => l.filter((id) => !postPipelineIds.includes(id)))
+    .filter((l) => l.length > 0);
+
+  assertEquals(filteredLevels.length, 2);
+  assertEquals(filteredLevels[0], ["pm"]);
+  assertEquals(filteredLevels[1], ["architect"]);
+  for (const level of filteredLevels) {
+    assertEquals(level.includes("meta-agent"), false);
+    assertEquals(level.includes("tech-lead-review"), false);
+  }
+  assertEquals(postPipelineIds.length, 2);
+  assertEquals(postPipelineIds.includes("meta-agent"), true);
+  assertEquals(postPipelineIds.includes("tech-lead-review"), true);
+});

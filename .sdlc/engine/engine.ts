@@ -70,7 +70,25 @@ export class Engine {
       for (const [id, node] of Object.entries(this.config.nodes)) {
         labels[id] = node.label;
       }
-      this.output.dryRunPlan(levels, labels);
+      const rawPostPipelineIds = collectPostPipelineNodes(this.config.nodes);
+      const postPipelineNodeIds = sortPostPipelineNodes(
+        rawPostPipelineIds,
+        this.config.nodes,
+      );
+      const filteredLevels = levels
+        .map((level) => level.filter((id) => !postPipelineNodeIds.includes(id)))
+        .filter((level) => level.length > 0);
+      const runOnMap: Record<string, string> = {};
+      for (const id of postPipelineNodeIds) {
+        const node = this.config.nodes[id];
+        if (node.run_on) runOnMap[id] = node.run_on;
+      }
+      this.output.dryRunPlan(
+        filteredLevels,
+        labels,
+        postPipelineNodeIds,
+        runOnMap,
+      );
       return this.createDryRunState(levels);
     }
 
