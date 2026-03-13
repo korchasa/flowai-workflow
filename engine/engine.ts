@@ -28,6 +28,7 @@ import {
   saveState,
 } from "./state.ts";
 import { rollbackUncommitted } from "./git.ts";
+import { acquireLock, defaultLockPath, releaseLock } from "./lock.ts";
 import { runAgent } from "./agent.ts";
 import { saveAgentLog } from "./log.ts";
 import { detectHitlRequest, runHitlLoop } from "./hitl.ts";
@@ -110,6 +111,22 @@ export class Engine {
       );
     }
 
+    // Acquire pipeline lock (prevents parallel runs)
+    const lockPath = this.options.lock_path ?? defaultLockPath();
+    await acquireLock(lockPath, this.state.run_id);
+
+    try {
+      return await this.runWithLock(levels, lockPath);
+    } finally {
+      await releaseLock(lockPath);
+    }
+  }
+
+  /** Execute the pipeline after lock is acquired. */
+  private async runWithLock(
+    levels: string[][],
+    _lockPath: string,
+  ): Promise<RunState> {
     // Create run directory structure
     await this.ensureRunDirs(levels);
     await saveState(this.state);

@@ -71,12 +71,21 @@ Fields:
 
 ## Git Workflow
 
-1. Stash any local changes, checkout main, pull latest.
-2. Create branch: `sdlc/issue-<N>`.
-3. Commit decision artifact + SDS changes (single commit).
-4. Push with `-u` and create draft PR via `gh pr create --draft`.
+1. Check `git status` first. If on `main` and clean, proceed directly.
+   If working tree has changes from previous pipeline nodes, use
+   `git stash --include-untracked` once. Do NOT `git stash pop` after
+   checkout — the stashed changes are from earlier pipeline stages and are
+   already committed or irrelevant to your branch.
+2. Ensure you are on `main` with latest: `git checkout main && git pull`.
+3. Create branch: `git checkout -b sdlc/issue-<N>`.
+4. Commit decision artifact + SDS changes (single commit).
+5. Push with `-u` and create draft PR via `gh pr create --draft`.
    PR body MUST include `Closes #<N>` (issue number from spec) on its own line
    so GitHub auto-closes the issue when the PR is merged.
+
+**Git error recovery:** If a git operation fails, read the error message and
+diagnose before retrying. Do NOT retry the same command or loop through
+reset/clean/checkout. One stash + one branch creation should suffice.
 
 ## Efficiency
 

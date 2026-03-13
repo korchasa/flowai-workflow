@@ -25,7 +25,11 @@ implement the code changes defined in the task breakdown from the Architect.
 4. **Commit and push:** After all checks pass, stage changes (`git add -A`),
    commit (`git commit -m "sdlc(impl): <brief summary>"`), and push
    (`git push origin HEAD`). One commit per implementation run.
-5. **Fix QA issues:** On iterations > 1, read the QA report and fix issues.
+5. **Fix QA issues (iteration > 1):** The QA report is at
+   `<run-dir>/verify/05-qa-report.md` (same run directory as your node).
+   Read it FIRST. Trust the QA diagnosis — apply the fix directly without
+   re-investigating. Typical flow: read QA report → fix identified issues →
+   `deno task check` → commit. Target: ≤10 turns for fix iterations.
 
 ## Input
 
@@ -36,7 +40,9 @@ Do NOT use hardcoded paths like `.sdlc/pipeline/...`.
 - `documents/requirements.md` — current SRS.
 - `documents/design.md` — current SDS.
 - Source code (as referenced in task breakdown).
-- On iteration > 1: QA report from previous iteration — path from task message.
+- On iteration > 1: QA report at `<run-dir>/verify/05-qa-report.md` (derive
+  `<run-dir>` from the decision path in the task message, e.g.,
+  `.sdlc/runs/<run-id>/verify/05-qa-report.md`).
 
 ## Output
 

@@ -1,0 +1,88 @@
+/** Pipeline lock to prevent parallel runs.
+ * Lock file contains JSON with PID, run_id, and timestamp.
+ * Stale locks (dead PID) are automatically reclaimed. */
+
+/** Lock file content structure. */
+export interface LockInfo {
+  pid: number;
+  run_id: string;
+  started_at: string;
+}
+
+const LOCK_PATH = ".sdlc/runs/.lock";
+
+/** Default lock file path. */
+export function defaultLockPath(): string {
+  return LOCK_PATH;
+}
+
+/** Check if a process with given PID is alive. */
+function isProcessAlive(pid: number): boolean {
+  try {
+    Deno.kill(pid, "SIGCONT");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Read lock info from lock file. Throws if file doesn't exist. */
+export async function readLockInfo(lockPath: string): Promise<LockInfo> {
+  const text = await Deno.readTextFile(lockPath);
+  return JSON.parse(text) as LockInfo;
+}
+
+/** Acquire pipeline lock. Throws if another live process holds it.
+ * Reclaims stale locks (dead PID) automatically. */
+export async function acquireLock(
+  lockPath: string,
+  runId: string,
+): Promise<void> {
+  // Check existing lock
+  try {
+    const existing = await readLockInfo(lockPath);
+    if (isProcessAlive(existing.pid)) {
+      throw new Error(
+        `Pipeline is already running (run_id: ${existing.run_id}, pid: ${existing.pid}). ` +
+          `Remove ${lockPath} manually if the process is stuck.`,
+      );
+    }
+    // Stale lock — reclaim it
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) {
+      // No lock file — proceed
+    } else if (
+      err instanceof Error && err.message.includes("already running")
+    ) {
+      throw err;
+    } else if (err instanceof SyntaxError) {
+      // Corrupted lock file — overwrite
+    }
+    // For NotFound and SyntaxError, fall through to create new lock
+  }
+
+  const info: LockInfo = {
+    pid: Deno.pid,
+    run_id: runId,
+    started_at: new Date().toISOString(),
+  };
+
+  // Ensure parent directory exists
+  const dir = lockPath.substring(0, lockPath.lastIndexOf("/"));
+  if (dir) {
+    await Deno.mkdir(dir, { recursive: true });
+  }
+
+  await Deno.writeTextFile(lockPath, JSON.stringify(info, null, 2) + "\n");
+}
+
+/** Release pipeline lock. No-op if lock file doesn't exist. */
+export async function releaseLock(lockPath: string): Promise<void> {
+  try {
+    await Deno.remove(lockPath);
+  } catch (err) {
+    if (!(err instanceof Deno.errors.NotFound)) {
+      throw err;
+    }
+  }
+}
