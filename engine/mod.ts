@@ -40,7 +40,6 @@ export { extractFrontmatterField, runLoop } from "./loop.ts";
 export type { LoopResult } from "./loop.ts";
 export { runHuman } from "./human.ts";
 export type { HumanResult, UserInput } from "./human.ts";
-export { commitNodeChanges, getCurrentBranch, pushToOrigin } from "./git.ts";
 export { OutputManager } from "./output.ts";
 export type { RunSummary } from "./output.ts";
 export { Engine } from "./engine.ts";

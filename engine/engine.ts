@@ -27,7 +27,6 @@ import {
   markRunFailed,
   saveState,
 } from "./state.ts";
-import { rollbackUncommitted } from "./git.ts";
 import { acquireLock, defaultLockPath, releaseLock } from "./lock.ts";
 import { runAgent } from "./agent.ts";
 import { saveAgentLog } from "./log.ts";
@@ -168,16 +167,12 @@ export class Engine {
 
     // Execute post-pipeline nodes (filtered by run_on condition)
     if (postPipelineNodeIds.length > 0) {
-      // Pre-step: on failure, rollback uncommitted changes and write failed-node-id
+      // Pre-step: on failure, run failure hook and write failed-node-id
       if (!pipelineSuccess) {
-        try {
-          await rollbackUncommitted();
-          this.output.status("engine", "Rolled back uncommitted changes");
-        } catch (err) {
-          this.output.warn(
-            `Rollback failed: ${(err as Error).message}`,
-          );
-        }
+        await runFailureHook(
+          this.config.defaults?.on_failure_script,
+          this.output,
+        );
 
         // Write failed node ID to failed-node.txt for meta-agent consumption
         const failedNodes = getNodesByStatus(this.state, "failed");
@@ -811,6 +806,35 @@ export function collectAllNodeIds(config: PipelineConfig): string[] {
     }
   }
   return ids;
+}
+
+/**
+ * Execute the on_failure_script hook (domain-agnostic).
+ * Swallows errors — failure hook must not crash the engine.
+ */
+export async function runFailureHook(
+  script: string | undefined,
+  output: OutputManager,
+): Promise<void> {
+  if (!script) return;
+  try {
+    const cmd = new Deno.Command(script, {
+      stdout: "piped",
+      stderr: "piped",
+    });
+    const result = await cmd.output();
+    const stdout = new TextDecoder().decode(result.stdout).trim();
+    const stderr = new TextDecoder().decode(result.stderr).trim();
+    if (stdout) output.status("engine", `Hook stdout: ${stdout}`);
+    if (stderr) output.warn(`Hook stderr: ${stderr}`);
+    if (!result.success) {
+      output.warn(`Failure hook exited with code ${result.code}`);
+    } else {
+      output.status("engine", "Failure hook completed");
+    }
+  } catch (err) {
+    output.warn(`Failure hook error: ${(err as Error).message}`);
+  }
 }
 
 /** Recursively copy a directory. */

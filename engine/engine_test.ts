@@ -12,6 +12,7 @@ import {
   Engine,
   findNodeConfig,
   resolveInputArtifacts,
+  runFailureHook,
   sortPostPipelineNodes,
 } from "./engine.ts";
 import type { AgentResult } from "./agent.ts";
@@ -758,4 +759,55 @@ Deno.test("RunState — total_cost_usd in state.json roundtrip", async () => {
   } finally {
     await Deno.remove(tmpDir, { recursive: true });
   }
+});
+
+// --- FR-34: runFailureHook tests ---
+
+Deno.test("runFailureHook — no-op when script undefined", async () => {
+  const cap = createCapture();
+  const out = new OutputManager("normal", cap.writer);
+  await runFailureHook(undefined, out);
+  assertEquals(cap.lines.length, 0);
+});
+
+Deno.test("runFailureHook — executes script and logs completion", async () => {
+  const tmpScript = await Deno.makeTempFile({ suffix: ".sh" });
+  try {
+    await Deno.writeTextFile(tmpScript, "#!/bin/bash\necho 'hook ran'");
+    await Deno.chmod(tmpScript, 0o755);
+    const cap = createCapture();
+    const out = new OutputManager("normal", cap.writer);
+    await runFailureHook(tmpScript, out);
+    const output = cap.lines.join("");
+    assertEquals(
+      output.includes("hook ran") || output.includes("completed"),
+      true,
+    );
+  } finally {
+    await Deno.remove(tmpScript);
+  }
+});
+
+Deno.test("runFailureHook — script failure does not throw (swallows error)", async () => {
+  const tmpScript = await Deno.makeTempFile({ suffix: ".sh" });
+  try {
+    await Deno.writeTextFile(tmpScript, "#!/bin/bash\nexit 1");
+    await Deno.chmod(tmpScript, 0o755);
+    const cap = createCapture();
+    const out = new OutputManager("normal", cap.writer);
+    // Must not throw
+    await runFailureHook(tmpScript, out);
+    const output = cap.lines.join("");
+    assertEquals(output.includes("WARN"), true);
+  } finally {
+    await Deno.remove(tmpScript);
+  }
+});
+
+Deno.test("runFailureHook — nonexistent script does not throw (swallows error)", async () => {
+  const cap = createCapture();
+  const out = new OutputManager("normal", cap.writer);
+  await runFailureHook("/nonexistent/hook.sh", out);
+  const output = cap.lines.join("");
+  assertEquals(output.includes("WARN"), true);
 });

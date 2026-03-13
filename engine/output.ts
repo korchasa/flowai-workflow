@@ -150,43 +150,6 @@ export class OutputManager {
     }
   }
 
-  /** Show safety check results: diffed files and any violations. */
-  verboseSafety(
-    nodeId: string,
-    files: string[],
-    violations: string[],
-  ): void {
-    if (this.verbosity !== "verbose") return;
-    this.write(`── ${nodeId}: SAFETY CHECK (${files.length} files) ──\n`);
-    for (const f of files) {
-      this.write(`  ${f}\n`);
-    }
-    if (violations.length > 0) {
-      this.write(`  VIOLATIONS:\n`);
-      for (const v of violations) {
-        this.write(`    ${v}\n`);
-      }
-    } else {
-      this.write(`  No violations\n`);
-    }
-  }
-
-  /** Show commit details: staged files, message, branch. */
-  verboseCommit(
-    nodeId: string,
-    files: string[],
-    message: string,
-    branchName: string,
-  ): void {
-    if (this.verbosity !== "verbose") return;
-    this.write(`── ${nodeId}: COMMIT (${branchName}) ──\n`);
-    this.write(`  message: ${message}\n`);
-    this.write(`  files (${files.length}):\n`);
-    for (const f of files) {
-      this.write(`    ${f}\n`);
-    }
-  }
-
   /** Show one-line agent result summary after node completion (FR-30). Suppressed in quiet mode. */
   nodeResult(nodeId: string, output: ClaudeCliOutput): void {
     if (this.verbosity === "quiet") return;

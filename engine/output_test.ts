@@ -128,48 +128,6 @@ Deno.test("verboseContinuation — emits continuation context in verbose mode", 
   assertEquals(cap.lines.some((l) => l.includes("output.md")), true);
 });
 
-Deno.test("verboseSafety — emits safety results in verbose mode", () => {
-  const cap = createCapture();
-  const out = new OutputManager("verbose", cap.writer);
-  out.verboseSafety(
-    "executor",
-    ["src/main.ts", ".github/ci.yml"],
-    ["Out-of-scope: .github/ci.yml"],
-  );
-  assertEquals(cap.lines.length > 0, true);
-  assertEquals(cap.lines.some((l) => l.includes("src/main.ts")), true);
-  assertEquals(cap.lines.some((l) => l.includes("Out-of-scope")), true);
-});
-
-Deno.test("verboseSafety — no-op in normal mode", () => {
-  const cap = createCapture();
-  const out = new OutputManager("normal", cap.writer);
-  out.verboseSafety("executor", ["src/main.ts"], []);
-  assertEquals(cap.lines.length, 0);
-});
-
-Deno.test("verboseCommit — emits commit details in verbose mode", () => {
-  const cap = createCapture();
-  const out = new OutputManager("verbose", cap.writer);
-  out.verboseCommit(
-    "executor",
-    ["src/main.ts", "src/util.ts"],
-    "sdlc(executor): run-1 — Executor",
-    "agent/18",
-  );
-  assertEquals(cap.lines.length > 0, true);
-  assertEquals(cap.lines.some((l) => l.includes("src/main.ts")), true);
-  assertEquals(cap.lines.some((l) => l.includes("agent/18")), true);
-  assertEquals(cap.lines.some((l) => l.includes("sdlc(executor)")), true);
-});
-
-Deno.test("verboseCommit — no-op in quiet mode", () => {
-  const cap = createCapture();
-  const out = new OutputManager("quiet", cap.writer);
-  out.verboseCommit("executor", ["src/main.ts"], "msg", "main");
-  assertEquals(cap.lines.length, 0);
-});
-
 // --- nodeResult tests (FR-30) ---
 
 Deno.test("nodeResult — emits result line in normal mode", () => {
@@ -279,7 +237,7 @@ Deno.test("nodeResult — handles empty result string", () => {
 
 // --- AC8: Default mode (verbose=false) emits zero verbose output ---
 
-Deno.test("AC8 — default mode emits zero output from all 6 verbose methods", () => {
+Deno.test("AC8 — default mode emits zero output from all verbose methods", () => {
   const cap = createCapture();
   const out = new OutputManager("normal", cap.writer);
 
@@ -293,8 +251,6 @@ Deno.test("AC8 — default mode emits zero output from all 6 verbose methods", (
     { rule: "file_not_empty", passed: false, detail: "empty" },
   ]);
   out.verboseContinuation("node1", 1, 3, ["validation failed"]);
-  out.verboseSafety("node1", ["src/main.ts"], ["Out-of-scope: .github/ci.yml"]);
-  out.verboseCommit("node1", ["src/main.ts"], "commit msg", "agent/42");
 
   assertEquals(
     cap.lines.length,

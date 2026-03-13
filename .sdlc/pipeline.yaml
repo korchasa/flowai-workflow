@@ -15,13 +15,14 @@ defaults:
   model: claude-sonnet-4-6
   claude_args:
     - "--dangerously-skip-permissions"
+  on_failure_script: .sdlc/scripts/rollback-uncommitted.sh
   hitl:
     ask_script: .sdlc/scripts/hitl-ask.sh
     check_script: .sdlc/scripts/hitl-check.sh
-    issue_source: plan/specification/01-spec.md
+    artifact_source: plan/specification/01-spec.md
     poll_interval: 60
     timeout: 7200
-    bot_login: "github-actions[bot]"
+    exclude_login: "github-actions[bot]"
 
 phases:
   plan: [specification, design, decision]

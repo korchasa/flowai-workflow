@@ -239,8 +239,8 @@ function buildScriptArgs(
   const args = [
     "--run-dir",
     runDir,
-    "--issue-source",
-    config.issue_source ?? "",
+    "--artifact-source",
+    config.artifact_source ?? "",
     "--run-id",
     runId,
     "--node-id",
@@ -251,8 +251,8 @@ function buildScriptArgs(
     args.push("--question-json", JSON.stringify(question));
   }
 
-  if (type === "check" && config.bot_login) {
-    args.push("--bot-login", config.bot_login);
+  if (type === "check" && config.exclude_login) {
+    args.push("--exclude-login", config.exclude_login);
   }
 
   return args;

@@ -20,6 +20,7 @@ export interface PipelineDefaults extends NodeSettings {
   claude_args?: string[]; // extra args passed to claude CLI (e.g. ["--dangerously-skip-permissions"])
   model?: string; // default Claude model for all agent nodes (e.g. "claude-sonnet-4-6")
   hitl?: HitlConfig; // human-in-the-loop config (ask/check scripts, poll, timeout)
+  on_failure_script?: string; // path to script executed on pipeline failure (FR-34)
 }
 
 /** Configuration for a single pipeline node. */
@@ -211,8 +212,8 @@ export interface ClaudeCliOutput {
 export interface HitlConfig {
   ask_script: string;
   check_script: string;
-  issue_source?: string; // relative path from run_dir to artifact with issue frontmatter
+  artifact_source?: string; // relative path from run_dir to artifact with issue frontmatter
   poll_interval: number; // seconds between polls, default 60
   timeout: number; // max wait seconds, default 7200
-  bot_login?: string; // login to exclude in hitl-check.sh
+  exclude_login?: string; // login to exclude in hitl-check.sh
 }
