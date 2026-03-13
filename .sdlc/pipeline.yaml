@@ -152,6 +152,7 @@ nodes:
       Update documents/meta.md with findings and fix outcomes.
       Write minimal changelog: {{node_dir}}/07-changelog.md
     run_on: always
+    after: "deno task dashboard --run-dir {{run_dir}} || true"
     settings:
       on_error: continue
     validate:
