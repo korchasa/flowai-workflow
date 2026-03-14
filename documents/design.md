@@ -185,6 +185,14 @@ graph LR
   Summary` validation on 6 nodes (`specification`, `design`, `decision`,
   `verify`, `optimize`, `tech-lead-review`). Developer (`build`) excluded from
   file-based validation — uses existing `custom_script: deno task check`.
+- **Voice Convention (FR-40):** Each SKILL.md contains a `## Voice` section
+  (after `# Role:` heading, before `## Responsibilities`) mandating first-person
+  narrative ("I") in all agent outputs (GitHub comments, artifacts, reports).
+  Passive/third-person prohibited in narrative text. YAML frontmatter and code
+  blocks excluded. Each agent's section includes 2-3 role-specific correct vs
+  incorrect examples anchored to that agent's typical output types (e.g., PM:
+  "I selected issue #42" not "Issue #42 was selected"; QA: "I verified all
+  criteria" not "All criteria were verified").
 - **Migration (FR-36):** Complete. Formerly `agents/<name>/SKILL.md` with
   symlinks from `.claude/skills/`. Migrated to canonical `.claude/skills/`
   layout; `agents/` directory removed; symlink indirection eliminated. Legacy
