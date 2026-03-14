@@ -46,3 +46,4 @@ export type { HumanResult, UserInput } from "./human.ts";
 export { OutputManager } from "./output.ts";
 export type { RunSummary } from "./output.ts";
 export { Engine } from "./engine.ts";
+export type { NodeExecutionContext } from "./node-dispatch.ts";
