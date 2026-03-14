@@ -243,7 +243,15 @@ graph LR
     Append semantics: multiple invocations (continuation) with same path
     produce concatenated JSONL. `--verbose` flag removed from
     `buildClaudeArgs()` (unrelated to streaming, changes stderr globally).
-    **Turn separators and summary footer (FR-39):** `executeClaudeProcess()`
+    **Repeated file read warning (FR-39):** `FileReadTracker` class in
+    `agent.ts`. `track(path): string | null` — maintains `Map<string, number>`,
+    returns `[WARN] repeated file read: <path> (<N> times)` when count >
+    threshold (default 2), else null. Instantiated per `executeClaudeProcess()`
+    call (counter resets per invocation). In event loop: for `tool_use` blocks
+    with `name === "Read"`, calls `tracker.track(block.input.file_path)`. Non-
+    null result written to `logFile` via `stampLines()`. Log-file-only (terminal
+    `onOutput` unchanged). Pure-logic class — unit-testable without I/O.
+    **Turn separators and summary footer (FR-40):** `executeClaudeProcess()`
     maintains `turnCount` counter. On each `event.type === "assistant"`:
     increments counter, writes `--- turn N ---` line to `logFile` via
     `stampLines()` (timestamped, consistent with existing log writes). After
@@ -252,6 +260,17 @@ graph LR
     `status=<ok|error> duration=<X>s cost=$<Y> turns=<N>`. Both separators and
     footer are log-file-only (terminal `onOutput` callback unchanged).
     `formatFooter()` is a pure function — unit-testable without CLI.
+    **Repeated file read warning (FR-40):** `executeClaudeProcess()` maintains
+    `readCounts: Map<string, number>` tracking per-path `Read` tool-use events.
+    On each `assistant` event: iterates `message.content` blocks, detects
+    `tool_use` with `name === "Read"`, extracts `input.file_path`, increments
+    count. When count > 2: writes warning to `logFile` via `stampLines()`.
+    `checkRepeatedRead(readCounts, filePath): string | null` — helper: increments
+    map, returns formatted warning when count > 2, else null.
+    `formatRepeatedReadWarning(path, count): string` — pure function returning
+    `[WARN] repeated file read: <path> (<N> times)`. Exported for unit testing.
+    Warning is log-only (no `onOutput` callback). Counters reset per invocation
+    (map is local to `executeClaudeProcess()` call). Execution not blocked.
     **Semi-verbose filtering (FR-41):** `formatEventForOutput(event,
     verbosity?)` accepts optional `Verbosity` param. When
     `verbosity === "semi-verbose"`, skips `tool_use` content blocks in

@@ -863,7 +863,24 @@
     parallel node stacking, single-node edge case, missing-timing omission.
   - [ ] `deno task check` passes.
 
-### 3.38 FR-40: Dashboard Stream Log Links
+### 3.38 FR-39: Repeated File Read Warning
+
+- **Description:** Stream log emits a `[WARN]` line when the same file path is read more than 2 times within one agent session (`executeClaudeProcess()` invocation). Warning includes the file path and read count. Informational only — does not block execution. Enables meta-agent to detect and diagnose repeated-read anti-patterns from log analysis.
+- **Motivation:** Agents were silently re-reading the same file 3-4 times per session (run `20260313T025203`: PM agent read `documents/requirements.md` 4 times consecutively), wasting tokens. The pattern was invisible to logging and prompt optimization tooling.
+- **Implementation:** `FileReadTracker` class in `engine/agent.ts`. Instantiated per `executeClaudeProcess()` call (counters reset per invocation). In event loop: for `tool_use` blocks with `name === "Read"`, calls `tracker.track(block.input.file_path)`. Non-null result written to log via `stampLines()`. Terminal `onOutput` callback unchanged (log-file-only).
+- **Warning format:** `[WARN] repeated file read: <path> (<N> times)`.
+- **Acceptance criteria:**
+  - [x] Stream log emits `[WARN] repeated file read: <path> (<N> times)` when same path is read >2 times in one session. Evidence: `engine/agent.ts` (`FileReadTracker.track()`), commit `ebe7cb2`.
+  - [x] Warning includes file path and read count. Evidence: `engine/agent.ts` (`FileReadTracker` return value format).
+  - [x] Warning is log-file-only — terminal `onOutput` callback unchanged. Evidence: `engine/agent.ts` (warning written via `stampLines()` to logFile only).
+  - [x] Counter resets per `executeClaudeProcess()` invocation (not cross-continuation). Evidence: `FileReadTracker` instantiated inside `executeClaudeProcess()`.
+  - [x] Execution not blocked by warning. Evidence: `track()` returns warning string; engine continues normally.
+  - [x] `FileReadTracker` is a pure-logic class — unit-testable without I/O. Evidence: `engine/agent_test.ts` (FileReadTracker unit tests).
+  - [x] `deno task check` passes. Evidence: QA PASS — all tests pass (run `20260314T060523`).
+
+---
+
+### 3.39 FR-40: Dashboard Stream Log Links
 
 - **Description:** Each node card in the HTML dashboard must include a direct
   link to that node's `stream.log` execution log when the file exists. The link

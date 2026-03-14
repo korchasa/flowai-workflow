@@ -325,6 +325,35 @@ export function buildClaudeArgs(opts: InvokeOptions): string[] {
 }
 
 /**
+ * Tracks per-path file read counts within a single agent invocation.
+ * Returns a warning string when a path is read more than `threshold` times.
+ * Pure-logic class — unit-testable without I/O.
+ */
+export class FileReadTracker {
+  private counts = new Map<string, number>();
+
+  constructor(private readonly threshold = 2) {}
+
+  /**
+   * Increment read count for path.
+   * Returns `[WARN] repeated file read: <path> (<N> times)` when count > threshold, else null.
+   */
+  track(path: string): string | null {
+    const count = (this.counts.get(path) ?? 0) + 1;
+    this.counts.set(path, count);
+    if (count > this.threshold) {
+      return `[WARN] repeated file read: ${path} (${count} times)`;
+    }
+    return null;
+  }
+
+  /** Clear all counts (for testing isolation). */
+  reset(): void {
+    this.counts.clear();
+  }
+}
+
+/**
  * Execute the claude CLI process with stream-json output.
  * Processes NDJSON events in real-time: writes readable formatted summaries
  * to streamLogPath (full, unfiltered), forwards filtered summaries to onOutput
@@ -378,6 +407,7 @@ async function executeClaudeProcess(
   const encoder = new TextEncoder();
   let buffer = "";
   let turnCount = 0;
+  const tracker = new FileReadTracker();
 
   const stdoutReader = process.stdout.getReader();
   const stdoutDone = (async () => {
@@ -399,6 +429,20 @@ async function executeClaudeProcess(
               await logFile.write(
                 encoder.encode(stampLines(`--- turn ${turnCount} ---`) + "\n"),
               );
+              // Track repeated file reads
+              const contents = event.message?.content;
+              if (Array.isArray(contents)) {
+                for (const block of contents) {
+                  if (block.type === "tool_use" && block.name === "Read") {
+                    const warn = tracker.track(block.input?.file_path);
+                    if (warn) {
+                      await logFile.write(
+                        encoder.encode(stampLines(warn) + "\n"),
+                      );
+                    }
+                  }
+                }
+              }
             }
             if (event.type === "result") {
               resultEvent = extractClaudeOutput(event);
@@ -438,6 +482,20 @@ async function executeClaudeProcess(
             await logFile.write(
               encoder.encode(stampLines(`--- turn ${turnCount} ---`) + "\n"),
             );
+            // Track repeated file reads
+            const contents = event.message?.content;
+            if (Array.isArray(contents)) {
+              for (const block of contents) {
+                if (block.type === "tool_use" && block.name === "Read") {
+                  const warn = tracker.track(block.input?.file_path);
+                  if (warn) {
+                    await logFile.write(
+                      encoder.encode(stampLines(warn) + "\n"),
+                    );
+                  }
+                }
+              }
+            }
           }
           if (event.type === "result") {
             resultEvent = extractClaudeOutput(event);
