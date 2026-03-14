@@ -29,11 +29,12 @@ implement the code changes defined in the task breakdown from the Architect.
 - **FORBIDDEN: Agent tool.** Do NOT spawn subagents. Read files directly with
   Read tool. Agent subagent to read a file = 1 wasted turn + overhead.
   **Evidence:** Run 20260314T051048: spawned Agent just to read decision file.
-- **FORBIDDEN: Skill tool.** Do NOT call Skill("agent-developer") or any other
-  skill. You ARE the developer agent — calling Skill is recursive and wastes
-  an entire session. **Evidence:** Run 20260314T054224: called
-  Skill("agent-developer") = recursive invocation, massive cost inflation
-  (14t/$1.38 vs 9t/$0.31 baseline).
+- **FORBIDDEN: Skill tool, ToolSearch tool.** Do NOT call Skill (recursive) or
+  ToolSearch. Read, Write, Edit, Bash, Grep, Glob are already available —
+  ToolSearch wastes a turn discovering tools you already have.
+  **Evidence:** Run 20260314T082012: ToolSearch("select:Read,Grep,Bash,Write,Edit,Glob")
+  = 1 wasted turn. All 6 tools were already available.
+  Run 20260314T054224: Skill("agent-developer") = recursive, $1.38 vs $0.31.
 - **HARD STOP — `deno task check` EXACTLY ONCE per run.** Run it once. Read the
   output. Extract pass/fail. Done. Do NOT run it a second time unless you made
   code changes to fix failures from the first run. Back-to-back duplicate runs
