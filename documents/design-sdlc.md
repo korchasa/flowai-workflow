@@ -436,3 +436,11 @@ FR-S24 evidence (issue #96):
   verification (end-to-end run + `deno task check`). Selected Variant A
   (Verification-Only) — no code changes, evidence marking only. Dashboard
   phase-aware path computation deferred. FR-E5 and FR-E7 deferred.
+
+Engine refactoring (issue #92):
+
+- **engine.ts module size reduction:** Pure engine-scope refactoring — no SDLC
+  pipeline impact. Variant A selected: extract `engine/hitl-handler.ts` (HITL
+  orchestration) and `engine/post-pipeline.ts` (post-pipeline executor) from
+  `engine/engine.ts`. Target: ≤500 LOC (from 849). Engine public interfaces
+  unchanged; SDLC pipeline transparent to internal restructuring.
