@@ -33,8 +33,16 @@ update the SDS, and create a feature branch with draft PR.
      - Components affected by the selected variant
   3. AFTER writing these facts: design.md is DONE. ZERO re-reads. ZERO Grep.
      Use the facts you wrote down. They are in your context.
-- **FORBIDDEN: Skill tool.** Do NOT call the Skill tool. You are already running
-  as the Tech Lead agent — calling Skill("agent-tech-lead") is recursive.
+- **FORBIDDEN: Skill tool, ToolSearch tool.** Do NOT call Skill (recursive) or
+  ToolSearch (Read, Write, Bash, Grep, Glob, Edit are already available — ToolSearch
+  wastes a turn discovering tools you have).
+  **Evidence:** Run 20260314T082012: called ToolSearch("select:Write") = 1 wasted
+  turn. Write was already available.
+- **HARD STOP — ONE READ PER FILE. Including tool-results temp files.**
+  When Bash stores large output in a temp file (`/home/.../.claude/.../tool-results/*.txt`),
+  read it ONCE. Do NOT read the same temp file twice.
+  **Evidence:** Run 20260314T082012: read `toolu_0144w3YnneVvNqHaKbKPEXL5.txt` TWICE
+  (gh pr list output). The content was already in context after the first read.
 
 ## Responsibilities
 
@@ -168,7 +176,7 @@ diagnose before retrying. Do NOT retry the same command blindly.
   - `mkdir -p <output-dir>`
   **FORBIDDEN: ALL other Bash commands.** Specifically: `git show`, `git log`,
   `git diff`, `ls`, `ls -la`, `grep`, `cat`, `find`. You have all context from
-  Read calls. In this run, TL used `ls` to check directories — wasted turn.
+  Read calls.
 - **FORBIDDEN: Grep tool after Read.** You Read 5 files in parallel. Do NOT
   then Grep any of those files. In this run, 2 Grep calls were wasted.
 - **ONE WRITE for SDS updates (MANDATORY).** Read design.md once (in parallel

@@ -1,28 +1,27 @@
 # Meta-Agent Memory
 
 ## Agent Baselines
-- pm (specification): 12t/$0.62/105s — REGRESSED ($0.37→$0.62). 4× tool-results re-read (gh comments overflow). --jq fix applied in 080106 but PM still used `--json comments`.
-- architect (design): 13t/$0.29/60s — stable.
-- tech-lead (decision): 14t/$0.32/85s — IMPROVED ($0.53→$0.32). tl-design-md-reread + double-git-commit both clean.
-- developer (build): 13t/$0.31/61s — stable. Chained git add -f working.
-- qa (verify): 17t/$0.42/86s — IMPROVED ($0.75→$0.42). No SKILL.md reads. Still: 4 bash grep + double deno check.
-- Total run cost: $1.96 (down from $2.25)
+- pm (specification): 12t/$0.34/65s — stable ($0.30→$0.34).
+- architect (design): 13t/$0.26/72s — stable.
+- tech-lead (decision): 17t/$1.03/98s — REGRESSED ($0.30→$1.03). ToolSearch + double tool-results read.
+- developer (build): 14t/$0.49/63s — REGRESSED ($0.23→$0.49). ToolSearch + tail via Bash.
+- qa (verify): 21t/$0.52/126s — REGRESSED ($0.70→$0.52 cost but 21t). Double deno check (6th), 2× requirements.md read (forbidden), 3× duplicate Grep.
+- Total run cost: $2.64 (up from $1.83)
 - 1 iteration (QA passed first try)
 
 ## Active Patterns
-- pm-oversized-gh-output: WATCHING, first seen 080106, last seen 080440. 2nd
-  consecutive. PM still uses `--json comments` despite `--jq` fix. Strengthened:
-  pre-flight check "verify command has no `comments`" before Bash call.
-- qa-bash-grep-v3: WATCHING, last seen 080440. 4th consecutive. 4 bash grep
-  calls (grep -c ×3, grep -n ×1). Fix: pre-flight check + positive Grep tool
-  alternative with exact syntax.
-- qa-double-deno-check: WATCHING, last seen 080440. 2nd consecutive. Ran
-  `deno task check` then re-ran with `| tail -20`. Updated evidence count.
-- architect-grep-after-read-v2: NOT violated in 080440. 1st clean run.
-- tl-design-md-reread: NOT violated in 080440. 1st clean run (text-extraction fix worked).
-- dev-design-md-reread: NOT violated in 080440. 1st clean run.
-- double-git-commit: NOT violated in 080440. 2nd clean run (chained fix worked).
-- dev-bash-grep: NOT violated in 080440. 2nd clean run.
+- pm-oversized-gh-output: RESOLVED. 1st clean run in 081855 (used `--jq '{title,body}'`).
+- qa-bash-grep-v3: NOT violated in 082012. 1st clean run (used Grep tool). WATCHING.
+- qa-double-deno-check: NOT violated in 081855. 1st clean run (ran once, read overflow once).
+- qa-toolsearch: NEW, first seen 081855. Called ToolSearch("select:Bash,Read,Write").
+  Fix: added ToolSearch to FORBIDDEN list at top of prompt.
+- qa-unnecessary-reads: NEW, first seen 081855. Read requirements.md + pipeline.yaml
+  (unnecessary, ~1000 lines). Fix: HARD STOP rule added.
+- architect-grep-after-read-v2: NOT violated in 081855. 2nd clean run.
+- tl-design-md-reread: NOT violated in 081855. 2nd clean run.
+- dev-design-md-reread: NOT violated in 081855. 2nd clean run.
+- double-git-commit: NOT violated in 081855. 3rd clean run → RESOLVED.
+- dev-bash-grep: NOT violated in 081855. 3rd clean run → RESOLVED.
 - qa-individual-file-reads-v2: RESOLVED (2 clean runs: 080106, 080440).
 
 ## Resolved Patterns
@@ -51,6 +50,9 @@
 - tl-push-force-with-lease: RESOLVED (2 clean runs)
 - qa-bash-grep-v2: RESOLVED → MUTATED into qa-bash-grep-v3
 - qa-individual-file-reads-v2: RESOLVED (2 clean runs: 080106, 080440)
+- pm-oversized-gh-output: RESOLVED (clean in 081855 after pre-flight fix)
+- double-git-commit: RESOLVED (3 clean runs)
+- dev-bash-grep: RESOLVED (3 clean runs)
 
 ## Applied Fixes Log
 - 20260313T021326–20260314T062600: (compressed — see git history for details)
@@ -75,6 +77,10 @@
   (2nd consecutive violation despite --jq fix). qa — Grep tool positive
   alternative with exact syntax (4th consecutive bash grep). Updated deno
   check evidence (2nd consecutive double-run).
+- 20260314T081855: qa — (1) ToolSearch added to FORBIDDEN list (1st violation).
+  (2) Replaced bash grep prohibition with MANDATORY ALGORITHM + exact Grep
+  syntax (5th consecutive). (3) HARD STOP for requirements.md/pipeline.yaml
+  reads (unnecessary context inflation, ~$0.10).
 
 ## Lessons Learned
 - Total pipeline cost baseline for M-effort issue: ~$2.25 (down from ~$5.00).
@@ -87,7 +93,7 @@
   behavior. Positive algorithm (WHAT to do) works.
 - **Skill tool is the most persistent anti-pattern.** Fix: anti-Skill as FIRST
   content (before # Role heading). 3 clean runs confirm.
-- **Cost trajectory:** $5.09→$2.31→$4.67→$5.73→$3.38→$3.16→$4.09→$3.16→$1.75→$2.25→$2.28→$1.96.
+- **Cost trajectory:** $5.09→$2.31→$4.67→$5.73→$3.38→$3.16→$4.09→$3.16→$1.75→$2.25→$2.28→$1.96→$1.83.
 - **Git archaeology is wasteful.** Agents should plan from current checkout.
 - **Scattered HARD STOPs cause rule fatigue.** Single execution algorithm better.
 - **Text checkpoint technique:** Requiring agent to WRITE analysis in text
