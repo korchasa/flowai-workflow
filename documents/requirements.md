@@ -918,6 +918,23 @@
 
 ---
 
+### 3.40 FR-41: Intermediate Verbosity Level (Agent Reasoning View)
+
+- **Description:** Add a verbosity level between `normal` and `verbose` that surfaces agent text output (reasoning/commentary) to terminal without tool-call noise. Currently: `normal` shows only STARTED/COMPLETED/FAILED status events (minutes of silence); `verbose` (`-v`) floods output with every tool call, making reasoning hard to follow.
+- **Motivation:** No middle ground for users who want to observe agent reasoning without tool-call noise during long pipeline runs.
+- **Acceptance criteria:**
+  - [ ] A new verbosity level exists between `normal` and `verbose`.
+  - [ ] At this level, agent text blocks (assistant message content) are streamed to terminal in real-time.
+  - [ ] Tool call events (Read, Edit, Bash, Grep, etc.) are suppressed from terminal output at this level.
+  - [ ] STARTED/COMPLETED/FAILED status lines remain visible at this level.
+  - [ ] Existing `quiet` (`-q`), `normal` (default), and `verbose` (`-v`) levels are unchanged in behavior.
+  - [ ] New level is selectable via CLI flag (exact flag defined by Architect).
+  - [ ] `OutputManager` in `engine/output.ts` handles new verbosity value.
+  - [ ] Unit tests cover: text block output at new level, tool-call suppression at new level, no regression on existing levels.
+  - [ ] `deno task check` passes.
+
+---
+
 ## 4. Non-functional requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution is not supported.
