@@ -9,7 +9,7 @@ Deno.test("parseArgs — --prompt sets args.prompt", () => {
 Deno.test("parseArgs — no flags produces empty args", () => {
   const opts = parseArgs([]);
   assertEquals(opts.args.prompt, undefined);
-  assertEquals(opts.config_path, ".sdlc/pipeline.yaml");
+  assertEquals(opts.config_path, ".auto-flow/pipeline.yaml");
 });
 
 Deno.test("parseArgs — --prompt combined with --config and -v", () => {

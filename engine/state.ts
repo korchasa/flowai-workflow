@@ -89,7 +89,7 @@ export function createRunState(
 
 /** Get the run directory path for a given run ID. */
 export function getRunDir(runId: string): string {
-  return `.sdlc/runs/${runId}`;
+  return `.auto-flow/runs/${runId}`;
 }
 
 /** Get the node output directory path.

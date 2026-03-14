@@ -95,8 +95,8 @@ Deno.test("detectHitlRequest — handles flat tool_input (no questions wrapper)"
 
 function makeHitlConfig(): HitlConfig {
   return {
-    ask_script: ".sdlc/scripts/hitl-ask.sh",
-    check_script: ".sdlc/scripts/hitl-check.sh",
+    ask_script: ".auto-flow/scripts/hitl-ask.sh",
+    check_script: ".auto-flow/scripts/hitl-check.sh",
     artifact_source: "pm/01-spec.md",
     poll_interval: 0.01, // fast for tests (10ms)
     timeout: 0.5, // 500ms timeout for tests

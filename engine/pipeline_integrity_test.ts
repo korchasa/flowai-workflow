@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { collectPromptPaths, loadConfig } from "./config.ts";
 
-const PIPELINE_PATH = ".sdlc/pipeline.yaml";
+const PIPELINE_PATH = ".auto-flow/pipeline.yaml";
 
 Deno.test("pipeline.yaml — all prompt files exist on disk", async () => {
   const config = await loadConfig(PIPELINE_PATH);

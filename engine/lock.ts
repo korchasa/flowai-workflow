@@ -11,7 +11,7 @@ export interface LockInfo {
   started_at: string;
 }
 
-const LOCK_PATH = ".sdlc/runs/.lock";
+const LOCK_PATH = ".auto-flow/runs/.lock";
 
 /** Default lock file path. */
 export function defaultLockPath(): string {

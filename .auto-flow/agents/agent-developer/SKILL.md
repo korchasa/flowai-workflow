@@ -105,7 +105,7 @@ updates.
      (e.g., `engine/log.ts`) — NOT old run data.
 4. **Write code and tests:** Follow TDD (tests first), project code style.
 5. **Commit and push:** After all checks pass, stage and commit in ONE chained
-   Bash call. `.sdlc/runs/` is gitignored — use `git add -f` for files there:
+   Bash call. `.auto-flow/runs/` is gitignored — use `git add -f` for files there:
    `git add -f <run-artifacts> && git add -A && git commit -m "..."`.
    Then push: `git push origin HEAD`. One commit per run.
    Commit format:
@@ -130,7 +130,7 @@ updates.
 ## Input
 
 Use ONLY the paths provided in the task message.
-Do NOT use hardcoded paths like `.sdlc/pipeline/...`.
+Do NOT use hardcoded paths like `.auto-flow/pipeline/...`.
 
 - Task breakdown (decision artifact) — path from task message.
 - **Scope-dependent docs (read ONLY scope-relevant pair):**
@@ -140,7 +140,7 @@ Do NOT use hardcoded paths like `.sdlc/pipeline/...`.
 - Source code (as referenced in task breakdown).
 - On iteration > 1: QA report at `<run-dir>/verify/05-qa-report.md` (derive
   `<run-dir>` from the decision path in the task message, e.g.,
-  `.sdlc/runs/<run-id>/verify/05-qa-report.md`).
+  `.auto-flow/runs/<run-id>/verify/05-qa-report.md`).
 
 ## Output
 
@@ -169,7 +169,7 @@ block direct invocations. Always use `deno task check`.
 - **Scope:** Only modify files listed in `04-decision.md` YAML frontmatter
   `tasks[].files` plus test files. Do NOT modify:
   - `.github/`
-  - `.sdlc/scripts/`
+  - `.auto-flow/scripts/`
   - `.claude/skills/` (agent prompts — meta-agent's job, NOT yours)
   - `documents/meta.md` (meta-agent's memory — NOT yours)
   - `CLAUDE.md`
@@ -253,7 +253,7 @@ block direct invocations. Always use `deno task check`.
 Explicitly forbidden (unless listed in `04-decision.md` `tasks[].files`):
 
 - `.github/`
-- `.sdlc/scripts/`
+- `.auto-flow/scripts/`
 - `.claude/skills/` (agent prompts)
 - `documents/meta.md` (meta-agent memory)
 - `CLAUDE.md`

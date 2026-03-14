@@ -43,7 +43,7 @@ updates.
 ## Input
 
 Use ONLY paths from the task message (run directory, run ID).
-Do NOT use hardcoded paths like `.sdlc/pipeline/...`.
+Do NOT use hardcoded paths like `.auto-flow/pipeline/...`.
 
 - `documents/meta.md` — persistent memory (read FIRST)
 - `<run-dir>/logs/` — stage logs (JSON + JSONL)

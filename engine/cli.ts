@@ -4,7 +4,7 @@
  * Usage: deno task run [options]
  *
  * Options:
- *   --config <path>       Pipeline config file (default: .sdlc/pipeline.yaml)
+ *   --config <path>       Pipeline config file (default: .auto-flow/pipeline.yaml)
  *   --prompt <text>       Additional context for PM agent (sets args.prompt)
  *   --resume <run-id>     Resume a previous run from its state
  *   --dry-run             Print execution plan without running
@@ -20,7 +20,7 @@ import type { EngineOptions, Verbosity } from "./types.ts";
 import { Engine } from "./engine.ts";
 
 export function parseArgs(args: string[]): EngineOptions {
-  let configPath = ".sdlc/pipeline.yaml";
+  let configPath = ".auto-flow/pipeline.yaml";
   let runId: string | undefined;
   let resume = false;
   let dryRun = false;
@@ -111,7 +111,7 @@ Usage:
   deno task run [options]
 
 Options:
-  --config <path>       Pipeline config file (default: .sdlc/pipeline.yaml)
+  --config <path>       Pipeline config file (default: .auto-flow/pipeline.yaml)
   --prompt <text>       Additional context for PM agent (optional)
   --resume <run-id>     Resume a previous run
   --dry-run             Print execution plan without running

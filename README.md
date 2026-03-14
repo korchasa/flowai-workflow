@@ -51,7 +51,7 @@ Options:
   --prompt <text>     Additional context passed to first agent
   --resume <run-id>   Resume a previous run (skip completed nodes)
   --dry-run           Validate config and show DAG without executing
-  --config <path>     Custom pipeline config (default: .sdlc/pipeline.yaml)
+  --config <path>     Custom pipeline config (default: .auto-flow/pipeline.yaml)
   --skip <nodes>      Comma-separated node IDs to skip
   --only <nodes>      Run only specified nodes
   --env KEY=VAL       Set environment variable for the run
@@ -74,7 +74,7 @@ Node-level overrides are supported for all defaults.
 
 The engine is developed using its own SDLC pipeline (dogfooding). This pipeline automates the full software development lifecycle — from GitHub Issue triage to merged PR — via a chain of specialized AI agents.
 
-Pipeline config: `.sdlc/pipeline.yaml`
+Pipeline config: `.auto-flow/pipeline.yaml`
 
 | Node | Phase | Role | Output |
 |------|-------|------|--------|
@@ -85,7 +85,7 @@ Pipeline config: `.sdlc/pipeline.yaml`
 | `review` | report | Tech Lead Review — Final Review + Merge (run_on: always) | `08-review.md` |
 | `optimize` | report | Meta-Agent — Prompt Optimization (run_on: always) | `07-changelog.md` |
 
-All 7 pipeline agents are also available as Claude Code slash commands via `.claude/skills/agent-<name>/SKILL.md`:
+All 7 pipeline agents are also available as Claude Code slash commands via `.auto-flow/agents/agent-<name>/SKILL.md`:
 
 - `/agent-pm` — Project Manager (specification)
 - `/agent-architect` — Architect (design-solution plan)
@@ -99,8 +99,9 @@ All 7 pipeline agents are also available as Claude Code slash commands via `.cla
 
 ```
 engine/                          # DAG executor engine (Deno/TypeScript)
-.claude/
-  skills/                        # Agent prompts (agentskills.io-compliant)
+.auto-flow/
+  pipeline.yaml                  # SDLC pipeline config (example)
+  agents/                        # Agent prompts (symlinked from .claude/skills/)
     agent-pm/SKILL.md
     agent-architect/SKILL.md
     agent-tech-lead/SKILL.md
@@ -108,10 +109,8 @@ engine/                          # DAG executor engine (Deno/TypeScript)
     agent-qa/SKILL.md
     agent-tech-lead-review/SKILL.md
     agent-meta-agent/SKILL.md
-.sdlc/
-  pipeline.yaml                  # SDLC pipeline config (example)
   runs/                          # Per-run artifacts and state
-  scripts/                       # Legacy shell scripts + HITL scripts
+  scripts/                       # HITL scripts
 documents/
   requirements-engine.md         # SRS — Engine scope
   requirements-sdlc.md           # SRS — SDLC Pipeline scope

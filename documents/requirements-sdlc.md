@@ -28,7 +28,7 @@
 
 ## 2. General description
 
-- **System context:** Operates as a local Deno engine process triggered by CLI command (`deno task run [--prompt "..."]`). The engine reads pipeline DAG config (`.sdlc/pipeline.yaml`), executes nodes sequentially via `claude` CLI, validates outputs, and commits artifacts. PM agent autonomously triages open GitHub issues; `--prompt` passes optional additional context. Agents communicate through files in the repository.
+- **System context:** Operates as a local Deno engine process triggered by CLI command (`deno task run [--prompt "..."]`). The engine reads pipeline DAG config (`.auto-flow/pipeline.yaml`), executes nodes sequentially via `claude` CLI, validates outputs, and commits artifacts. PM agent autonomously triages open GitHub issues; `--prompt` passes optional additional context. Agents communicate through files in the repository.
 - **Assumptions and constraints:**
   - A devcontainer provides the runtime environment with all required tools (see FR-S10).
   - Each agent is stateless between runs — all context comes from input artifacts and its system prompt.
@@ -41,16 +41,16 @@
 
 - **Description:** Single entry point `deno task run [--prompt "..."]`. PM agent autonomously triages open GitHub issues — selects highest-priority open issue, fetches its title and body, and writes `issue: <N>` in `01-spec.md` YAML frontmatter. `--prompt` provides optional additional context passed to the PM agent.
 - **Acceptance criteria:**
-  - [x] `deno task run` starts pipeline; PM selects highest-priority open issue autonomously. Evidence: `engine/cli.ts:36-76` (CLI argument parsing + pipeline entry point), `.claude/skills/agent-pm/SKILL.md` (PM triage logic via `gh issue list`)
+  - [x] `deno task run` starts pipeline; PM selects highest-priority open issue autonomously. Evidence: `engine/cli.ts:36-76` (CLI argument parsing + pipeline entry point), `.auto-flow/agents/agent-pm/SKILL.md` (PM triage logic via `gh issue list`)
   - [x] `deno task run --prompt "..."` passes additional context string to PM agent. Evidence: `engine/cli.ts:40-42` (`--prompt` arg parsed into `cliArgs.prompt`)
-  - [x] PM writes `issue: <N>` in `01-spec.md` YAML frontmatter after issue selection. Evidence: `.claude/skills/agent-pm/SKILL.md` (Output Format section mandates YAML frontmatter with `issue: N`)
+  - [x] PM writes `issue: <N>` in `01-spec.md` YAML frontmatter after issue selection. Evidence: `.auto-flow/agents/agent-pm/SKILL.md` (Output Format section mandates YAML frontmatter with `issue: N`)
   - [x] Common engine flags (`--resume`, `--dry-run`, `-v`, `-q`, `--config`) work with the single entry point. Evidence: `engine/cli.ts:36-76` (`--resume` :43-45, `--dry-run` :47-49, `-v` :50-53, `-q` :58-61, `--config` :37-39)
 
 ### 3.2 FR-S2 (ex FR-2): Stage 1 — Project Manager (Specification)
 
 - **Description:** The PM agent reads the issue, analyzes existing documentation, and produces a specification. PM updates only the SRS (what needs to be done), not the SDS (how to do it — that's the Tech Lead's job).
 - **Input:** Issue title + body, `documents/requirements-sdlc.md`, `documents/design-sdlc.md`, `AGENTS.md`.
-- **Output:** `.sdlc/pipeline/<issue-number>/01-spec.md`, updated `documents/requirements-sdlc.md`.
+- **Output:** `.auto-flow/pipeline/<issue-number>/01-spec.md`, updated `documents/requirements-sdlc.md`.
 - **Acceptance criteria:**
   - Agent updates `documents/requirements-sdlc.md` with new/modified requirements (marked with status markers per CLAUDE.md conventions).
   - Agent produces `01-spec.md` containing:
@@ -207,9 +207,9 @@
 - **Input:**
   - `documents/meta.md` — persistent memory (read first).
   - Run logs from `<run-dir>/logs/` and `state.json` (failed node context from `nodes[*].status` field; no `failed-node.txt`).
-  - Current agent prompts from `.claude/skills/agent-*/`.
+  - Current agent prompts from `.auto-flow/agents/agent-*/`.
 - **Output:**
-  - Primary: edited `.claude/skills/agent-*/SKILL.md` (prompt fixes).
+  - Primary: edited `.auto-flow/agents/agent-*/SKILL.md` (prompt fixes).
   - Secondary: `<run-dir>/meta-agent/07-changelog.md` (minimal fix log).
   - Persistent: updated `documents/meta.md` (cross-run memory).
 - **Acceptance criteria:**
@@ -217,7 +217,7 @@
   - `07-changelog.md` lists each fix with evidence (turns/cost/error data).
   - `documents/meta.md` updated with new patterns, fix outcomes, baselines.
   - Does NOT produce verbose reports — focus is on prompt optimization.
-  - [ ] `.claude/skills/agent-meta-agent/SKILL.md` Input section references `state.json` for failed-node context; no `failed-node.txt` reference (engine SRS FR-29 compliance).
+  - [ ] `.auto-flow/agents/agent-meta-agent/SKILL.md` Input section references `state.json` for failed-node context; no `failed-node.txt` reference (engine SRS FR-29 compliance).
 - **Quality metrics:**
   - Every fix references specific log data as evidence.
   - Fixes are minimal, targeted, and testable in next run.
@@ -232,19 +232,19 @@
   - `gh` CLI — for creating PRs and posting issue comments.
   - `gitleaks` — for secret detection in diff-based safety checks (see engine SRS FR-8).
 - **Stage scripts (legacy):**
-  - Located in `.sdlc/scripts/stage-<N>-<role>.sh`.
+  - Located in `.auto-flow/scripts/stage-<N>-<role>.sh`.
   - Each script is responsible for:
     1. Preparing input: collecting handoff artifacts, setting environment variables.
-    2. Invoking `claude` CLI with the agent prompt from `.claude/skills/agent-<role>/SKILL.md`.
+    2. Invoking `claude` CLI with the agent prompt from `.auto-flow/agents/agent-<role>/SKILL.md`.
     3. Running stage-specific validation (artifact checks, `deno task check` for Developer).
     4. Implementing the Continuation mechanism (engine SRS FR-8): re-invoking via `--resume` on validation failure.
     5. Committing output artifacts and logs to the feature branch.
     6. Reporting stage status to the GitHub Issue via `gh`.
-  - Scripts share common functions via `.sdlc/scripts/lib.sh` (logging, git operations, continuation loop, artifact validation).
+  - Scripts share common functions via `.auto-flow/scripts/lib.sh` (logging, git operations, continuation loop, artifact validation).
 - **Acceptance criteria:**
   - Devcontainer builds successfully and contains all listed tools.
   - Primary launch: `deno task run [--prompt "..."]` (engine path).
-  - Legacy: each stage can be run independently via `.sdlc/scripts/stage-1-pm.sh`.
+  - Legacy: each stage can be run independently via `.auto-flow/scripts/stage-1-pm.sh`.
   - Stage scripts are executable and pass `shellcheck` without errors.
   - **Retry logic:** `lib.sh` implements a generic retry wrapper (`retry_with_backoff`) used for all external API calls (`claude` CLI, `gh` CLI). Parameters: max attempts = 3, initial delay = 5s, backoff multiplier = 2x. Retryable conditions: non-zero exit code from CLI tools (network errors, rate limits). Non-retryable: validation failures, agent logic errors.
 
@@ -252,8 +252,8 @@
 
 - **Description:** Defines how data flows between pipeline stages and when commits happen on the feature branch.
 - **Data flow:**
-  - Engine path: artifacts stored in `.sdlc/runs/<run-id>/[<phase>/]<node-id>/` (phase subdir present when node's `phase` field is set in `pipeline.yaml`; flat `<node-id>/` otherwise). Linked via `{{input.<node-id>}}` templates. Phase-aware directory creation depends on engine FR-E9 implementation. Evidence: `documents/design-sdlc.md` §2.2 (Artifact Store subsystem description).
-  - Legacy path: artifacts in `.sdlc/pipeline/<issue-number>/`.
+  - Engine path: artifacts stored in `.auto-flow/runs/<run-id>/[<phase>/]<node-id>/` (phase subdir present when node's `phase` field is set in `pipeline.yaml`; flat `<node-id>/` otherwise). Linked via `{{input.<node-id>}}` templates. Phase-aware directory creation depends on engine FR-E9 implementation. Evidence: `documents/design-sdlc.md` §2.2 (Artifact Store subsystem description).
+  - Legacy path: artifacts in `.auto-flow/pipeline/<issue-number>/`.
   - The file system is the single source of truth for inter-stage communication. No manifest or registry.
   - Claude CLI's built-in context auto-compression handles large input sets; no manual context management is required.
 - **Commit strategy (FR-S15):**
@@ -286,15 +286,15 @@
 
 ### 3.13 FR-S13 (ex FR-19): Agents as Skills
 
-- **Description:** Each pipeline agent is a Claude Code project skill stored canonically in `.claude/skills/agent-<name>/SKILL.md` per the agentskills.io specification. Each skill directory may include a `scripts/` subdirectory with co-located stage scripts. No symlinks. Each agent can be invoked standalone via `/agent-<name>` or used by the pipeline engine.
+- **Description:** Each pipeline agent is a Claude Code project skill stored canonically in `.auto-flow/agents/agent-<name>/SKILL.md` per the agentskills.io specification. Each skill directory may include a `scripts/` subdirectory with co-located stage scripts. No symlinks. Each agent can be invoked standalone via `/agent-<name>` or used by the pipeline engine.
 - **Agents (7):** pm, architect, tech-lead, tech-lead-review, developer, qa, meta-agent. (FR-S15: reduced from 10-agent set; removed committer, tech-lead-reviewer, tech-lead-sds; presenter has no agent directory. FR-S18: executor renamed to developer.)
 - **Supersedes:** Original layout `agents/<name>/SKILL.md` with `.claude/skills/` symlinks (superseded by FR-S17).
 - **Acceptance criteria:**
-  - [x] Each of 7 agents has a canonical directory `.claude/skills/agent-<name>/` containing `SKILL.md` with spec-compliant YAML frontmatter (`name`, `description`, `compatibility`, `allowed-tools`; no `disable-model-invocation`). Expected: `.claude/skills/agent-pm/SKILL.md`, `.claude/skills/agent-architect/SKILL.md`, `.claude/skills/agent-tech-lead/SKILL.md`, `.claude/skills/agent-tech-lead-review/SKILL.md`, `.claude/skills/agent-developer/SKILL.md`, `.claude/skills/agent-qa/SKILL.md`, `.claude/skills/agent-meta-agent/SKILL.md`. Evidence: commits `6176e91`, `985e3e5`, `f0085df`; QA PASS runs `20260313T230627`, `20260314T000902`
-  - [x] No symlinks in `.claude/skills/` pointing to `agents/`. Evidence: `agents/` directory removed; `.claude/skills/agent-*/` are real directories (commits `6176e91`, `985e3e5`)
+  - [x] Each of 7 agents has a canonical directory `.auto-flow/agents/agent-<name>/` containing `SKILL.md` with spec-compliant YAML frontmatter (`name`, `description`, `compatibility`, `allowed-tools`; no `disable-model-invocation`). Expected: `.auto-flow/agents/agent-pm/SKILL.md`, `.auto-flow/agents/agent-architect/SKILL.md`, `.auto-flow/agents/agent-tech-lead/SKILL.md`, `.auto-flow/agents/agent-tech-lead-review/SKILL.md`, `.auto-flow/agents/agent-developer/SKILL.md`, `.auto-flow/agents/agent-qa/SKILL.md`, `.auto-flow/agents/agent-meta-agent/SKILL.md`. Evidence: commits `6176e91`, `985e3e5`, `f0085df`; QA PASS runs `20260313T230627`, `20260314T000902`
+  - [x] No symlinks in `.claude/skills/` pointing to `agents/`. Evidence: `agents/` directory removed; `.auto-flow/agents/agent-*/` are real directories (commits `6176e91`, `985e3e5`)
   - [x] `agents/` top-level directory removed after migration. Evidence: commit `985e3e5 sdlc(impl): remove agents/ directory and fix stale path references`
-  - [x] Pipeline engine `prompt:` fields in `pipeline.yaml` reference `.claude/skills/agent-<name>/SKILL.md`. Evidence: `.sdlc/pipeline.yaml` (commit `6176e91`)
-  - [x] Each agent skill is invocable standalone via `/agent-<name>`. Evidence: Claude Code discovers skills from canonical `.claude/skills/agent-<name>/SKILL.md` location; no symlinks required
+  - [x] Pipeline engine `prompt:` fields in `pipeline.yaml` reference `.auto-flow/agents/agent-<name>/SKILL.md`. Evidence: `.auto-flow/pipeline.yaml` (commit `6176e91`)
+  - [x] Each agent skill is invocable standalone via `/agent-<name>`. Evidence: Claude Code discovers skills from canonical `.auto-flow/agents/agent-<name>/SKILL.md` location; no symlinks required
   - [x] `deno task check` passes after migration. Evidence: QA PASS — 436 tests pass (run `20260313T230627`)
 
 ### 3.14 FR-S14 (ex FR-22): Project Documentation (README)
@@ -307,7 +307,7 @@
   - [ ] Prerequisites list: Deno, Docker/devcontainer, Claude Code CLI, `gh` CLI, Git.
   - [ ] Available `deno task` commands documented (run, check, test).
   - [ ] Configuration section references `pipeline.yaml` (not env vars).
-  - [ ] Project directory structure matches actual layout (`engine/`, `.sdlc/runs/`, `.claude/skills/`).
+  - [ ] Project directory structure matches actual layout (`engine/`, `.auto-flow/runs/`, `.claude/skills/`).
   - [ ] Agents-as-skills mentioned with `/agent-<name>` slash command examples.
   - [ ] Installation/setup instructions are accurate for devcontainer workflow.
 
@@ -333,7 +333,7 @@
   developer, qa — plus tech-lead-review and meta-agent as post-pipeline.
 - **Role changes:**
   - `tech-lead` node (current) → renamed to **`architect`** (designs solution
-    with variants). Prompt: `.claude/skills/agent-architect/SKILL.md`.
+    with variants). Prompt: `.auto-flow/agents/agent-architect/SKILL.md`.
   - `reviewer` node → **removed**. Design review absorbed into new tech-lead.
   - `architect` node (current) → renamed to **`tech-lead`** (reviews design,
     selects variant, task breakdown, updates SDS, creates branch
@@ -351,32 +351,32 @@
     `--request-changes`), not issue comments.
   - **Tech-lead-review** reviews PR diff, checks CI, merges or leaves open.
 - **File changes:**
-  - Rename `.claude/skills/agent-tech-lead/` ↔ `.claude/skills/agent-architect/` (swap roles).
-  - Expand `.claude/skills/agent-tech-lead/SKILL.md` (design review, SDS update, branch creation, draft PR).
-  - Delete `.claude/skills/agent-tech-lead-reviewer/`, `.claude/skills/agent-tech-lead-sds/`,
-    `.claude/skills/agent-committer/`.
-  - Update `.claude/skills/agent-developer/SKILL.md` — add commit/push, PR comments. (FR-S18: formerly `agent-executor`)
-  - Update `.claude/skills/agent-qa/SKILL.md` — PR review instead of issue comments.
-  - New `.claude/skills/agent-tech-lead-review/SKILL.md` — code review + CI gate + merge.
+  - Rename `.auto-flow/agents/agent-tech-lead/` ↔ `.auto-flow/agents/agent-architect/` (swap roles).
+  - Expand `.auto-flow/agents/agent-tech-lead/SKILL.md` (design review, SDS update, branch creation, draft PR).
+  - Delete `.auto-flow/agents/agent-tech-lead-reviewer/`, `.auto-flow/agents/agent-tech-lead-sds/`,
+    `.auto-flow/agents/agent-committer/`.
+  - Update `.auto-flow/agents/agent-developer/SKILL.md` — add commit/push, PR comments. (FR-S18: formerly `agent-executor`)
+  - Update `.auto-flow/agents/agent-qa/SKILL.md` — PR review instead of issue comments.
+  - New `.auto-flow/agents/agent-tech-lead-review/SKILL.md` — code review + CI gate + merge.
   - Update `pipeline.yaml` — new DAG with fewer nodes.
 - **Invariants (no changes):**
   - `engine/` — engine remains domain-agnostic, no code changes.
-  - `.claude/skills/agent-pm/` — no changes.
-  - `.claude/skills/agent-meta-agent/` — no changes.
+  - `.auto-flow/agents/agent-pm/` — no changes.
+  - `.auto-flow/agents/agent-meta-agent/` — no changes.
 - **Acceptance criteria:**
-  - [x] Agent directory `.claude/skills/agent-architect/` contains design-solution prompt. Evidence: `.claude/skills/agent-architect/SKILL.md`
-  - [x] Agent directory `.claude/skills/agent-tech-lead/` contains expanded prompt: critique + variant selection + task breakdown + SDS update + branch creation + draft PR. Evidence: `.claude/skills/agent-tech-lead/SKILL.md`
+  - [x] Agent directory `.auto-flow/agents/agent-architect/` contains design-solution prompt. Evidence: `.auto-flow/agents/agent-architect/SKILL.md`
+  - [x] Agent directory `.auto-flow/agents/agent-tech-lead/` contains expanded prompt: critique + variant selection + task breakdown + SDS update + branch creation + draft PR. Evidence: `.auto-flow/agents/agent-tech-lead/SKILL.md`
   - [x] `agent-tech-lead-reviewer`, `agent-tech-lead-sds`, `agent-committer` deleted. Evidence: directories removed; `agents/` directory removed (commit `985e3e5`)
-  - [x] `.claude/skills/agent-tech-lead-review/SKILL.md` created with code review + CI gate + merge logic. Evidence: `.claude/skills/agent-tech-lead-review/SKILL.md:21-24`
-  - [x] `.claude/skills/agent-developer/SKILL.md` exists: commits/pushes own code, posts PR comments, "do not commit" rule removed. Evidence: commit `f0085df sdlc(impl): rename Executor agent role to Developer (FR-37)`, `.claude/skills/agent-developer/SKILL.md`
-  - [x] `.claude/skills/agent-qa/SKILL.md` updated: posts PR reviews via `gh pr review` ONLY (no issue comments). Evidence: `.claude/skills/agent-qa/SKILL.md`
-  - [x] `pipeline.yaml` updated: `finalize` (committer) node removed; `review` node renamed to `tech-lead-review` using `.claude/skills/agent-tech-lead-review/SKILL.md` with `run_on: always` + merge capability. Evidence: `.sdlc/pipeline.yaml:163-184`
+  - [x] `.auto-flow/agents/agent-tech-lead-review/SKILL.md` created with code review + CI gate + merge logic. Evidence: `.auto-flow/agents/agent-tech-lead-review/SKILL.md:21-24`
+  - [x] `.auto-flow/agents/agent-developer/SKILL.md` exists: commits/pushes own code, posts PR comments, "do not commit" rule removed. Evidence: commit `f0085df sdlc(impl): rename Executor agent role to Developer (FR-37)`, `.auto-flow/agents/agent-developer/SKILL.md`
+  - [x] `.auto-flow/agents/agent-qa/SKILL.md` updated: posts PR reviews via `gh pr review` ONLY (no issue comments). Evidence: `.auto-flow/agents/agent-qa/SKILL.md`
+  - [x] `pipeline.yaml` updated: `finalize` (committer) node removed; `review` node renamed to `tech-lead-review` using `.auto-flow/agents/agent-tech-lead-review/SKILL.md` with `run_on: always` + merge capability. Evidence: `.auto-flow/pipeline.yaml:163-184`
   - [x] `.claude/skills/` canonical agent directories present (no symlinks). Evidence: commit `6176e91`, `985e3e5`
-  - [x] Pipeline produces 5 agent invocations in happy path (pm, architect, tech-lead, developer, qa) plus 2 post-pipeline (tech-lead-review, meta-agent). Evidence: commit `f0085df`, `.sdlc/pipeline.yaml` (developer node in impl-loop)
-  - [x] Developer creates commits on feature branch during implementation. Evidence: commit `f0085df`, `.claude/skills/agent-developer/SKILL.md`
-  - [x] QA posts review on PR only (not issue comment). Evidence: `.claude/skills/agent-qa/SKILL.md`
-  - [x] Tech-lead-review merges PR if CI green, or leaves open with comments. Evidence: `.claude/skills/agent-tech-lead-review/SKILL.md`
-  - [x] `--prompt` mode (no GitHub issue) uses fallback branch name `sdlc/<run-id>`. Evidence: `.claude/skills/agent-tech-lead/SKILL.md`
+  - [x] Pipeline produces 5 agent invocations in happy path (pm, architect, tech-lead, developer, qa) plus 2 post-pipeline (tech-lead-review, meta-agent). Evidence: commit `f0085df`, `.auto-flow/pipeline.yaml` (developer node in impl-loop)
+  - [x] Developer creates commits on feature branch during implementation. Evidence: commit `f0085df`, `.auto-flow/agents/agent-developer/SKILL.md`
+  - [x] QA posts review on PR only (not issue comment). Evidence: `.auto-flow/agents/agent-qa/SKILL.md`
+  - [x] Tech-lead-review merges PR if CI green, or leaves open with comments. Evidence: `.auto-flow/agents/agent-tech-lead-review/SKILL.md`
+  - [x] `--prompt` mode (no GitHub issue) uses fallback branch name `sdlc/<run-id>`. Evidence: `.auto-flow/agents/agent-tech-lead/SKILL.md`
   - [x] All existing engine tests pass (no engine code changes). Evidence: engine/ unchanged.
   - [x] `deno task check` passes after all changes. Evidence: validated post-implementation.
   - [x] SRS, SDS updated to reflect final pipeline structure. Evidence: `documents/requirements-sdlc.md`, `documents/design-sdlc.md`
@@ -394,14 +394,14 @@
 
 ### 3.17 FR-S17 (ex FR-36): Agentskills.io-Compliant Skill Layout
 
-- **Description:** All pipeline agent skills must conform to the [agentskills.io specification](https://agentskills.io/specification). Canonical skill directories live in `.claude/skills/agent-<name>/`. Associated stage scripts co-located under `scripts/` subdirectory of each skill. Frontmatter uses only spec-defined fields.
+- **Description:** All pipeline agent skills must conform to the [agentskills.io specification](https://agentskills.io/specification). Canonical skill directories live in `.auto-flow/agents/agent-<name>/`. Associated stage scripts co-located under `scripts/` subdirectory of each skill. Frontmatter uses only spec-defined fields.
 - **Motivation:** Spec compliance enables standard skill tooling and discovery. Co-location reduces cognitive overhead. Removing the `agents/` → `.claude/skills/` symlink indirection eliminates broken-symlink failure mode.
 - **Acceptance criteria:**
-  - [x] Each skill directory `.claude/skills/agent-<name>/` contains `SKILL.md` with frontmatter fields: `name` (matches directory name), `description`, `compatibility`, `allowed-tools`. No `disable-model-invocation` field. Expected: `.claude/skills/agent-pm/SKILL.md`, `.claude/skills/agent-architect/SKILL.md`, `.claude/skills/agent-tech-lead/SKILL.md`, `.claude/skills/agent-tech-lead-review/SKILL.md`, `.claude/skills/agent-developer/SKILL.md`, `.claude/skills/agent-qa/SKILL.md`, `.claude/skills/agent-meta-agent/SKILL.md`. Evidence: commit `f0085df sdlc(impl): rename Executor agent role to Developer (FR-37)`; QA PASS run `20260314T000902` (436 tests)
-  - [x] Stage scripts formally deprecated (superseded by engine); co-location N/A for deprecated scripts. Evidence: deprecation headers added to all `.sdlc/scripts/stage-*.sh`; `AGENT_PROMPT` paths updated to `.claude/skills/agent-<name>/SKILL.md` (this commit).
-  - [x] `hitl-ask.sh`, `hitl-check.sh`, `lib.sh`, and shared utilities remain in `.sdlc/scripts/` (engine infrastructure, not agent skills). Evidence: `.sdlc/scripts/hitl-ask.sh`, `.sdlc/scripts/hitl-check.sh`, `.sdlc/scripts/lib.sh`
+  - [x] Each skill directory `.auto-flow/agents/agent-<name>/` contains `SKILL.md` with frontmatter fields: `name` (matches directory name), `description`, `compatibility`, `allowed-tools`. No `disable-model-invocation` field. Expected: `.auto-flow/agents/agent-pm/SKILL.md`, `.auto-flow/agents/agent-architect/SKILL.md`, `.auto-flow/agents/agent-tech-lead/SKILL.md`, `.auto-flow/agents/agent-tech-lead-review/SKILL.md`, `.auto-flow/agents/agent-developer/SKILL.md`, `.auto-flow/agents/agent-qa/SKILL.md`, `.auto-flow/agents/agent-meta-agent/SKILL.md`. Evidence: commit `f0085df sdlc(impl): rename Executor agent role to Developer (FR-37)`; QA PASS run `20260314T000902` (436 tests)
+  - [x] Stage scripts formally deprecated (superseded by engine); co-location N/A for deprecated scripts. Evidence: deprecation headers added to all `.auto-flow/scripts/stage-*.sh`; `AGENT_PROMPT` paths updated to `.auto-flow/agents/agent-<name>/SKILL.md` (this commit).
+  - [x] `hitl-ask.sh`, `hitl-check.sh`, `lib.sh`, and shared utilities remain in `.auto-flow/scripts/` (engine infrastructure, not agent skills). Evidence: `.auto-flow/scripts/hitl-ask.sh`, `.auto-flow/scripts/hitl-check.sh`, `.auto-flow/scripts/lib.sh`
   - [x] `agents/` top-level directory removed; no broken symlinks in `.claude/skills/`. Evidence: commit `985e3e5 sdlc(impl): remove agents/ directory and fix stale path references`
-  - [x] `pipeline.yaml` `prompt:` fields updated to `.claude/skills/agent-<name>/SKILL.md`. Evidence: `.sdlc/pipeline.yaml` (commit `6176e91`)
+  - [x] `pipeline.yaml` `prompt:` fields updated to `.auto-flow/agents/agent-<name>/SKILL.md`. Evidence: `.auto-flow/pipeline.yaml` (commit `6176e91`)
   - [x] `documents/requirements-sdlc.md` path references updated to reflect new `.claude/skills/` layout and FR-S18 rename. Evidence: this update (run `20260314T010515`); commit `f0085df`
   - [x] `deno task check` passes after migration. Evidence: QA PASS — 436 tests pass (run `20260313T230627`)
 
@@ -410,8 +410,8 @@
 - **Description:** Rename the `executor` agent to `developer` across all project files. The executor agent's actual role — writing code, committing, pushing, posting PR comments — matches the industry term "developer", not the generic "executor". All other pipeline agents use role-based names; this rename completes the alignment.
 - **Scope:** Pure rename — no behavioral changes. Affected artifacts: agent skill directory, pipeline config node IDs, all SKILL.md cross-references, legacy shell scripts, engine test fixtures, and documentation.
 - **Acceptance criteria:**
-  - [x] `.claude/skills/agent-executor/` directory renamed to `.claude/skills/agent-developer/`. `SKILL.md` frontmatter `name` field updated to `agent-developer`. Evidence: commit `f0085df sdlc(impl): rename Executor agent role to Developer (FR-37)`
-  - [x] `.sdlc/pipeline.yaml`: loop body node id `executor` → `developer`; all `{{input.executor}}` → `{{input.developer}}` template references updated. Evidence: commit `f0085df`
+  - [x] `.auto-flow/agents/agent-executor/` directory renamed to `.auto-flow/agents/agent-developer/`. `SKILL.md` frontmatter `name` field updated to `agent-developer`. Evidence: commit `f0085df sdlc(impl): rename Executor agent role to Developer (FR-37)`
+  - [x] `.auto-flow/pipeline.yaml`: loop body node id `executor` → `developer`; all `{{input.executor}}` → `{{input.developer}}` template references updated. Evidence: commit `f0085df`
   - [x] All agent `SKILL.md` files: `{{input.executor}}` → `{{input.developer}}` in cross-agent references. Evidence: commit `f0085df`
   - [x] Legacy scripts renamed: `stage-6-executor.sh` → `stage-6-developer.sh`; internal refs and `AGENT_PROMPT` path updated. `stage-7-qa.sh` executor output references updated. Evidence: commit `f0085df`
   - [x] Engine test fixtures: node IDs using `executor` as example updated to `developer`. Evidence: commit `f0085df`
@@ -502,23 +502,23 @@
     `## Summary` section in their output artifact.
     Agents: `agent-pm`, `agent-architect`, `agent-tech-lead`,
     `agent-developer`, `agent-qa`, `agent-tech-lead-review`, `agent-meta-agent`.
-    Evidence: `.claude/skills/agent-pm/SKILL.md:113`,
-    `.claude/skills/agent-architect/SKILL.md:120`,
-    `.claude/skills/agent-tech-lead/SKILL.md:87`,
-    `.claude/skills/agent-developer/SKILL.md:92`,
-    `.claude/skills/agent-qa/SKILL.md:113`,
-    `.claude/skills/agent-meta-agent/SKILL.md:81,93`,
-    `.claude/skills/agent-tech-lead-review/SKILL.md:55`.
+    Evidence: `.auto-flow/agents/agent-pm/SKILL.md:113`,
+    `.auto-flow/agents/agent-architect/SKILL.md:120`,
+    `.auto-flow/agents/agent-tech-lead/SKILL.md:87`,
+    `.auto-flow/agents/agent-developer/SKILL.md:92`,
+    `.auto-flow/agents/agent-qa/SKILL.md:113`,
+    `.auto-flow/agents/agent-meta-agent/SKILL.md:81,93`,
+    `.auto-flow/agents/agent-tech-lead-review/SKILL.md:55`.
   - [x] `pipeline.yaml` validation rules include `contains_section: Summary`
     for all 7 agent nodes (`specification`, `design`, `decision`, `build`,
     `verify`, `tech-lead-review`, `optimize`).
-    Evidence: `.sdlc/pipeline.yaml:61` (specification), `:83` (design),
+    Evidence: `.auto-flow/pipeline.yaml:61` (specification), `:83` (design),
     `:108` (decision), `:140` (build), `:159` (verify), `:185` (optimize),
     `:210` (tech-lead-review).
   - [x] Continuation mechanism is triggered when `## Summary` is absent
     (same `contains_section` rule behavior as other section validations).
     Evidence: Inherent behavior of `contains_section` validation in engine;
-    `.sdlc/pipeline.yaml` `contains_section` rules trigger continuation on
+    `.auto-flow/pipeline.yaml` `contains_section` rules trigger continuation on
     missing section (same mechanism as all other section validations).
   - [x] `deno task check` passes after changes.
     Evidence: Run 20260314T073009 — 490 tests pass, pipeline integrity valid.
@@ -538,18 +538,18 @@
 - **Acceptance criteria:**
   - [x] Hardcoded `gh issue comment --body` templates changed to first-person in
     PM, Architect, and Tech Lead SKILL.md files. Evidence:
-    `.claude/skills/agent-pm/SKILL.md`,
-    `.claude/skills/agent-architect/SKILL.md`,
-    `.claude/skills/agent-tech-lead/SKILL.md`
+    `.auto-flow/agents/agent-pm/SKILL.md`,
+    `.auto-flow/agents/agent-architect/SKILL.md`,
+    `.auto-flow/agents/agent-tech-lead/SKILL.md`
   - [x] "This includes GitHub issue comments, PR descriptions, and status
     updates." scope sentence added to all 7 `## Voice` sections. Evidence:
-    `.claude/skills/agent-pm/SKILL.md`,
-    `.claude/skills/agent-architect/SKILL.md`,
-    `.claude/skills/agent-tech-lead/SKILL.md`,
-    `.claude/skills/agent-developer/SKILL.md`,
-    `.claude/skills/agent-qa/SKILL.md`,
-    `.claude/skills/agent-tech-lead-review/SKILL.md`,
-    `.claude/skills/agent-meta-agent/SKILL.md`
+    `.auto-flow/agents/agent-pm/SKILL.md`,
+    `.auto-flow/agents/agent-architect/SKILL.md`,
+    `.auto-flow/agents/agent-tech-lead/SKILL.md`,
+    `.auto-flow/agents/agent-developer/SKILL.md`,
+    `.auto-flow/agents/agent-qa/SKILL.md`,
+    `.auto-flow/agents/agent-tech-lead-review/SKILL.md`,
+    `.auto-flow/agents/agent-meta-agent/SKILL.md`
   - [x] Third correct/incorrect example pair targeting GitHub interactions added
     to all 7 `## Voice` sections. Evidence: all 7 SKILL.md files listed above.
   - [x] `deno task check` passes.
@@ -565,37 +565,72 @@
 
 ### 3.24 FR-S24: Pipeline Config Validation
 
-- **Description:** SDLC pipeline config (`.sdlc/pipeline.yaml`) must be validated for schema correctness as part of `deno task check`. Detects drift between pipeline config and engine schema requirements before runtime failures occur.
+- **Description:** SDLC pipeline config (`.auto-flow/pipeline.yaml`) must be validated for schema correctness as part of `deno task check`. Detects drift between pipeline config and engine schema requirements before runtime failures occur.
 - **Rationale:** Unvalidated config changes cause hard-to-diagnose runtime failures. Static validation catches invalid node types, missing required fields, and bad `inputs` references at development time. Maps to SDLC-scope aspect of engine FR-E7 (config drift detection).
 - **Acceptance criteria:**
-  - [x] `scripts/check.ts` validates `.sdlc/pipeline.yaml` schema: node types, required fields, `inputs` references, `run_on` values. Evidence: `scripts/check.ts:84-96` (`pipelineIntegrity()` calls `loadConfig()`), `engine/config.ts:43-103` (schema validation), `engine/config.ts:105-249` (node validation — types, inputs, `run_on`).
+  - [x] `scripts/check.ts` validates `.auto-flow/pipeline.yaml` schema: node types, required fields, `inputs` references, `run_on` values. Evidence: `scripts/check.ts:84-96` (`pipelineIntegrity()` calls `loadConfig()`), `engine/config.ts:43-103` (schema validation), `engine/config.ts:105-249` (node validation — types, inputs, `run_on`).
   - [x] `deno task check` exits non-zero with descriptive error on invalid config. Evidence: `scripts/check.ts:84-96` (`pipelineIntegrity()` catches `loadConfig()` exceptions and reports descriptive error messages).
-  - [x] `deno task check` passes on valid config with no false positives. Evidence: `deno task check` passes on current `.sdlc/pipeline.yaml` with no errors.
+  - [x] `deno task check` passes on valid config with no false positives. Evidence: `deno task check` passes on current `.auto-flow/pipeline.yaml` with no errors.
 
 ### 3.25 FR-S25: Phase-Organized SDLC Artifact Directories
 
-- **Description:** SDLC pipeline nodes with a `phase` config field must store output artifacts in phase-organized subdirectories (`.sdlc/runs/<run-id>/<phase>/<node-id>/`). Nodes without `phase` use flat layout (`.sdlc/runs/<run-id>/<node-id>/`). Depends on engine FR-E9 implementation.
+- **Description:** SDLC pipeline nodes with a `phase` config field must store output artifacts in phase-organized subdirectories (`.auto-flow/runs/<run-id>/<phase>/<node-id>/`). Nodes without `phase` use flat layout (`.auto-flow/runs/<run-id>/<node-id>/`). Depends on engine FR-E9 implementation.
 - **Rationale:** SDLC pipeline nodes are grouped into `plan`, `impl`, `report` phases in `pipeline.yaml`. Phase-organized storage improves navigability and aligns artifact structure with declared execution flow. Without engine FR-E9 (phase registry + phase-aware `getNodeDir()`), the `phase` field in `pipeline.yaml` has no effect on artifact paths.
 - **Acceptance criteria:**
-  - [x] All SDLC pipeline nodes in `.sdlc/pipeline.yaml` have `phase:` field set to `plan`, `impl`, or `report` as appropriate. Evidence: `.sdlc/pipeline.yaml` (specification, design, decision → `plan`; implementation → `impl`; tech-lead-review, optimize → `report`).
-  - [x] After engine FR-E9 implementation, artifact directories follow `.sdlc/runs/<run-id>/<phase>/<node-id>/` layout for all phased nodes. Evidence: `engine/state.ts:20-36` (`setPhaseRegistry()`), `engine/state.ts:98-103` (`getNodeDir()` phase-aware path), `engine/engine.ts:129-130` (init at run start).
+  - [x] All SDLC pipeline nodes in `.auto-flow/pipeline.yaml` have `phase:` field set to `plan`, `impl`, or `report` as appropriate. Evidence: `.auto-flow/pipeline.yaml` (specification, design, decision → `plan`; implementation → `impl`; tech-lead-review, optimize → `report`).
+  - [x] After engine FR-E9 implementation, artifact directories follow `.auto-flow/runs/<run-id>/<phase>/<node-id>/` layout for all phased nodes. Evidence: `engine/state.ts:20-36` (`setPhaseRegistry()`), `engine/state.ts:98-103` (`getNodeDir()` phase-aware path), `engine/engine.ts:129-130` (init at run start).
   - [x] `{{input.<node-id>}}` and `{{node_dir}}` template variables resolve to phase-aware paths for phased nodes. Evidence: `engine/state.ts:44-46` (`getPhaseForNode()`); `getNodeDir()` underpins template variable resolution.
   - [x] SDLC pipeline runs end-to-end successfully with phase subdirectory layout.
-    Evidence: `.sdlc/runs/20260314T154052/plan/specification/`,
-    `.sdlc/runs/20260314T154052/plan/design/`,
-    `.sdlc/runs/20260314T154052/plan/decision/`,
-    `.sdlc/runs/20260314T154052/impl/implementation/`,
-    `.sdlc/runs/20260314T154052/report/tech-lead-review/`,
-    `.sdlc/runs/20260314T154052/report/optimize/` — 6 phase-organized node
+    Evidence: `.auto-flow/runs/20260314T154052/plan/specification/`,
+    `.auto-flow/runs/20260314T154052/plan/design/`,
+    `.auto-flow/runs/20260314T154052/plan/decision/`,
+    `.auto-flow/runs/20260314T154052/impl/implementation/`,
+    `.auto-flow/runs/20260314T154052/report/tech-lead-review/`,
+    `.auto-flow/runs/20260314T154052/report/optimize/` — 6 phase-organized node
     directories across all 3 phases (`plan`, `impl`, `report`).
   - [x] `deno task check` passes. Evidence: `deno task check` exit 0, 498 tests
     passed, 0 failed, run 20260314T154052.
+
+### 3.26 FR-S26: Pipeline Asset Directory Consolidation
+
+- **Desc:** All pipeline assets (config, agent prompts, scripts, tasks, runs) MUST be consolidated under `.auto-flow/` directory. Eliminates `.sdlc/` (domain-specific naming, violates engine's domain-agnostic principle) and decouples agent prompts from `.claude/skills/` (Claude Code's skill-system coupling).
+- **Directory layout:**
+  ```
+  .auto-flow/
+  ├── pipeline.yaml          # from .auto-flow/pipeline.yaml
+  ├── agents/                # from .claude/skills/agent-*/
+  │   └── <name>/SKILL.md   # 7 agents
+  ├── scripts/               # active scripts only (from .auto-flow/scripts/)
+  │   ├── rollback-uncommitted.sh
+  │   ├── hitl-ask.sh
+  │   ├── hitl-check.sh
+  │   └── lib.sh
+  ├── tasks/                 # from .auto-flow/tasks/
+  └── runs/                  # from .auto-flow/runs/
+  ```
+- **Rationale:** Single discoverable location; easier portability between projects; `.auto-flow/` is engine-brand-aligned and domain-agnostic.
+- **Migration actions:**
+  - Delete deprecated `stage-*.sh` scripts and their `*_test.ts` files (already marked DEPRECATED).
+  - Update all internal path references: `pipeline.yaml`, engine CLI defaults, `deno.json` tasks, docs, `CLAUDE.md`.
+  - `.claude/hooks/guard-deno-direct.sh` stays in `.claude/hooks/` (Claude Code hooks dir is fixed by Claude Code; not movable).
+- **Acceptance:**
+  - [ ] `pipeline.yaml` at `.auto-flow/pipeline.yaml`
+  - [ ] Agent prompts at `.auto-flow/agents/<name>/SKILL.md` (7 agents: pm, architect, tech-lead, developer, qa, tech-lead-review, meta-agent)
+  - [ ] Active scripts at `.auto-flow/scripts/` (rollback-uncommitted.sh, hitl-ask.sh, hitl-check.sh, lib.sh)
+  - [ ] Tasks at `.auto-flow/tasks/`; runs at `.auto-flow/runs/`
+  - [ ] Deprecated stage scripts (`stage-*.sh`) and their `*_test.ts` files deleted
+  - [ ] Zero `.sdlc/` path references remain in codebase (except git history)
+  - [ ] Zero `.claude/skills/agent-*` path references remain in codebase
+  - [ ] `deno task run` works with `.auto-flow/pipeline.yaml` as default config path
+  - [ ] `deno task check` passes clean
+  - [ ] All docs (CLAUDE.md, AGENTS.md, SRS, SDS) updated with new paths
+  - [ ] `.claude/hooks/guard-deno-direct.sh` placement decision documented (stays in `.claude/hooks/`)
 
 ## 4. Non-functional requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution is not supported.
 - **Reproducibility:** Agent prompts are versioned in the repository under `.claude/skills/`.
-- **Observability:** Full logs stored per stage in `.sdlc/runs/<run-id>/logs/`. Total pipeline duration reported in the final PR description.
+- **Observability:** Full logs stored per stage in `.auto-flow/runs/<run-id>/logs/`. Total pipeline duration reported in the final PR description.
 - **Fault tolerance:** If a stage fails (agent error, timeout, continuation limit exhausted), the pipeline stops, Meta-Agent runs to analyze the failure. Manual restart via `--resume <run-id>`.
 - **Timeouts:** Each stage has a configurable timeout via `SDLC_STAGE_TIMEOUT_MINUTES` env var (default: 30 min). Engine enforces timeout per node. When a timeout fires, the stage is treated as failed — Meta-Agent is triggered for analysis.
 - **Security:** Enforced at the engine/stage script level via diff-based checks (see engine SRS FR-8). Agents run with the local user's permissions.
@@ -604,13 +639,13 @@
 
 - **Trigger:** Single entry point `deno task run [--prompt "..."]`. PM agent autonomously selects and triages open GitHub issues. `--prompt` passes optional additional context to PM. Common engine flags: `--resume`, `--dry-run`, `-v`, `-q`, `--config`.
 - **Agent runtime:** `claude` CLI invoked by the Deno engine. Prompt content cached at config load time and passed inline via `--append-system-prompt`; fallback to `--append-system-prompt-file` for template paths. Key flags:
-  - `--append-system-prompt` — adds role-specific instructions inline (content cached from `.claude/skills/agent-<name>/SKILL.md` at startup). Preserves Claude Code's built-in capabilities. Fallback: `--append-system-prompt-file` for template-path prompts.
+  - `--append-system-prompt` — adds role-specific instructions inline (content cached from `.auto-flow/agents/agent-<name>/SKILL.md` at startup). Preserves Claude Code's built-in capabilities. Fallback: `--append-system-prompt-file` for template-path prompts.
   - `--output-format stream-json` — streams JSON events line-by-line; `result` event contains `result`, `session_id`, `total_cost_usd`, `duration_ms`, `num_turns`, `is_error`.
   - `--resume <session-id>` — re-invokes agent in the same session for continuations (engine SRS FR-8).
   - `-p "<prompt>"` — non-interactive mode, task description is passed as the prompt argument.
-- **Pipeline engine:** Deno/TypeScript engine (`engine/`) reads DAG config from `.sdlc/pipeline.yaml`, resolves node dependencies, executes nodes in topological order, manages state in `.sdlc/runs/<run-id>/state.json`.
-- **Legacy stage scripts:** `.sdlc/scripts/stage-<N>-<role>.sh` — handle invocation, validation, continuation, artifact commit. Superseded by engine but preserved.
-- **Inter-stage communication:** Engine: artifacts in `.sdlc/runs/<run-id>/[<phase>/]<node-id>/`, linked via templates. Legacy: `.sdlc/pipeline/<issue-number>/`. Filesystem is source of truth.
+- **Pipeline engine:** Deno/TypeScript engine (`engine/`) reads DAG config from `.auto-flow/pipeline.yaml`, resolves node dependencies, executes nodes in topological order, manages state in `.auto-flow/runs/<run-id>/state.json`.
+- **Legacy stage scripts:** `.auto-flow/scripts/stage-<N>-<role>.sh` — handle invocation, validation, continuation, artifact commit. Superseded by engine but preserved.
+- **Inter-stage communication:** Engine: artifacts in `.auto-flow/runs/<run-id>/[<phase>/]<node-id>/`, linked via templates. Legacy: `.auto-flow/pipeline/<issue-number>/`. Filesystem is source of truth.
 - **Branching & commits:** Feature branch `sdlc/issue-<N>` created by Tech Lead (fallback `sdlc/{{run_id}}` for `--prompt` mode). Developer owns commits (`git add`, `git commit`, `git push` per task). Commit format: `sdlc(impl): <summary>`. Failed stages produce no commits.
 
 ## 6. Acceptance criteria
@@ -642,33 +677,33 @@ The system is considered accepted if:
 ## Appendix B: File Structure
 
 ```
-.claude/skills/                          # Canonical agent skills (agentskills.io-compliant, FR-S17)
-  agent-pm/SKILL.md                      # PM: issue triage + spec
-  agent-architect/SKILL.md               # Architect: design-solution plan with variants
-  agent-tech-lead/SKILL.md               # Tech Lead: critique + decision + SDS + branch + PR
-  agent-tech-lead-review/SKILL.md        # Final code review + CI gate + merge (post-pipeline)
-  agent-developer/SKILL.md               # Implementation + commits + push (FR-S18: formerly agent-executor)
-  agent-qa/SKILL.md                      # QA via PR reviews
-  agent-meta-agent/SKILL.md              # Prompt optimization + failure analysis (post-pipeline)
-  flow-*/SKILL.md                        # Utility skills (unaffected)
-.sdlc/
-  scripts/                             # Stage orchestration & HITL scripts (engine infrastructure)
-    lib.sh                             # Shared functions (logging, continuation loop, git ops)
-    hitl-ask.sh                        # HITL question delivery via GitHub issue
-    hitl-check.sh                      # HITL reply polling via GitHub issue
-    stage-*.sh                         # Legacy stage scripts (preserved; co-location deferred FR-S17)
+.claude/skills/                          # Symlinks to .auto-flow/agents/ (Claude Code skill discovery)
+  agent-*/                               # Symlink → ../../.auto-flow/agents/agent-*/
+.auto-flow/                              # Pipeline assets (FR-S26)
+  agents/                               # Canonical agent prompts (agentskills.io-compliant, FR-S17)
+    agent-pm/SKILL.md                    # PM: issue triage + spec
+    agent-architect/SKILL.md             # Architect: design-solution plan with variants
+    agent-tech-lead/SKILL.md             # Tech Lead: critique + decision + SDS + branch + PR
+    agent-tech-lead-review/SKILL.md      # Final code review + CI gate + merge (post-pipeline)
+    agent-developer/SKILL.md             # Implementation + commits + push (FR-S18)
+    agent-qa/SKILL.md                    # QA via PR reviews
+    agent-meta-agent/SKILL.md            # Prompt optimization + failure analysis (post-pipeline)
+  scripts/                              # HITL scripts (engine infrastructure)
+    lib.sh                              # Shared functions (logging, continuation loop, git ops)
+    hitl-ask.sh                         # HITL question delivery via GitHub issue
+    hitl-check.sh                       # HITL reply polling via GitHub issue
+  runs/                                 # Per-run artifacts (engine-controlled path)
+    <run-id>/                           # Per-run artifacts
+      <phase>/<node-id>/                # Phase-grouped node output
+      logs/
+        <node-id>.json                # CLI JSON output (metadata)
+        <node-id>.jsonl               # Full session transcript
+      state.json                      # Run state (node statuses, session IDs)
+  pipeline.yaml                         # DAG-based pipeline configuration
 engine/                                # Deno/TypeScript pipeline engine
     cli.ts                             # Entry point: deno task run
     engine.ts                          # DAG executor
     ...
-  runs/
-    <run-id>/                          # Per-run artifacts (engine path)
-      <phase>/<node-id>/               # Phase-grouped node output
-      logs/
-        <node-id>.json               # CLI JSON output (metadata)
-        <node-id>.jsonl              # Full session transcript
-      state.json                     # Run state (node statuses, session IDs)
-  pipeline.yaml                        # DAG-based pipeline configuration
 ```
 
 ## Appendix C: FR Cross-Reference
@@ -700,3 +735,4 @@ engine/                                # Deno/TypeScript pipeline engine
 | —      | FR-S23 | SDLC Documentation Accuracy |
 | —      | FR-S24 | Pipeline Config Validation |
 | —      | FR-S25 | Phase-Organized SDLC Artifact Directories |
+| —      | FR-S26 | Pipeline Asset Directory Consolidation |

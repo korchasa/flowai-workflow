@@ -35,7 +35,7 @@ async function commentScan(): Promise<void> {
   for await (const entry of walkDir(".")) {
     if (!extensions.some((ext) => entry.endsWith(ext))) continue;
     if (
-      entry.includes("node_modules") || entry.includes(".sdlc/pipeline") ||
+      entry.includes("node_modules") || entry.includes(".auto-flow/pipeline") ||
       entry.endsWith("scripts/check.ts")
     ) {
       continue;
@@ -83,7 +83,7 @@ async function* walkDir(dir: string): AsyncGenerator<string> {
 
 async function pipelineIntegrity(): Promise<void> {
   console.log("\n--- Pipeline Integrity ---");
-  const pipelinePath = ".sdlc/pipeline.yaml";
+  const pipelinePath = ".auto-flow/pipeline.yaml";
 
   // 1. Load and validate pipeline config (schema + prompt paths + phases)
   const { loadConfig } = await import("../engine/config.ts");
@@ -131,7 +131,7 @@ await run("deno", ["lint"], "Linting");
 await run("gitleaks", ["detect", "--no-git"], "Secret Scan", true);
 // Allow test failure when no test files exist yet
 // Scope tests to project dirs (exclude .claude/skills/ which may need network)
-const testDirs = ["scripts", ".sdlc", "engine"];
+const testDirs = ["scripts", ".auto-flow", "engine"];
 const testableDir = (await Promise.all(
   testDirs.map(async (d) => ({ d, has: await hasTestFiles(d) })),
 )).filter((x) => x.has).map((x) => x.d);

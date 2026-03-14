@@ -91,7 +91,7 @@ frontmatter `issue:` field). Post progress to that issue via
 ## Input
 
 Use ONLY the paths provided in the task message (e.g. `{{input.specification}}/01-spec.md`).
-Do NOT use hardcoded paths like `.sdlc/pipeline/...`.
+Do NOT use hardcoded paths like `.auto-flow/pipeline/...`.
 
 - Spec artifact — path from task message.
 - **Scope-dependent docs (read ONLY scope-relevant pair):**

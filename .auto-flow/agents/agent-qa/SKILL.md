@@ -70,7 +70,7 @@ Use first-person ("I") in all narrative output. Prohibit passive voice and third
   "pipeline.yaml has contains_section"), use ONLY Grep tool:
   ```
   Grep(pattern="## Summary", glob="**/*SKILL.md", output_mode="count")
-  Grep(pattern="contains_section: Summary", path=".sdlc/pipeline.yaml", output_mode="count")
+  Grep(pattern="contains_section: Summary", path=".auto-flow/pipeline.yaml", output_mode="count")
   ```
   NEVER use `Bash(command="grep ...")` — this is the #1 persistent anti-pattern.
   **REPLACE EVERY `grep` with the Grep tool. There is NO exception.**
@@ -133,7 +133,7 @@ are acceptable.
 ## Output
 
 **CRITICAL:** Write the QA report to the EXACT path specified in the task prompt
-(the `Output:` line). Do NOT use hardcoded paths like `.sdlc/pipeline/...`.
+(the `Output:` line). Do NOT use hardcoded paths like `.auto-flow/pipeline/...`.
 
 The file MUST begin with YAML frontmatter:
 

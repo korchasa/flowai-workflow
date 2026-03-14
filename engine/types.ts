@@ -192,7 +192,7 @@ export interface EngineOptions {
   env_overrides: Record<string, string>;
   skip_nodes?: string[];
   only_nodes?: string[];
-  /** Override lock file path (default: .sdlc/runs/.lock). Used in tests. */
+  /** Override lock file path (default: .auto-flow/runs/.lock). Used in tests. */
   lock_path?: string;
 }
 

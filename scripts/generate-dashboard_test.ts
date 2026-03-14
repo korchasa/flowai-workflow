@@ -34,7 +34,7 @@ Deno.test("readRunState — parses valid state.json", async () => {
   try {
     const state: RunState = {
       run_id: "test-123",
-      config_path: ".sdlc/pipeline.yaml",
+      config_path: ".auto-flow/pipeline.yaml",
       started_at: "2024-01-01T00:00:00.000Z",
       status: "completed",
       args: {},
@@ -187,7 +187,7 @@ Deno.test("renderCard — 3-line preview in summary, full text in details body",
 Deno.test("renderHtml — contains all node cards", () => {
   const state: RunState = {
     run_id: "run-xyz",
-    config_path: ".sdlc/pipeline.yaml",
+    config_path: ".auto-flow/pipeline.yaml",
     started_at: "2024-01-01T00:00:00Z",
     status: "completed",
     args: {},

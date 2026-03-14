@@ -15,10 +15,10 @@ defaults:
   model: claude-sonnet-4-6
   claude_args:
     - "--dangerously-skip-permissions"
-  on_failure_script: .sdlc/scripts/rollback-uncommitted.sh
+  on_failure_script: .auto-flow/scripts/rollback-uncommitted.sh
   hitl:
-    ask_script: .sdlc/scripts/hitl-ask.sh
-    check_script: .sdlc/scripts/hitl-check.sh
+    ask_script: .auto-flow/scripts/hitl-ask.sh
+    check_script: .auto-flow/scripts/hitl-check.sh
     artifact_source: plan/specification/01-spec.md
     poll_interval: 60
     timeout: 7200
@@ -35,7 +35,7 @@ nodes:
     type: agent
     phase: plan
     label: "Project Manager — Specification"
-    prompt: ".claude/skills/agent-pm/SKILL.md"
+    prompt: ".auto-flow/agents/agent-pm/SKILL.md"
     task_template: |
       Select a GitHub issue to implement. Prefer issues labeled "in-progress"; fall back to any open issue.
       Output:
@@ -70,7 +70,7 @@ nodes:
     label: "Architect — Design-Solution Plan"
     model: claude-opus-4-6
     inputs: [specification]
-    prompt: ".claude/skills/agent-architect/SKILL.md"
+    prompt: ".auto-flow/agents/agent-architect/SKILL.md"
     task_template: |
       Read the specification at {{input.specification}}/01-spec.md.
       Read ONLY scope-relevant SRS/SDS docs (derive scope from spec frontmatter `scope:` field).
@@ -92,7 +92,7 @@ nodes:
     label: "Tech Lead — Decision + Branch + PR"
     model: claude-opus-4-6
     inputs: [specification, design]
-    prompt: ".claude/skills/agent-tech-lead/SKILL.md"
+    prompt: ".auto-flow/agents/agent-tech-lead/SKILL.md"
     task_template: |
       Read the plan at {{input.design}}/02-plan.md.
       Read the spec at {{input.specification}}/01-spec.md.
@@ -125,7 +125,7 @@ nodes:
         type: agent
         label: "Developer — Implementation"
         inputs: [decision]
-        prompt: ".claude/skills/agent-developer/SKILL.md"
+        prompt: ".auto-flow/agents/agent-developer/SKILL.md"
         task_template: |
           Read the decision at {{input.decision}}/04-decision.md.
           Read ONLY scope-relevant SRS/SDS docs (derive scope from decision's spec reference or task context).
@@ -145,7 +145,7 @@ nodes:
         type: agent
         label: "QA — Verification"
         inputs: [specification, decision, build]
-        prompt: ".claude/skills/agent-qa/SKILL.md"
+        prompt: ".auto-flow/agents/agent-qa/SKILL.md"
         task_template: |
           Verify the implementation against the spec at {{input.specification}}/01-spec.md.
           Check the decision at {{input.decision}}/04-decision.md.
@@ -167,11 +167,11 @@ nodes:
     phase: report
     label: "Meta-Agent — Prompt Optimization"
     model: claude-opus-4-6
-    prompt: ".claude/skills/agent-meta-agent/SKILL.md"
+    prompt: ".auto-flow/agents/agent-meta-agent/SKILL.md"
     task_template: |
       Read your memory at documents/meta.md first.
       Analyze logs from run {{run_id}} at {{run_dir}}.
-      Diagnose problems in agent behavior and fix their prompts in .claude/skills/agent-*/SKILL.md.
+      Diagnose problems in agent behavior and fix their prompts in .auto-flow/agents/agent-*/SKILL.md.
       Update documents/meta.md with findings and fix outcomes.
       Write minimal changelog: {{node_dir}}/07-changelog.md
     run_on: always
@@ -193,7 +193,7 @@ nodes:
     phase: report
     label: "Tech Lead Review — Final Review + CI + Merge"
     inputs: [specification, decision]
-    prompt: ".claude/skills/agent-tech-lead-review/SKILL.md"
+    prompt: ".auto-flow/agents/agent-tech-lead-review/SKILL.md"
     task_template: |
       Perform final code review of the PR.
       Read the spec at {{input.specification}}/01-spec.md for acceptance criteria.

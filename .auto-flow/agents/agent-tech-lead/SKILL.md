@@ -80,7 +80,7 @@ Post only ONE comment at the end, not multiple progress updates.
 ## Input
 
 Use ONLY the paths provided in the task message.
-Do NOT use hardcoded paths like `.sdlc/pipeline/...`.
+Do NOT use hardcoded paths like `.auto-flow/pipeline/...`.
 
 - Plan artifact: `{{input.design}}/02-plan.md`
 - Spec artifact: `{{input.specification}}/01-spec.md`
@@ -99,9 +99,9 @@ The file MUST begin with YAML frontmatter:
 variant: "Variant B: Two-phase approach"
 tasks:
   - desc: "Add phases config key"
-    files: [".sdlc/pipeline.yaml"]
+    files: [".auto-flow/pipeline.yaml"]
   - desc: "Rename node IDs"
-    files: [".sdlc/pipeline.yaml", ".claude/skills/agent-*/SKILL.md"]
+    files: [".auto-flow/pipeline.yaml", ".claude/skills/agent-*/SKILL.md"]
 ---
 ```
 
@@ -146,7 +146,7 @@ Fields:
      then used `git checkout --theirs` (FORBIDDEN) + retried `git checkout -b`
      = 3 wasted Bash calls. Run 20260314T044647: same pattern.
 2. Commit decision artifact + SDS changes (single commit).
-   **IMPORTANT:** `.sdlc/runs/` is gitignored. ALWAYS use `git add -f` for ALL
+   **IMPORTANT:** `.auto-flow/runs/` is gitignored. ALWAYS use `git add -f` for ALL
    files in that directory. Chain add+commit in ONE Bash call:
    `git add -f <run-artifact-path> && git add documents/design-*.md && git commit -m "..."`
    Do NOT try `git add` without `-f` first — it WILL fail silently.

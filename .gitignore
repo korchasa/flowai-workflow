@@ -1,4 +1,5 @@
 .DS_Store
 .env
 .sdlc/runs/
+.auto-flow/runs/
 documents/whiteboard.md

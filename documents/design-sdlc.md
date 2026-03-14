@@ -42,9 +42,9 @@ graph LR
     from `.auto-flow/agents/agent-<name>/SKILL.md` (canonical location;
     symlinked from `.claude/skills/agent-<name>` for Claude Code interactive
     discovery per FR-S26)
-  - **Artifact Store**: Git-tracked files in `.sdlc/runs/<run-id>/[<phase>/]<node-id>/`
+  - **Artifact Store**: Git-tracked files in `.auto-flow/runs/<run-id>/[<phase>/]<node-id>/`
     (phase subdir present when node has `phase` field in config). Note: runs
-    directory remains at `.sdlc/runs/` — engine-controlled hardcoded path;
+    directory remains at `.auto-flow/runs/` — engine-controlled hardcoded path;
     configurable `runs_dir` deferred to separate engine FR.
   - **Legacy Shell Scripts** (`.auto-flow/scripts/`): Deprecated stage scripts
     deleted per FR-S26. HITL and rollback scripts retained.
@@ -148,9 +148,9 @@ graph LR
   were verified"). Hardcoded `gh issue comment --body` templates in SKILL.md
   files must also use first-person (FR-43).
 - **Migration (FR-36, FR-S26):** Two migrations completed:
-  1. FR-36: `agents/<name>/` → `.claude/skills/agent-<name>/` (symlinks
+  1. FR-36: `agents/<name>/` → `.auto-flow/agents/agent-<name>/` (symlinks
      eliminated, `.claude/skills/` became canonical).
-  2. FR-S26: `.claude/skills/agent-<name>/` → `.auto-flow/agents/agent-<name>/`
+  2. FR-S26: `.auto-flow/agents/agent-<name>/` → `.auto-flow/agents/agent-<name>/`
      (consolidated into pipeline directory; `.claude/skills/agent-<name>`
      symlinks created for Claude Code discovery).
 - **Voice directive (FR-40):** Each SKILL.md contains `## Voice` section
@@ -366,8 +366,8 @@ graph LR
 - **Sec:** Secret detection via `gitleaks detect --no-git` in `deno task check`
   (`scripts/check.ts`). Engine-level scope checks removed. Agents run with
   local user's permissions.
-- **Logs:** Full transcripts per stage in `.sdlc/runs/<run-id>/logs/`. Note:
-  logs path remains engine-controlled (`.sdlc/runs/`); configurable `runs_dir`
+- **Logs:** Full transcripts per stage in `.auto-flow/runs/<run-id>/logs/`. Note:
+  logs path remains engine-controlled (`.auto-flow/runs/`); configurable `runs_dir`
   deferred to separate engine FR.
 
 ## 7. Constraints
@@ -428,12 +428,12 @@ FR-S24 evidence (issue #96):
   `engine/config.ts:105-249` (node validation — types, inputs, run_on).
   No new code required — Variant A (evidence-only) selected.
 - **FR-S11 (Inter-Stage Data Flow):** SRS text updated by PM to reflect
-  phase-aware artifact path `.sdlc/runs/<run-id>/[<phase>/]<node-id>/`.
+  phase-aware artifact path `.auto-flow/runs/<run-id>/[<phase>/]<node-id>/`.
   SDS §2.2 already documents phase-aware layout. Engine FR-E9 implementation
   deferred (separate issue).
 - **FR-S25 (Phase-Organized SDLC Artifact Directories):** FR-E9 phase registry
   implemented (`engine/state.ts:20-36`, `engine/engine.ts:129-130`). Artifact
-  paths resolve to `.sdlc/runs/<run-id>/<phase>/<node-id>/` for nodes with
+  paths resolve to `.auto-flow/runs/<run-id>/<phase>/<node-id>/` for nodes with
   `phase:` field. SDLC pipeline nodes have `phase:` fields in `pipeline.yaml`
   (`plan`, `impl`, `report`). ACs #1-3 marked with evidence. ACs #4-5 pending
   verification (end-to-end run + `deno task check`). Selected Variant A
