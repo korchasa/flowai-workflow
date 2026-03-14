@@ -243,7 +243,15 @@ graph LR
     Append semantics: multiple invocations (continuation) with same path
     produce concatenated JSONL. `--verbose` flag removed from
     `buildClaudeArgs()` (unrelated to streaming, changes stderr globally).
-    **Turn separators and summary footer (FR-39):** `executeClaudeProcess()`
+    **Repeated file read warning (FR-39):** `FileReadTracker` class in
+    `agent.ts`. `track(path): string | null` — maintains `Map<string, number>`,
+    returns `[WARN] repeated file read: <path> (<N> times)` when count >
+    threshold (default 2), else null. Instantiated per `executeClaudeProcess()`
+    call (counter resets per invocation). In event loop: for `tool_use` blocks
+    with `name === "Read"`, calls `tracker.track(block.input.file_path)`. Non-
+    null result written to `logFile` via `stampLines()`. Log-file-only (terminal
+    `onOutput` unchanged). Pure-logic class — unit-testable without I/O.
+    **Turn separators and summary footer (FR-40):** `executeClaudeProcess()`
     maintains `turnCount` counter. On each `event.type === "assistant"`:
     increments counter, writes `--- turn N ---` line to `logFile` via
     `stampLines()` (timestamped, consistent with existing log writes). After
