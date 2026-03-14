@@ -549,6 +549,17 @@
     mixed node types (agent + merge).
   - [ ] `deno task check` passes.
 
+### 3.23 FR-E23: CLI Help for `deno task check`
+
+- **Description:** `scripts/check.ts` (`deno task check`) must respond to `--help` / `-h` with a usage synopsis describing what checks are run and exit 0. Unknown flags must produce an error message referencing `--help` and exit non-zero. Output format follows the pattern established by `engine/cli.ts`.
+- **Motivation:** Users must read source code to discover what `deno task check` does and whether any options exist. No help text forces unnecessary source inspection.
+- **Acceptance criteria:**
+  - [ ] `--help` / `-h` prints usage synopsis (`<Tool name> — <description>`, `Usage:`, `Options:`, `Examples:`) and exits 0.
+  - [ ] Usage text documents all checks performed (type-check, tests, lint, pipeline integrity, secret detection) and any flags.
+  - [ ] Unknown flags print an error message referencing `--help` and exit non-zero.
+  - [ ] `deno task check` (no args) continues to run all checks unchanged (backward-compatible).
+  - [ ] `deno task check` passes (self-check).
+
 ## 4. Non-Functional Requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution is not supported.
@@ -597,3 +608,4 @@
 | FR-39  | FR-E20 | Repeated File Read Warning |
 | FR-41  | FR-E21 | Semi-Verbose Output Mode (`-s`) |
 | —      | FR-E22 | Pipeline Final Summary with Node Results |
+| —      | FR-E23 | CLI Help for `deno task check` |
