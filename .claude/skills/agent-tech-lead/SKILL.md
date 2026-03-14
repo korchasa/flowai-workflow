@@ -84,7 +84,13 @@ Fields:
 1. **Justification:** Why this variant was selected. Reference technical fit,
    vision alignment (`AGENTS.md`), and complexity trade-off.
 2. **Task descriptions:** Detailed description of each task from the YAML.
-3. **Summary:** 3-5 lines: variant selected, task count, branch/PR created.
+
+### `## Summary` (required)
+
+`04-decision.md` MUST end with a `## Summary` section (3-5 lines) covering:
+- Variant selected and rationale
+- Tasks defined (count + key actions)
+- Branch and draft PR created
 
 ## Git Workflow
 

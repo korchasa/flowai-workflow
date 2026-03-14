@@ -920,6 +920,69 @@
 
 ---
 
+### 3.40 FR-41: Semi-Verbose Output Mode (`-s`)
+
+- **Description:** Pipeline engine must support a `semi-verbose` verbosity level
+  (`-s` CLI flag) that shows agent text output but suppresses tool-call lines
+  (e.g., `Read`, `Write`, `Bash` invocations). Sits between `normal` (silent)
+  and `verbose` (full tool output).
+- **Motivation:** `verbose` mode is too noisy for monitoring (hundreds of tool
+  lines per node). `normal` shows nothing. Operators need intermediate view:
+  agent reasoning + results without tool-call noise.
+- **Acceptance criteria:**
+  - [x] `Verbosity` type includes `"semi-verbose"` value alongside `"quiet"`,
+    `"normal"`, `"verbose"`. Evidence: `engine/types.ts` (`Verbosity` union).
+  - [x] `-s` CLI flag maps to `semi-verbose` verbosity. Evidence: `engine/cli.ts`.
+  - [x] In semi-verbose mode, `formatEventForOutput()` skips `tool_use` content
+    blocks in `assistant` events — emits only `text` blocks. Evidence:
+    `engine/agent.ts` (`formatEventForOutput()` with `verbosity` param).
+  - [x] Log file writes are unaffected — full output preserved. Evidence:
+    `engine/agent.ts` (log path calls `formatEventForOutput()` without verbosity).
+  - [x] `nodeOutput()` gate shows in both `verbose` and `semi-verbose`. Evidence:
+    `engine/output.ts` (`nodeOutput()` condition).
+  - [x] `deno task check` passes. Evidence: design.md (FR-41 referenced as implemented).
+
+---
+
+### 3.41 FR-42: Agent Output Summary Section
+
+- **Description:** Every agent in the pipeline must produce a `## Summary`
+  section in its primary output artifact. The pipeline validation must enforce
+  its presence via `contains_section: Summary` rule. Ensures traceability:
+  any operator or downstream agent can read a single section to understand
+  what the stage accomplished.
+- **Motivation:** Agent artifacts vary widely in length (spec: ~1 page;
+  QA report: multi-page). Without a mandatory summary, downstream agents and
+  operators must parse the full artifact to assess outcomes — increasing cost
+  and latency.
+- **Acceptance criteria:**
+  - [x] All 7 agent SKILL.md files include documented requirement for a
+    `## Summary` section in their output artifact.
+    Agents: `agent-pm`, `agent-architect`, `agent-tech-lead`,
+    `agent-developer`, `agent-qa`, `agent-tech-lead-review`, `agent-meta-agent`.
+    Evidence: `.claude/skills/agent-pm/SKILL.md:113`,
+    `.claude/skills/agent-architect/SKILL.md:120`,
+    `.claude/skills/agent-tech-lead/SKILL.md:87`,
+    `.claude/skills/agent-developer/SKILL.md:92`,
+    `.claude/skills/agent-qa/SKILL.md:113`,
+    `.claude/skills/agent-meta-agent/SKILL.md:81,93`,
+    `.claude/skills/agent-tech-lead-review/SKILL.md:55`.
+  - [x] `pipeline.yaml` validation rules include `contains_section: Summary`
+    for all 7 agent nodes (`specification`, `design`, `decision`, `build`,
+    `verify`, `tech-lead-review`, `optimize`).
+    Evidence: `.sdlc/pipeline.yaml:61` (specification), `:83` (design),
+    `:108` (decision), `:140` (build), `:159` (verify), `:185` (optimize),
+    `:210` (tech-lead-review).
+  - [x] Continuation mechanism is triggered when `## Summary` is absent
+    (same `contains_section` rule behavior as other section validations).
+    Evidence: Inherent behavior of `contains_section` validation in engine;
+    `.sdlc/pipeline.yaml` `contains_section` rules trigger continuation on
+    missing section (same mechanism as all other section validations).
+  - [x] `deno task check` passes after changes.
+    Evidence: Run 20260314T073009 — 490 tests pass, pipeline integrity valid.
+
+---
+
 ## 4. Non-functional requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution is not supported.

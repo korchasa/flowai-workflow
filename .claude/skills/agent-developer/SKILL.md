@@ -57,8 +57,15 @@ implement the code changes defined in the task breakdown from the Architect.
      (e.g., `engine/log.ts`) — NOT old run data.
 3. **Write code and tests:** Follow TDD (tests first), project code style.
 4. **Commit and push:** After all checks pass, stage changes (`git add -A`),
-   commit (`git commit -m "sdlc(impl): <brief summary>"`), and push
-   (`git push origin HEAD`). One commit per implementation run.
+   commit with subject + body, and push (`git push origin HEAD`). One commit per implementation run.
+   Commit format:
+   ```
+   sdlc(impl): <brief one-line summary>
+
+   - Files changed: <list key files and what changed>
+   - Tests: <added/modified test files>
+   - Check: PASS
+   ```
    **Push ONCE only.** If `git push` returns "Everything up-to-date", the
    branch is already synced — do NOT retry with different syntax (`git push`,
    `git push origin <branch>`). One attempt, then move on.
