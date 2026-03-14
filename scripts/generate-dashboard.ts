@@ -382,10 +382,52 @@ strong.aborted{color:#854d0e}
 .log-link{font-family:monospace;font-size:.75rem;color:#6b7280;display:inline-block;margin-bottom:.5rem}`
   .trim();
 
+export function printUsage(): string {
+  return `HTML dashboard generator — produces a self-contained dashboard for a pipeline run
+
+Usage:
+  deno task dashboard --run-dir <path>
+
+Options:
+  --run-dir <path>   Path to the pipeline run directory (required)
+  --help, -h         Show this help
+
+Example:
+  deno task dashboard --run-dir .sdlc/runs/20260101T120000`;
+}
+
+export function checkArgs(
+  args: string[],
+): { text: string; code: number } | null {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--help" || arg === "-h") {
+      return { text: printUsage(), code: 0 };
+    }
+    if (arg === "--run-dir") {
+      i++;
+      continue;
+    }
+    if (arg.startsWith("-")) {
+      return {
+        text: `Error: Unknown argument: ${arg}. Use --help for usage.`,
+        code: 1,
+      };
+    }
+  }
+  return null;
+}
+
 // --- CLI entry ---
 
 if (import.meta.main) {
   const args = Deno.args;
+  const argCheck = checkArgs(args);
+  if (argCheck !== null) {
+    if (argCheck.code === 0) console.log(argCheck.text);
+    else console.error(argCheck.text);
+    Deno.exit(argCheck.code);
+  }
   const runDirIdx = args.indexOf("--run-dir");
   if (runDirIdx === -1 || !args[runDirIdx + 1]) {
     console.error("Usage: generate-dashboard.ts --run-dir <path>");

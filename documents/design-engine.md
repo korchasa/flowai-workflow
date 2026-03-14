@@ -209,6 +209,12 @@ graph TD
     loop executor for iteration-qualified derivation
   - `cli.ts` — CLI entry point: argument parsing, .env loading
   - `mod.ts` — public API re-exports
+- **`scripts/check.ts` CLI help (FR-E23):** `printUsage()` static function
+  outputs: description of checks performed, usage line, note about no accepted
+  options, example. `--help`/`-h` in `Deno.args` → `printUsage()` +
+  `Deno.exit(0)`. Any other arg → error referencing `--help` + `Deno.exit(1)`.
+  Follows `engine/cli.ts` format. Exported `printUsage()`/`checkArgs()` for
+  unit testing
 - **Interfaces:**
   - CLI: `deno task run [--prompt <text>] [--config <path>] [--resume <run-id>]
     [--dry-run] [-v|-s|-q] [--env KEY=VAL] [--skip nodes] [--only nodes]`

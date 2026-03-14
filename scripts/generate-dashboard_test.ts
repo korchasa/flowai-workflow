@@ -1,10 +1,12 @@
 import { assertEquals } from "@std/assert";
 import {
+  checkArgs,
   computeCostBars,
   computeTimeline,
   type CostBar,
   escHtml,
   groupNodesByPhase,
+  printUsage,
   readNodeLog,
   readRunState,
   renderCard,
@@ -711,4 +713,54 @@ Deno.test("groupNodesByPhase — no phases config returns single group with all 
   assertEquals(groups.length, 1);
   assertEquals(groups[0].label, "");
   assertEquals(groups[0].ids, ["spec", "build"]);
+});
+
+// --- printUsage ---
+
+Deno.test("printUsage — contains Usage and deno task dashboard", () => {
+  const text = printUsage();
+  assertEquals(text.includes("Usage:"), true);
+  assertEquals(text.includes("deno task dashboard"), true);
+});
+
+Deno.test("printUsage — mentions --run-dir option", () => {
+  const text = printUsage();
+  assertEquals(text.includes("--run-dir"), true);
+});
+
+// --- checkArgs ---
+
+Deno.test("checkArgs — --help returns usage text with code 0", () => {
+  const result = checkArgs(["--help"]);
+  assertEquals(result?.code, 0);
+  assertEquals(result?.text.includes("deno task dashboard"), true);
+});
+
+Deno.test("checkArgs — -h returns usage text with code 0", () => {
+  const result = checkArgs(["-h"]);
+  assertEquals(result?.code, 0);
+  assertEquals(result?.text.includes("deno task dashboard"), true);
+});
+
+Deno.test("checkArgs — --help alongside --run-dir returns help (code 0)", () => {
+  const result = checkArgs(["--help", "--run-dir", "/some/path"]);
+  assertEquals(result?.code, 0);
+  assertEquals(result?.text.includes("deno task dashboard"), true);
+});
+
+Deno.test("checkArgs — unknown flag returns error string with code 1", () => {
+  const result = checkArgs(["--output", "out.html"]);
+  assertEquals(result?.code, 1);
+  assertEquals(result?.text.includes("Unknown argument: --output"), true);
+  assertEquals(result?.text.includes("--help"), true);
+});
+
+Deno.test("checkArgs — valid --run-dir arg returns null (ok)", () => {
+  const result = checkArgs(["--run-dir", ".sdlc/runs/20260101T120000"]);
+  assertEquals(result, null);
+});
+
+Deno.test("checkArgs — empty args returns null", () => {
+  const result = checkArgs([]);
+  assertEquals(result, null);
 });

@@ -626,6 +626,18 @@
   - [ ] All docs (CLAUDE.md, AGENTS.md, SRS, SDS) updated with new paths
   - [ ] `.claude/hooks/guard-deno-direct.sh` placement decision documented (stays in `.claude/hooks/`)
 
+### 3.27 FR-S27: CLI Help for SDLC Utility Scripts
+
+- **Description:** SDLC utility scripts that accept CLI arguments must respond to `--help` / `-h` with a usage synopsis and exit 0. Unknown flags must produce an error message referencing `--help` and exit non-zero. Output format follows the pattern in `engine/cli.ts`. Applies to: `scripts/self_runner.ts`, `scripts/loop_in_claude.ts`, `scripts/generate-dashboard.ts`.
+- **Motivation:** Users must read source code to discover available options for SDLC utility scripts. No help text forces unnecessary source inspection and increases risk of misuse.
+- **Acceptance criteria:**
+  - [ ] `scripts/self_runner.ts`: `--help` / `-h` prints usage (loop interval, stop conditions, pass-through args) and exits 0.
+  - [ ] `scripts/loop_in_claude.ts`: `--help` / `-h` prints usage (description, relation to `self_runner`, accepted args) and exits 0.
+  - [ ] `scripts/generate-dashboard.ts`: `--help` / `-h` prints usage (`--run-dir` flag, output path) and exits 0.
+  - [ ] All three scripts: unknown flags produce error message referencing `--help` and exit non-zero.
+  - [ ] Output format follows `engine/cli.ts` pattern: `<Tool> — <description>\n\nUsage:\n  deno task <name> [options]\n\nOptions:\n  ...\n\nExamples:\n  ...`.
+  - [ ] `deno task check` passes.
+
 ## 4. Non-functional requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution is not supported.
@@ -736,3 +748,4 @@ engine/                                # Deno/TypeScript pipeline engine
 | —      | FR-S24 | Pipeline Config Validation |
 | —      | FR-S25 | Phase-Organized SDLC Artifact Directories |
 | —      | FR-S26 | Pipeline Asset Directory Consolidation |
+| —      | FR-S27 | CLI Help for SDLC Utility Scripts |

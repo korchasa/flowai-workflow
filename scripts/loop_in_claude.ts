@@ -111,8 +111,40 @@ async function sleep(sec: number): Promise<void> {
   await new Promise((r) => setTimeout(r, sec * 1000));
 }
 
+export function printUsage(): string {
+  return `Pipeline loop runner (via claude CLI) — check GitHub issues and run pipeline via claude
+
+Usage:
+  deno task loop-in-claude [claude-args...]
+
+Arguments:
+  [claude-args...]   Arguments passed through to the claude CLI
+
+Note: All arguments (except --help/-h) are forwarded directly to claude.
+
+Examples:
+  deno task loop-in-claude
+  deno task loop-in-claude --verbose
+  deno task loop-in-claude --model claude-opus-4-6`;
+}
+
+export function checkArgs(
+  args: string[],
+): { text: string; code: number } | null {
+  if (args.includes("--help") || args.includes("-h")) {
+    return { text: printUsage(), code: 0 };
+  }
+  return null;
+}
+
 // --- Main loop ---
 if (import.meta.main) {
+  const argCheck = checkArgs(Deno.args);
+  if (argCheck !== null) {
+    if (argCheck.code === 0) console.log(argCheck.text);
+    else console.error(argCheck.text);
+    Deno.exit(argCheck.code);
+  }
   console.log("=== auto-flow: loop-in-claude started ===");
   let pause = MIN_PAUSE_SEC;
 

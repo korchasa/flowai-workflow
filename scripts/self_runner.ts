@@ -71,8 +71,49 @@ async function sleep(sec: number): Promise<void> {
   await new Promise((r) => setTimeout(r, sec * 1000));
 }
 
+export function printUsage(): string {
+  return `Pipeline loop runner — check GitHub issues and run pipeline repeatedly
+
+Usage:
+  deno task loop [interval] [-- claude-args...]
+
+Options:
+  [interval]     Initial backoff in seconds (default: 30)
+  [-- args...]   Arguments passed through to the pipeline (optional)
+  --help, -h     Show this help
+
+Examples:
+  deno task loop
+  deno task loop 60
+  deno task loop -- --prompt "Focus on the login bug"`;
+}
+
+export function checkArgs(
+  args: string[],
+): { text: string; code: number } | null {
+  for (const arg of args) {
+    if (arg === "--help" || arg === "-h") {
+      return { text: printUsage(), code: 0 };
+    }
+    if (arg === "--") break;
+    if (arg.startsWith("--")) {
+      return {
+        text: `Error: Unknown argument: ${arg}. Use --help for usage.`,
+        code: 1,
+      };
+    }
+  }
+  return null;
+}
+
 // --- Main loop ---
 if (import.meta.main) {
+  const argCheck = checkArgs(Deno.args);
+  if (argCheck !== null) {
+    if (argCheck.code === 0) console.log(argCheck.text);
+    else console.error(argCheck.text);
+    Deno.exit(argCheck.code);
+  }
   console.log("=== auto-flow: self-runner started ===");
   let pause = MIN_PAUSE_SEC;
 

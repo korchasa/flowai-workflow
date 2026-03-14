@@ -254,6 +254,11 @@ graph LR
     "No cost data" message (mirrors timeline empty-state). Cost chart CSS
     appended to `CSS` const. Integrated into `renderHtml()` between timeline
     and `<main>` card grid (FR-40)
+- **CLI help (FR-S26):** `printUsage()` static function outputs: description,
+  usage line (`deno task dashboard --run-dir <path>`), options (`--run-dir`),
+  examples. `--help`/`-h` → `printUsage()` + `Deno.exit(0)`. Unknown flags →
+  error referencing `--help` + `Deno.exit(1)`. Follows `engine/cli.ts` format.
+  Exported `printUsage()`/`checkArgs()` for unit testing
 - **Interfaces:**
   - CLI: `deno task dashboard --run-dir <path>`
   - Hook: `after:` on `optimize` node (`|| true` suffix for non-fatal)
@@ -279,6 +284,22 @@ graph LR
 - **Interfaces:** Called as part of `deno task check` pipeline. No separate CLI
   entry point (deferred).
 - **Deps:** `engine/config.ts` (`loadConfig` function).
+
+### 3.9 SDLC Utility Scripts CLI Help (FR-S26)
+
+- **Purpose:** `--help`/`-h` support for `scripts/self_runner.ts` and
+  `scripts/loop_in_claude.ts`. Each script gets inline `printUsage()` following
+  `engine/cli.ts` format (description, usage, options, examples).
+- **`scripts/self_runner.ts`:** `printUsage()` describes pipeline loop runner.
+  Usage: `deno task loop [interval] [-- claude-args...]`. `--help`/`-h` →
+  print + exit 0. Unknown `--`-prefixed flags → error + exit 1. Exported
+  `printUsage()`/`checkArgs()` for unit testing.
+- **`scripts/loop_in_claude.ts`:** `printUsage()` describes in-Claude pipeline
+  runner. Usage: `deno task loop-in-claude [claude-args...]`. `--help`/`-h`
+  detected before passthrough to Claude CLI. Exported helpers for unit testing.
+- **Pattern:** Identical to `engine/cli.ts`: static string, `Deno.args` scan,
+  `Deno.exit(0)` on help, `Deno.exit(1)` on unknown flag with message
+  referencing `--help`.
 
 ## 4. Data
 

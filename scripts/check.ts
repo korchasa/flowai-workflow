@@ -124,29 +124,71 @@ async function pipelineIntegrity(): Promise<void> {
   console.log("  Agent symlinks valid.");
 }
 
-console.log("=== auto-flow: Full Check ===");
+export function printUsage(): string {
+  return `Full project verification: fmt, lint, test, comment-scan
 
-await run("deno", ["fmt", "--check"], "Formatting Check");
-await run("deno", ["lint"], "Linting");
-await run("gitleaks", ["detect", "--no-git"], "Secret Scan", true);
-// Allow test failure when no test files exist yet
-// Scope tests to project dirs (exclude .claude/skills/ which may need network)
-const testDirs = ["scripts", ".auto-flow", "engine"];
-const testableDir = (await Promise.all(
-  testDirs.map(async (d) => ({ d, has: await hasTestFiles(d) })),
-)).filter((x) => x.has).map((x) => x.d);
+Usage:
+  deno task check
 
-if (testableDir.length > 0) {
-  await run(
-    "deno",
-    ["test", "-A", "--no-check", ...testableDir],
-    "Tests",
-  );
-} else {
-  console.log("\n--- Tests ---");
-  console.log("No test files found, skipping.");
+Checks performed:
+  - Formatting check (deno fmt --check)
+  - Linting (deno lint)
+  - Secret scan (gitleaks)
+  - Tests (deno test)
+  - Pipeline integrity check
+  - Comment marker scan (TODO/FIXME/HACK/XXX)
+
+No options accepted.
+
+Example:
+  deno task check`;
 }
-await pipelineIntegrity();
-await commentScan();
 
-console.log("\n=== All checks passed! ===");
+export function checkArgs(
+  args: string[],
+): { text: string; code: number } | null {
+  for (const arg of args) {
+    if (arg === "--help" || arg === "-h") {
+      return { text: printUsage(), code: 0 };
+    }
+    return {
+      text: `Error: Unknown argument: ${arg}. Use --help for usage.`,
+      code: 1,
+    };
+  }
+  return null;
+}
+
+if (import.meta.main) {
+  const argCheck = checkArgs(Deno.args);
+  if (argCheck !== null) {
+    if (argCheck.code === 0) console.log(argCheck.text);
+    else console.error(argCheck.text);
+    Deno.exit(argCheck.code);
+  }
+
+  console.log("=== auto-flow: Full Check ===");
+
+  await run("deno", ["fmt", "--check"], "Formatting Check");
+  await run("deno", ["lint"], "Linting");
+  await run("gitleaks", ["detect", "--no-git"], "Secret Scan", true);
+  const testDirs = ["scripts", ".auto-flow", "engine"];
+  const testableDir = (await Promise.all(
+    testDirs.map(async (d) => ({ d, has: await hasTestFiles(d) })),
+  )).filter((x) => x.has).map((x) => x.d);
+
+  if (testableDir.length > 0) {
+    await run(
+      "deno",
+      ["test", "-A", "--no-check", ...testableDir],
+      "Tests",
+    );
+  } else {
+    console.log("\n--- Tests ---");
+    console.log("No test files found, skipping.");
+  }
+  await pipelineIntegrity();
+  await commentScan();
+
+  console.log("\n=== All checks passed! ===");
+}
