@@ -109,7 +109,8 @@ graph LR
     task breakdown from selected variant. Uses `{{run_id}}` for `--prompt` mode
     fallback branch `sdlc/{{run_id}}`.
   - `agent-developer` — implements tasks. Owns `git add`, `git commit`,
-    `git push` after each task. Posts PR comment with implementation summary.
+    `git push` after each task. Commit messages follow `sdlc(impl): <summary>`
+    format.
   - `agent-qa` — verifies developer output. Posts verdict as PR review
     (`gh pr review`: approve/request-changes).
   - `agent-tech-lead-review` — post-pipeline: final code review + CI gate
@@ -391,4 +392,6 @@ Engine FR evidence (issue #99):
 
 - **FR-E2, FR-E10, FR-E11, FR-E13, FR-E19:** Documentation-only — mark
   existing implementations with evidence in `documents/requirements-engine.md`.
-  No code or design changes. Variant A (batch single-pass) selected.
+  No code or design changes. Variant A (batch single-pass) selected. FR-E11
+  completed (commits `ba99362`, `232dc53`). Remaining: FR-E2 (2 ACs), FR-E10
+  (12 ACs), FR-E13 (6 ACs), FR-E19 (7 ACs) — 27 ACs total.
