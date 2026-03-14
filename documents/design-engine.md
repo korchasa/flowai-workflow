@@ -87,7 +87,8 @@ graph TD
   - `validate.ts` — artifact validation rules (file_exists, not_empty,
     contains_section, custom_script, frontmatter_field)
   - `state.ts` — RunState persistence to `state.json`, resume logic,
-    phase registry (planned, not yet implemented — see §3.2),
+    phase registry (`setPhaseRegistry()`, `getPhaseForNode()`,
+    `clearPhaseRegistry()` — see §3.2),
     cost aggregation (`updateRunCost()` sums
     `nodes[*].cost_usd` → `total_cost_usd`; called from
     `markNodeCompleted()` when optional `costUsd` param provided, FR-32)
@@ -177,7 +178,7 @@ graph TD
   - `engine.ts` — main executor: level iteration, sequential dispatch, verbose
     input resolution, node result summary display (FR-30),
     loop-node log saving via `onNodeComplete` callback,
-    phase registry init (planned, not yet implemented — see §3.2),
+    phase registry init via `setPhaseRegistry(config)` at engine startup,
     pre-post-pipeline `on_failure_script` execution.
     Dry-run path (FR-28): applies `collectPostPipelineNodes()` +
     `sortPostPipelineNodes()` + level filtering before calling
@@ -256,16 +257,19 @@ graph TD
   - All existing callers pass no `output` arg — zero behavioral change.
 - **Deps:** `claude` CLI, `deno`, `git`, `jsr:@std/yaml`.
 
-### 3.2 Phase Registry (`state.ts`) — NOT IMPLEMENTED
+### 3.2 Phase Registry (`state.ts`) — IMPLEMENTED
 
-- **Status:** Designed but not implemented. `getNodeDir()` in `engine/state.ts`
-  returns flat path `${runDir}/${nodeId}` without phase awareness. Phases are
-  validated in `config.ts` but do not affect filesystem structure.
+- **Status:** Implemented. `getNodeDir()` in `engine/state.ts` resolves
+  phase-aware artifact paths. Evidence: `engine/state.ts:20-36`
+  (`setPhaseRegistry()` — builds nodeId→phase map from config),
+  `engine/state.ts:98-104` (`getNodeDir()` — phase-aware path resolution),
+  `engine/state.ts:44-46` (`getPhaseForNode()` — lookup),
+  `engine/engine.ts:135` (`setPhaseRegistry(config)` call at engine init).
 - **Purpose:** Module-scoped mapping from nodeId → phase string, enabling
   `getNodeDir()` to resolve phase-aware artifact paths without signature change.
-- **Planned data:** `phaseRegistry: Map<string, string>` — populated from
+- **Data:** `phaseRegistry: Map<string, string>` — populated from
   `PipelineConfig` nodes' `phase` fields.
-- **Planned interfaces:**
+- **Interfaces:**
   - `setPhaseRegistry(config: PipelineConfig)` — iterates config nodes, builds
     map from `nodeId → node.phase` (skips nodes without `phase`). Called once at
     engine init (both fresh-run and `--resume` paths).
@@ -412,9 +416,11 @@ graph TD
         poll_interval: 60
         timeout: 7200
     ```
-  - **Phase Registry Init (NOT IMPLEMENTED)**: Planned: `setPhaseRegistry(config)`
-    called before `ensureRunDirs()` in `engine.ts` `run()`. Currently `getNodeDir()`
-    returns flat `${runDir}/${nodeId}` path. See §3.2 for planned design.
+  - **Phase Registry Init**: `setPhaseRegistry(config)` called at engine
+    startup before `ensureRunDirs()` in `engine.ts` `run()`. `getNodeDir()`
+    resolves phase-aware paths: `${runDir}/${phase}/${nodeId}` when phase
+    registered, `${runDir}/${nodeId}` otherwise. Evidence:
+    `engine/state.ts:20-36`, `engine/engine.ts:135`.
   - **Failure Hook Before Post-Pipeline Nodes (FR-34)**: When
     `pipelineSuccess === false`, engine executes `config.defaults.on_failure_script`
     (if configured) via `runFailureHook()` before post-pipeline nodes. Script
