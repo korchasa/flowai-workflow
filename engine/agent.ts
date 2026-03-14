@@ -5,6 +5,7 @@ import type {
   NodeSettings,
   PermissionDenial,
   TemplateContext,
+  Verbosity,
 } from "./types.ts";
 import { interpolate } from "./template.ts";
 import {
@@ -40,6 +41,8 @@ export interface AgentRunOptions {
   nodeId?: string;
   /** Path to write real-time stream-json log file. */
   streamLogPath?: string;
+  /** Verbosity level for terminal output filtering. */
+  verbosity?: Verbosity;
 }
 
 /**
@@ -62,6 +65,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
     output,
     nodeId,
     streamLogPath,
+    verbosity,
   } = opts;
 
   // Derive onOutput callback from OutputManager
@@ -97,6 +101,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
     retryDelaySeconds: settings.retry_delay_seconds,
     onOutput,
     streamLogPath,
+    verbosity,
   });
 
   let continuations = 0;
@@ -179,6 +184,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
       retryDelaySeconds: settings.retry_delay_seconds,
       onOutput,
       streamLogPath,
+      verbosity,
     });
   }
 
@@ -236,6 +242,8 @@ export interface InvokeOptions {
   onOutput?: (line: string) => void;
   /** Path to write real-time stream-json log file. */
   streamLogPath?: string;
+  /** Verbosity level for terminal output filtering (semi-verbose suppresses tool_use). */
+  verbosity?: Verbosity;
 }
 
 interface InvokeResult {
@@ -257,6 +265,7 @@ export async function invokeClaudeCli(
         opts.timeoutSeconds,
         opts.onOutput,
         opts.streamLogPath,
+        opts.verbosity,
       );
       if (output.is_error) {
         lastError = `Claude CLI returned error: ${output.result}`;
@@ -318,7 +327,8 @@ export function buildClaudeArgs(opts: InvokeOptions): string[] {
 /**
  * Execute the claude CLI process with stream-json output.
  * Processes NDJSON events in real-time: writes readable formatted summaries
- * to streamLogPath, forwards them to onOutput, and extracts ClaudeCliOutput
+ * to streamLogPath (full, unfiltered), forwards filtered summaries to onOutput
+ * (tool_use suppressed when verbosity=semi-verbose), and extracts ClaudeCliOutput
  * from the final "result" event.
  */
 async function executeClaudeProcess(
@@ -326,6 +336,7 @@ async function executeClaudeProcess(
   timeoutSeconds: number,
   onOutput?: (line: string) => void,
   streamLogPath?: string,
+  verbosity?: Verbosity,
 ): Promise<ClaudeCliOutput> {
   // Unset CLAUDECODE to allow nested claude CLI invocations.
   // Claude Code checks this variable and refuses to launch inside another session.
@@ -392,10 +403,12 @@ async function executeClaudeProcess(
             if (event.type === "result") {
               resultEvent = extractClaudeOutput(event);
             }
-            // Write readable formatted line to log file in real-time
-            const summary = formatEventForOutput(event);
-            if (logFile && summary) {
-              await logFile.write(encoder.encode(stampLines(summary) + "\n"));
+            // Write full unfiltered summary to log file
+            const logSummary = formatEventForOutput(event);
+            if (logFile && logSummary) {
+              await logFile.write(
+                encoder.encode(stampLines(logSummary) + "\n"),
+              );
             }
             if (event.type === "result" && resultEvent && logFile) {
               await logFile.write(
@@ -405,7 +418,11 @@ async function executeClaudeProcess(
                 encoder.encode(stampLines(formatFooter(resultEvent)) + "\n"),
               );
             }
-            if (onOutput && summary) onOutput(summary);
+            // Forward verbosity-filtered summary to terminal
+            if (onOutput) {
+              const termSummary = formatEventForOutput(event, verbosity);
+              if (termSummary) onOutput(termSummary);
+            }
           } catch {
             // Skip malformed JSON lines
           }
@@ -425,9 +442,9 @@ async function executeClaudeProcess(
           if (event.type === "result") {
             resultEvent = extractClaudeOutput(event);
           }
-          const summary = formatEventForOutput(event);
-          if (logFile && summary) {
-            await logFile.write(encoder.encode(stampLines(summary) + "\n"));
+          const logSummary = formatEventForOutput(event);
+          if (logFile && logSummary) {
+            await logFile.write(encoder.encode(stampLines(logSummary) + "\n"));
           }
           if (event.type === "result" && resultEvent && logFile) {
             await logFile.write(
@@ -437,7 +454,10 @@ async function executeClaudeProcess(
               encoder.encode(stampLines(formatFooter(resultEvent)) + "\n"),
             );
           }
-          if (onOutput && summary) onOutput(summary);
+          if (onOutput) {
+            const termSummary = formatEventForOutput(event, verbosity);
+            if (termSummary) onOutput(termSummary);
+          }
         } catch { /* skip */ }
       }
     } catch { /* stream closed */ }
@@ -553,9 +573,17 @@ function formatToolDetail(name: string, input?: Record<string, any>): string {
   }
 }
 
-/** Format a stream event as a one-line summary for verbose output. */
-// deno-lint-ignore no-explicit-any
-export function formatEventForOutput(event: Record<string, any>): string {
+/**
+ * Format a stream event as a one-line summary for output.
+ * When verbosity is "semi-verbose", tool_use blocks in assistant events are
+ * suppressed — only text blocks are emitted. Default undefined = all blocks.
+ * Log file writes call without verbosity to preserve full output.
+ */
+export function formatEventForOutput(
+  // deno-lint-ignore no-explicit-any
+  event: Record<string, any>,
+  verbosity?: Verbosity,
+): string {
   switch (event.type) {
     case "system":
       if (event.subtype === "init") {
@@ -573,6 +601,7 @@ export function formatEventForOutput(event: Record<string, any>): string {
             : block.text;
           parts.push(`[stream] text: ${preview.replaceAll("\n", "↵")}`);
         } else if (block.type === "tool_use") {
+          if (verbosity === "semi-verbose") continue;
           const detail = formatToolDetail(block.name, block.input);
           parts.push(
             detail
