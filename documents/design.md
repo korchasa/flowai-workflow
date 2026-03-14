@@ -198,7 +198,7 @@ graph LR
     `PipelineDefaults.on_failure_script` (FR-34 configurable failure hook),
     `HitlConfig.artifact_source` (renamed from `issue_source`),
     `HitlConfig.exclude_login` (renamed from `bot_login`),
-    `Verbosity` union: `"quiet"|"normal"|"semi-verbose"|"verbose"` (FR-40))
+    `Verbosity` union: `"quiet"|"normal"|"semi-verbose"|"verbose"` (FR-41))
   - `template.ts` — `{{var}}` interpolation for prompts/paths
   - `config.ts` — YAML parsing, schema validation, defaults merge,
     `run_on` normalization. `validateNode()`: if `run_on` present, must be
@@ -252,7 +252,7 @@ graph LR
     `status=<ok|error> duration=<X>s cost=$<Y> turns=<N>`. Both separators and
     footer are log-file-only (terminal `onOutput` callback unchanged).
     `formatFooter()` is a pure function — unit-testable without CLI.
-    **Semi-verbose filtering (FR-40):** `formatEventForOutput(event,
+    **Semi-verbose filtering (FR-41):** `formatEventForOutput(event,
     verbosity?)` accepts optional `Verbosity` param. When
     `verbosity === "semi-verbose"`, skips `tool_use` content blocks in
     `assistant` events — emits only `text` blocks. Default `undefined` =
