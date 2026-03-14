@@ -981,6 +981,69 @@
   - [x] `deno task check` passes after changes.
     Evidence: Run 20260314T073009 — 490 tests pass, pipeline integrity valid.
 
+### 3.38 FR-39: Repeated File Read Warning in Stream Log
+
+- **Description:** The pipeline engine must detect when an agent reads the same
+  file path more than 2 times within a single agent session and emit a warning
+  line to the stream log. The warning is informational only — it must not block
+  or interrupt execution.
+- **Rationale:** Agents repeatedly reading the same file waste tokens and incur
+  unnecessary cost. This pattern is invisible in current logging and undetectable
+  by Meta-Agent without manual parsing of raw JSONL transcripts. A warning
+  enables automated prompt optimization (Meta-Agent) to flag and fix
+  redundant-read patterns in agent prompts.
+- **Scope:** Stream log only (`.sdlc/runs/<run-id>/logs/<node-id>.jsonl`).
+  Terminal output via `onOutput` callback is unchanged. Engine-level detection
+  only (not agent-internal).
+- **Acceptance criteria:**
+  - [ ] Engine tracks per-session file read counts by monitoring Claude CLI
+    `tool_use` events with `tool_name == "Read"` in the stream-json output.
+  - [ ] When a file path's read count exceeds 2 within one agent invocation,
+    engine writes a warning line to the stream log:
+    `[WARN] repeated file read: <path> (<N> times)`.
+  - [ ] Warning line is timestamped via existing `tsPrefix()` / `stampLines()`
+    mechanism (consistent with FR-33 log format).
+  - [ ] Warning is written to stream log only — terminal `onOutput` callback
+    receives no additional output.
+  - [ ] Execution is not blocked or interrupted by the warning.
+  - [ ] Warning triggers on the 3rd read (count > 2), not the 2nd.
+  - [ ] Each agent invocation (including continuation resumes) tracks reads
+    independently (counter resets between invocations).
+  - [ ] Unit tests cover: first 2 reads → no warning; 3rd read → warning;
+    4th+ reads → warning each time; different paths counted independently.
+  - [ ] `deno task check` passes.
+
+### 3.42 FR-43: Agent First-Person Voice in GitHub Interactions
+
+- **Description:** All 7 agent SKILL.md files MUST include a `## Voice` section
+  that: (1) explicitly covers GitHub issue comments, PR descriptions, and status
+  updates in scope; (2) provides correct/incorrect example pairs including one
+  targeting GitHub interactions; (3) uses first-person ("I") in all hardcoded
+  `gh issue comment` body strings.
+- **Rationale:** FR-40 established per-agent Voice sections but omitted explicit
+  GitHub interaction scope and lacked GitHub-specific examples. Passive/impersonal
+  templates in PM, Architect, and Tech Lead comments reduce traceability.
+- **Scope:** All `gh issue comment` and `gh pr review` body strings in agent
+  SKILL.md files, plus the `## Voice` section scope sentence and examples.
+- **Acceptance criteria:**
+  - [x] Hardcoded `gh issue comment --body` templates changed to first-person in
+    PM, Architect, and Tech Lead SKILL.md files. Evidence:
+    `.claude/skills/agent-pm/SKILL.md`,
+    `.claude/skills/agent-architect/SKILL.md`,
+    `.claude/skills/agent-tech-lead/SKILL.md`
+  - [x] "This includes GitHub issue comments, PR descriptions, and status
+    updates." scope sentence added to all 7 `## Voice` sections. Evidence:
+    `.claude/skills/agent-pm/SKILL.md`,
+    `.claude/skills/agent-architect/SKILL.md`,
+    `.claude/skills/agent-tech-lead/SKILL.md`,
+    `.claude/skills/agent-developer/SKILL.md`,
+    `.claude/skills/agent-qa/SKILL.md`,
+    `.claude/skills/agent-tech-lead-review/SKILL.md`,
+    `.claude/skills/agent-meta-agent/SKILL.md`
+  - [x] Third correct/incorrect example pair targeting GitHub interactions added
+    to all 7 `## Voice` sections. Evidence: all 7 SKILL.md files listed above.
+  - [x] `deno task check` passes.
+
 ---
 
 ## 4. Non-functional requirements

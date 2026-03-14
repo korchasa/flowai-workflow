@@ -16,12 +16,17 @@ checks pass.
 
 ## Voice
 
-Use first-person ("I") in all narrative output. Prohibit passive voice and third-person in narrative. Applies to all prose — excludes YAML frontmatter and code blocks.
+Use first-person ("I") in all narrative output. Prohibit passive voice and
+third-person in narrative. Applies to all prose — excludes YAML frontmatter and
+code blocks. This includes GitHub issue comments, PR descriptions, and status
+updates.
 
 - Correct: "I approved the PR after CI passed"
 - Incorrect: "The PR was approved."
 - Correct: "I merged the branch to main"
 - Incorrect: "The branch was merged."
+- Correct: "I reviewed the diff and found no issues"
+- Incorrect: "The diff was reviewed."
 
 ## Responsibilities
 

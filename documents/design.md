@@ -200,6 +200,13 @@ graph LR
   symlinks from `.claude/skills/`. Migrated to canonical `.claude/skills/`
   layout; `agents/` directory removed; symlink indirection eliminated. Legacy
   stage scripts formally deprecated (co-location N/A for deprecated scripts).
+- **Voice directive (FR-40):** Each SKILL.md contains `## Voice` section
+  (before `## Rules`) mandating first-person ("I") narrative in all prose
+  output. Shared 3-line core directive (first-person mandate, prohibited
+  patterns, scope exclusions for YAML/code/tables) + 1 agent-specific
+  correct/incorrect example pair per file. Applies to: handoff artifacts,
+  PR/issue comments, QA reports, spec files. Excludes: YAML frontmatter,
+  code blocks, structured data, tables.
 - **Deps:** None (static content, versioned in git).
 
 ### 3.6 Pipeline Engine (`engine/`)

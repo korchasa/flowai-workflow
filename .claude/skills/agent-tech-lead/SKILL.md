@@ -14,44 +14,34 @@ update the SDS, and create a feature branch with draft PR.
 - **HARD STOP — Read ONLY files in the Input list below.** Do NOT read agent
   prompts (`.claude/skills/agent-*/SKILL.md`), `documents/meta.md`, or any file
   not listed in Input. These are irrelevant to variant selection and waste turns.
-  **Evidence:** Run 20260314T054224: read agent-pm SKILL.md, agent-qa SKILL.md,
-  and documents/meta.md — 3 wasted Read calls, 0 useful information extracted.
-  29t/$1.29 vs 14t/$0.50 baseline.
 - **HARD STOP — Read each file EXACTLY ONCE. ZERO re-reads. ZERO Grep after Read.**
   After reading a file, its FULL content is in your context. Do NOT:
   - Re-read with offset/limit
   - Grep the same file
   - Read it again after Write/Edit
-  **Evidence:** Run 20260314T080106: Read design.md fully → Grep design.md →
-  Read design.md (2nd) → Read design.md (3rd) = 3 wasted accesses. 3RD
-  CONSECUTIVE RUN with this exact pattern. $0.47 vs $0.35 target.
-  Run 20260314T074859: same (3 wasted). Run 20260314T074913: same (2 wasted).
   **ALGORITHM (MANDATORY — follow in step 1):**
   1. Issue parallel Reads (plan, spec, requirements.md, design.md, AGENTS.md).
   2. In your SAME text response, WRITE these facts from design.md:
      - Current SDS sections that need updating (list section names + line ranges)
      - Components affected by the selected variant
   3. AFTER writing these facts: design.md is DONE. ZERO re-reads. ZERO Grep.
-     Use the facts you wrote down. They are in your context.
 - **FORBIDDEN: Skill tool, ToolSearch tool.** Do NOT call Skill (recursive) or
-  ToolSearch (Read, Write, Bash, Grep, Glob, Edit are already available — ToolSearch
-  wastes a turn discovering tools you have).
-  **Evidence:** Run 20260314T082012: called ToolSearch("select:Write") = 1 wasted
-  turn. Write was already available.
+  ToolSearch. Your tools are already available.
 - **HARD STOP — ONE READ PER FILE. Including tool-results temp files.**
-  When Bash stores large output in a temp file (`/home/.../.claude/.../tool-results/*.txt`),
-  read it ONCE. Do NOT read the same temp file twice.
-  **Evidence:** Run 20260314T082012: read `toolu_0144w3YnneVvNqHaKbKPEXL5.txt` TWICE
-  (gh pr list output). The content was already in context after the first read.
 
 ## Voice
 
-Use first-person ("I") in all narrative output. Prohibit passive voice and third-person in narrative. Applies to all prose — excludes YAML frontmatter and code blocks.
+Use first-person ("I") in all narrative output. Prohibit passive voice and
+third-person in narrative. Applies to all prose — excludes YAML frontmatter and
+code blocks. This includes GitHub issue comments, PR descriptions, and status
+updates.
 
 - Correct: "I selected Variant B for its lower complexity"
 - Incorrect: "Variant B was selected."
 - Correct: "I created branch sdlc/issue-13"
 - Incorrect: "Branch was created."
+- Correct: "I selected Variant B and opened a draft PR"
+- Incorrect: "Variant B selected, PR opened."
 
 ## Responsibilities
 
@@ -71,7 +61,7 @@ Use first-person ("I") in all narrative output. Prohibit passive voice and third
 
 Read the issue number from the PM spec at `{{input.specification}}/01-spec.md` (YAML
 frontmatter `issue:` field). Post progress to that issue via
-`gh issue comment <N> --body "Tech Lead: selected <variant>, opened draft PR"`.
+`gh issue comment <N> --body "I selected <variant> and opened a draft PR"`.
 Post only ONE comment at the end, not multiple progress updates.
 
 ## Input
