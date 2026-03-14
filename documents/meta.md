@@ -1,26 +1,27 @@
 # Meta-Agent Memory
 
 ## Agent Baselines
-- pm (specification): 31t/$1.51/212s — REGRESSED from 17t (13 Edits on SRS)
-- architect (design): 8t/$0.51/735s (stable)
-- tech-lead (decision): 26t/$0.72/121s — slight increase from 17t
-- developer (build): 81t/$7.02/1798s — REGRESSED from 53t (re-read/re-write waste)
-- qa (verify): 24t/$0.77/123s — improved from 27t/$0.89
-- Total run cost: $10.53 (regressed from ~$6.00)
+- pm (specification): 13t/$0.54/91s — stable (simple task, no SRS changes needed)
+- architect (design): 15t/$0.43/76s — stable
+- tech-lead (decision): 14t/$0.47/89s — stable
+- developer (build): 14t/$0.50/50s — stable (simple 2-file rename)
+- qa (verify): 21t/$0.67/105s — ISSUE: 7 re-reads of check output temp file
+- Total run cost: $2.61 (lowest yet; simple task)
 - 1 iteration (QA passed first try)
 
 ## Active Patterns
-- pm-multi-edit-srs: ESCALATED, first seen 20260313T234144,
-  last seen 20260314T000902. 13 Edits on requirements.md (was 3). "ONE WRITE"
-  rule ignored entirely. Fix: step-by-step enforcement + "NEVER use Edit".
-- developer-multi-edit-waste: ESCALATED, first seen 20260313T230627,
-  last seen 20260314T000902. pipeline.yaml written 3x, 5 test files 2x.
-  81t/$7.02 (was 53t/$3.01). Fix: added replace_all guidance + mandatory
-  pre-edit checklist.
-- developer-reread-waste: NEW, first seen 20260314T000902. 5 test files read
-  3x each, stage-7-qa.sh 3x = 12 wasted reads despite ONE READ rule.
-- qa-reread-waste: WATCHING, first seen 20260313T234144. 24t/$0.77 (improved
-  from 27t/$0.89). Rule appears to be working — continue monitoring.
+- pm-multi-edit-srs: RESOLVED, first seen 20260313T234144,
+  last seen 20260314T000902. Fix (draft→Write, NEVER Edit) confirmed working:
+  16t/2 Writes in 20260314T010515. 1 clean run.
+- developer-multi-edit-waste: RESOLVED, first seen 20260313T230627,
+  last seen 20260314T000902. Fix (replace_all + checklist) confirmed working:
+  20t/$1.21 in 20260314T010515 (was 81t/$7.02). 1 clean run.
+- developer-reread-waste: RESOLVED, first seen 20260314T000902.
+  20t/11 Reads in 20260314T010515 (no wasted re-reads). 1 clean run.
+- qa-reread-waste: REGRESSED, first seen 20260313T234144,
+  last seen 20260314T013359. Recurred: 7 reads of same temp file (was marked
+  RESOLVED after 3 clean runs). Fix v2 applied: explicit temp-file naming in
+  QA prompt. WATCHING.
 - pm-branch-shortcut-regression: RESOLVED (3 consecutive runs with shortcut
   working: 22→17t, no gh issue list on branch).
 - tech-lead-bash-exploration: RESOLVED (all 8 Bash commands whitelisted,
@@ -41,9 +42,13 @@
 - 20260313T234144: developer — ONE WRITE PER FILE mandatory → FAILED (81t, 22 writes)
 - 20260313T234144: qa — ONE READ PER FILE mandatory → IMPROVED (24t from 27t)
 - 20260313T234144: pm — ONE WRITE for SRS mandatory → FAILED (13 Edits, worse)
-- 20260314T000902: pm — step-by-step enforcement: draft→Write, NEVER Edit → WATCHING
-- 20260314T000902: developer — replace_all for renames, mandatory checklist,
-  evidence from this run (81t/$7.02, 14 wasted writes, 12 wasted reads) → WATCHING
+- 20260314T000902: pm — step-by-step enforcement: draft→Write, NEVER Edit → RESOLVED
+  (16t/2 Writes in 20260314T010515)
+- 20260314T000902: developer — replace_all for renames, mandatory checklist → RESOLVED
+  (20t/$1.21 in 20260314T010515, down from 81t/$7.02)
+- 20260314T010515: no fixes needed — all agents within acceptable ranges
+- 20260314T013359: qa — strengthened temp-file re-read rule with explicit path
+  pattern and dual-run evidence. WATCHING for next run.
 
 ## Lessons Learned
 - PM/SDS-update scope overlap resolved by explicit constraints in PM prompt.
@@ -69,3 +74,7 @@
 - **PM ignores "ONE WRITE" when task has many SRS sections to update.**
   Root cause: Edit feels easier per-section. Fix: make Edit on SRS explicitly
   forbidden + enforce step-by-step (draft in text → one Write).
+- **QA temp-file re-read is a persistent pattern.** Generic "ONE READ PER FILE"
+  rule is insufficient — agent doesn't recognize tool-result temp files as
+  "files" covered by the rule. Must explicitly name the path pattern and
+  reference concrete past failures.
