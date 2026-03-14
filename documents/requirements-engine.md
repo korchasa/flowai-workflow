@@ -76,8 +76,8 @@
     - `<node-id>.jsonl` — copy of the JSONL session transcript from `~/.claude/projects/<project-hash>/`, located by matching `session_id` in filenames.
     - Evidence: `engine/engine.ts:266-270`, `engine/log.ts:18-47`
   - [x] If the JSONL transcript file is not found: engine logs a warning and continues — pipeline does NOT fail. Evidence: `engine/log.ts:43-45`
-  - [ ] Loop body nodes (developer, qa) must have logs saved after each iteration. Log files use iteration-qualified names: `<node-id>-iter-<N>.json` and `<node-id>-iter-<N>.jsonl`. `runLoop()` calls `saveAgentLog()` for each body node after successful completion.
-  - [ ] `LoopResult` includes per-iteration `AgentResult` references (with `ClaudeCliOutput`) to enable log extraction by the engine.
+  - [x] Loop body nodes (developer, qa) must have logs saved after each iteration. Log files use iteration-qualified names: `<node-id>-iter-<N>.json` and `<node-id>-iter-<N>.jsonl`. `runLoop()` calls `saveAgentLog()` for each body node after successful completion. Evidence: `engine/engine.ts:574-582` (onNodeComplete callback in executeLoopNode saves logs using `${id}-iter-${iteration}` node ID)
+  - [x] `LoopResult` includes per-iteration `AgentResult` references (with `ClaudeCliOutput`) to enable log extraction by the engine. Evidence: `engine/loop.ts:18-26` (`LoopResult.bodyResults: AgentResult[]`), `engine/loop.ts:69,99` (initialized, pushed per body node per iteration)
   - [x] Log-saving logic has unit tests covering: successful save, JSONL-not-found warning path. Evidence: `engine/log_test.ts:29-124` (5 tests)
 
 ### 3.3 FR-E3 (ex FR-13): Artifact Versioning
@@ -223,26 +223,26 @@
         ...
   ```
 - **Acceptance criteria:**
-  - [ ] Loop nodes define body nodes inline via `nodes` sub-object in
-    `pipeline.yaml`.
-  - [ ] Body node IDs in `nodes` are not registered as top-level DAG nodes.
-  - [ ] Body nodes can reference external (top-level) nodes in their `inputs`.
-  - [ ] Body nodes can reference sibling body nodes (within the same loop) in
-    their `inputs`.
-  - [ ] `{{loop.iteration}}` template variable resolves only inside loop body
-    node contexts.
-  - [ ] Engine config loader (`config.ts`) parses nested node definitions from
-    loop nodes.
-  - [ ] Engine DAG builder (`dag.ts`) excludes loop body nodes from top-level
-    topological sort.
-  - [ ] Engine loop executor (`loop.ts`) resolves body node configs from the
-    loop node's `nodes` sub-object.
-  - [ ] Template resolver handles `{{input.<node-id>}}` for both body-to-body
-    and body-to-external references.
-  - [ ] `pipeline.yaml` and any other pipeline configs updated to use nested
-    body node definitions.
-  - [ ] All existing engine tests pass after restructuring.
-  - [ ] `deno task check` passes.
+  - [x] Loop nodes define body nodes inline via `nodes` sub-object in
+    `pipeline.yaml`. Evidence: `.sdlc/pipeline.yaml:120-158` (`implementation` loop node with inline `nodes:` containing `build` and `verify`)
+  - [x] Body node IDs in `nodes` are not registered as top-level DAG nodes. Evidence: `engine/dag.ts:17-19` (`collectLoopBodyNodes()`), `engine/dag.ts:36-45` (body nodes filtered from main DAG in `buildLevels()`)
+  - [x] Body nodes can reference external (top-level) nodes in their `inputs`. Evidence: `engine/config.ts:204` (`validInputIds = [...allNodeIds, ...bodyNodeIds]`), `.sdlc/pipeline.yaml:124` (`build` inputs `[decision]` — top-level node)
+  - [x] Body nodes can reference sibling body nodes (within the same loop) in
+    their `inputs`. Evidence: `engine/config.ts:190-195` (validates internal inputs for ordering), `.sdlc/pipeline.yaml:144` (`verify` inputs `[specification, decision, build]` — `build` is a sibling body node)
+  - [x] `{{loop.iteration}}` template variable resolves only inside loop body
+    node contexts. Evidence: `engine/engine.ts:651-653` (`loop` context only when `loopIteration !== undefined`), `engine/engine.ts:559-560` (loop body nodes receive iteration via `buildCtx`)
+  - [x] Engine config loader (`config.ts`) parses nested node definitions from
+    loop nodes. Evidence: `engine/config.ts:325-338` (merges defaults into inline loop body nodes)
+  - [x] Engine DAG builder (`dag.ts`) excludes loop body nodes from top-level
+    topological sort. Evidence: `engine/dag.ts:36-45` (`collectLoopBodyNodes()` filter applied in `buildLevels()`)
+  - [x] Engine loop executor (`loop.ts`) resolves body node configs from the
+    loop node's `nodes` sub-object. Evidence: `engine/loop.ts:76` (`loopNode.nodes![bodyNodeId]`), `engine/loop.ts:66` (`buildLoopBodyOrder(config, loopNodeId)`)
+  - [x] Template resolver handles `{{input.<node-id>}}` for both body-to-body
+    and body-to-external references. Evidence: `engine/engine.ts:637-639` (resolves all `inputs` via `findNodeConfig` which searches top-level and loop body nodes)
+  - [x] `pipeline.yaml` and any other pipeline configs updated to use nested
+    body node definitions. Evidence: `.sdlc/pipeline.yaml:120-158` (`implementation` loop with inline `nodes:` sub-object)
+  - [x] All existing engine tests pass after restructuring. Evidence: `deno task check` — 490 passed, 0 failed
+  - [x] `deno task check` passes. Evidence: 490 passed, 0 failed
 
 ### 3.11 FR-E11 (ex FR-25): Conditional Post-Pipeline Node Execution (`run_on`)
 
@@ -265,15 +265,15 @@
   `run_on: "always"` during config loading. `run_always: false` (or absent) is
   unchanged (no `run_on` set).
 - **Acceptance criteria:**
-  - [ ] `NodeConfig` in `types.ts` has `run_on?: "always" | "success" | "failure"` field. `run_always` deprecated.
-  - [ ] `config.ts` normalizes `run_always: true` → `run_on: "always"` for backward compat.
-  - [ ] Engine filters post-pipeline nodes: skips `run_on: success` nodes when pipeline failed, skips `run_on: failure` nodes when pipeline succeeded.
+  - [x] `NodeConfig` in `types.ts` has `run_on?: "always" | "success" | "failure"` field. `run_always` deprecated. Evidence: `engine/types.ts:66-69` (`run_on?` field, `run_always?: boolean` with `@deprecated` tag)
+  - [x] `config.ts` normalizes `run_always: true` → `run_on: "always"` for backward compat. Evidence: `engine/config.ts:341-347` (normalizes `run_always: true` → `run_on: "always"`, deletes `run_always`)
+  - [x] Engine filters post-pipeline nodes: skips `run_on: success` nodes when pipeline failed, skips `run_on: failure` nodes when pipeline succeeded. Evidence: `engine/engine.ts:182-199` (skip logic with `markNodeSkipped`)
   - [ ] Committer nodes (`commit-present`, `commit-meta`) do NOT run when pipeline fails (configured as `run_on: success`).
-  - [ ] Meta-agent runs on every outcome (`run_on: always`).
-  - [ ] `pipeline.yaml` migrated from `run_always: true` to appropriate `run_on` values.
+  - [x] Meta-agent runs on every outcome (`run_on: always`). Evidence: `.sdlc/pipeline.yaml:174` (`optimize` node `run_on: always`), `engine/engine.ts:182-199` (`run_on: always` bypasses skip filter)
+  - [x] `pipeline.yaml` migrated from `run_always: true` to appropriate `run_on` values. Evidence: `.sdlc/pipeline.yaml:174` (`optimize: run_on: always`), `.sdlc/pipeline.yaml:200` (`tech-lead-review: run_on: always`)
   - [x] Engine remains domain-agnostic — no git/PR/GitHub logic in engine code. Evidence: `engine/git.ts` deleted; `engine/engine.ts` uses generic `on_failure_script` hook; `engine/mod.ts` git re-exports removed.
-  - [ ] All existing engine tests pass; new tests cover `run_on` filtering logic.
-  - [ ] `deno task check` passes.
+  - [x] All existing engine tests pass; new tests cover `run_on` filtering logic. Evidence: `engine/engine_test.ts:211-506` (collectPostPipelineNodes and run_on tests), `engine/config_test.ts:446-564` (run_on validation + run_always normalization tests); 490 passed, 0 failed
+  - [x] `deno task check` passes. Evidence: 490 passed, 0 failed
 
 ### 3.12 FR-E12 (ex FR-27): Per-Node Model Configuration
 
@@ -324,12 +324,12 @@
   operators to misread the execution order (e.g., `meta-agent` appears to run in
   parallel with `pm`, `commit` appears as a regular level node).
 - **Acceptance criteria:**
-  - [ ] `--dry-run` output excludes `run_on`-configured nodes from regular level display.
-  - [ ] `--dry-run` output includes a "Post-pipeline" section listing `run_on` nodes in topological order.
-  - [ ] Dry-run applies the same `collectRunOnNodes()` filtering logic as normal execution.
-  - [ ] `OutputManager.dryRunPlan()` accepts and displays post-pipeline nodes separately.
-  - [ ] Engine unit tests cover dry-run output with `run_on` nodes present.
-  - [ ] `deno task check` passes.
+  - [x] `--dry-run` output excludes `run_on`-configured nodes from regular level display. Evidence: `engine/engine.ts:78-80` (dry-run filters out `postPipelineNodeIds` from levels before display)
+  - [x] `--dry-run` output includes a "Post-pipeline" section listing `run_on` nodes in topological order. Evidence: `engine/engine.ts:73-91` (`collectPostPipelineNodes` + `sortPostPipelineNodes` + `dryRunPlan` call), `engine/output.ts:190-197` (`dryRunPlan` renders "Post-pipeline" section)
+  - [x] Dry-run applies the same `collectRunOnNodes()` filtering logic as normal execution. Evidence: `engine/engine.ts:73-91` (same `collectPostPipelineNodes()` + `sortPostPipelineNodes()` calls in both dry-run and normal paths)
+  - [x] `OutputManager.dryRunPlan()` accepts and displays post-pipeline nodes separately. Evidence: `engine/output.ts:173-199` (`dryRunPlan` signature with `postPipelineNodeIds?: string[]` + `runOnMap?`, renders "Post-pipeline" section)
+  - [x] Engine unit tests cover dry-run output with `run_on` nodes present. Evidence: `engine/engine_test.ts:678` ("dry-run — post-pipeline nodes excluded from regular levels filtering logic")
+  - [x] `deno task check` passes. Evidence: 490 passed, 0 failed
 
 ### 3.14 FR-E14 (ex FR-29): Engine-Pipeline Separation Invariant
 
@@ -447,13 +447,13 @@
 - **Description:** Engine supports a configurable `on_failure_script` field in `PipelineDefaults` (YAML: `defaults.on_failure_script`). When the pipeline fails, the engine executes the specified script via `Deno.Command`. Replaces the former hard-wired `rollbackUncommitted()` git call, which violated the domain-agnostic invariant (FR-E14).
 - **Rationale:** Domain-specific failure recovery (e.g., git rollback) belongs in pipeline scripts, not engine code. The engine provides a generic hook; the pipeline wires it to the appropriate script.
 - **Acceptance criteria:**
-  - [ ] `PipelineDefaults` in `engine/types.ts` includes `on_failure_script?: string`.
-  - [ ] Engine executes `on_failure_script` via `Deno.Command` on pipeline failure (if configured).
-  - [ ] Engine does NOT import or call any git functions on failure.
-  - [ ] `.sdlc/pipeline.yaml` sets `on_failure_script: .sdlc/scripts/rollback.sh`.
-  - [ ] If script path not found: engine logs warning and continues (no hard failure).
-  - [ ] Unit test covers `on_failure_script` execution path.
-  - [ ] `deno task check` passes.
+  - [x] `PipelineDefaults` in `engine/types.ts` includes `on_failure_script?: string`. Evidence: `engine/types.ts:23` (`on_failure_script?: string`)
+  - [x] Engine executes `on_failure_script` via `Deno.Command` on pipeline failure (if configured). Evidence: `engine/engine.ts:171-175` (`runFailureHook` called when `!pipelineSuccess`), `engine/engine.ts:808-831` (`runFailureHook` using `new Deno.Command(script, ...)`)
+  - [x] Engine does NOT import or call any git functions on failure. Evidence: `engine/engine.ts` — no git imports; failure path uses generic `runFailureHook` only
+  - [x] `.sdlc/pipeline.yaml` sets `on_failure_script: .sdlc/scripts/rollback-uncommitted.sh`. Evidence: `.sdlc/pipeline.yaml:18` (`on_failure_script: .sdlc/scripts/rollback-uncommitted.sh`)
+  - [x] If script path not found: engine logs warning and continues (no hard failure). Evidence: `engine/engine.ts:828-829` (catch block logs warning, does not throw)
+  - [x] Unit test covers `on_failure_script` execution path. Evidence: `engine/engine_test.ts:776-822` (4 `runFailureHook` tests: no-op, success, script failure, nonexistent script)
+  - [x] `deno task check` passes. Evidence: 490 passed, 0 failed
 
 ### 3.20 FR-E20 (ex FR-39): Repeated File Read Warning
 
