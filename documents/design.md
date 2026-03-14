@@ -448,7 +448,7 @@ graph LR
   highest-priority open issue via `gh`.
 - **Deps:** Devcontainer, Claude CLI auth (OAuth or API key), `GITHUB_TOKEN`.
 
-### 3.10 Dashboard Generator (`scripts/generate-dashboard.ts`) (FR-33, FR-35, FR-40, issue #49)
+### 3.10 Dashboard Generator (`scripts/generate-dashboard.ts`) (FR-33, FR-35, FR-38, FR-40, issue #15)
 
 - **Purpose:** Generate self-contained HTML dashboard summarizing pipeline run
   results. Reads `state.json` + per-node `logs/*.json`. Produces `index.html`
@@ -479,7 +479,7 @@ graph LR
     class. Labels sanitized via `escHtml()`. Timeline CSS appended to existing
     `CSS` const (inlined, no CDN deps). Integrated into `renderHtml()` between
     header and card grid (FR-38)
-- **Stream log link flow (issue #49):** CLI entry point scans each node
+- **Stream log link flow (issue #15):** CLI entry point scans each node
   directory for `stream.log` existence via `Deno.stat()`. For nodes with phases,
   computes relative path as `<phase>/<nodeId>/stream.log`; without phase:
   `<nodeId>/stream.log`. Builds `Record<string, string>` href map, passes to
@@ -737,10 +737,18 @@ graph LR
 
 ## 8. SRS Evidence Status
 
+All FR evidence for issue #15 is complete:
+
+- **FR-35 (Dashboard Result Summary Display):** Implemented. SRS section 3.34
+  evidence recorded — `scripts/generate-dashboard.ts` (`renderCard`,
+  `escHtml`). Tests in `scripts/generate-dashboard_test.ts`.
 - **FR-38 (Timeline Visualization):** Implemented. SRS section 3.37 evidence
-  update pending — `scripts/generate-dashboard.ts` (`computeTimeline`,
+  recorded — `scripts/generate-dashboard.ts` (`computeTimeline`,
   `renderTimeline`, `.timeline-bottleneck` CSS). Tests in
-  `scripts/generate-dashboard_test.ts`.
+  `scripts/generate-dashboard_test.ts`. Evidence committed in `e493cbb`.
 - **FR-39 (Repeated File Read Warning):** Implemented. SRS section 3.38
-  evidence update pending — `engine/agent.ts` (`FileReadTracker` class).
-  Tests in `engine/agent_test.ts`.
+  evidence recorded — `engine/agent.ts` (`FileReadTracker` class). Tests in
+  `engine/agent_test.ts`. Evidence committed in `e493cbb`.
+- **FR-40 (Dashboard Stream Log Links):** Implemented. SRS section 3.39
+  evidence recorded — `scripts/generate-dashboard.ts` (`streamLogHref`,
+  `.log-link` CSS). Tests in `scripts/generate-dashboard_test.ts`.
