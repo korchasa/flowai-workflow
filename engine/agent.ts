@@ -366,6 +366,7 @@ async function executeClaudeProcess(
   const stdoutDecoder = new TextDecoder();
   const encoder = new TextEncoder();
   let buffer = "";
+  let turnCount = 0;
 
   const stdoutReader = process.stdout.getReader();
   const stdoutDone = (async () => {
@@ -382,6 +383,12 @@ async function executeClaudeProcess(
           try {
             // deno-lint-ignore no-explicit-any
             const event = JSON.parse(line) as Record<string, any>;
+            if (event.type === "assistant" && logFile) {
+              turnCount++;
+              await logFile.write(
+                encoder.encode(stampLines(`--- turn ${turnCount} ---`) + "\n"),
+              );
+            }
             if (event.type === "result") {
               resultEvent = extractClaudeOutput(event);
             }
@@ -389,6 +396,14 @@ async function executeClaudeProcess(
             const summary = formatEventForOutput(event);
             if (logFile && summary) {
               await logFile.write(encoder.encode(stampLines(summary) + "\n"));
+            }
+            if (event.type === "result" && resultEvent && logFile) {
+              await logFile.write(
+                encoder.encode(stampLines("--- end ---") + "\n"),
+              );
+              await logFile.write(
+                encoder.encode(stampLines(formatFooter(resultEvent)) + "\n"),
+              );
             }
             if (onOutput && summary) onOutput(summary);
           } catch {
@@ -401,12 +416,26 @@ async function executeClaudeProcess(
         try {
           // deno-lint-ignore no-explicit-any
           const event = JSON.parse(buffer) as Record<string, any>;
+          if (event.type === "assistant" && logFile) {
+            turnCount++;
+            await logFile.write(
+              encoder.encode(stampLines(`--- turn ${turnCount} ---`) + "\n"),
+            );
+          }
           if (event.type === "result") {
             resultEvent = extractClaudeOutput(event);
           }
           const summary = formatEventForOutput(event);
           if (logFile && summary) {
             await logFile.write(encoder.encode(stampLines(summary) + "\n"));
+          }
+          if (event.type === "result" && resultEvent && logFile) {
+            await logFile.write(
+              encoder.encode(stampLines("--- end ---") + "\n"),
+            );
+            await logFile.write(
+              encoder.encode(stampLines(formatFooter(resultEvent)) + "\n"),
+            );
           }
           if (onOutput && summary) onOutput(summary);
         } catch { /* skip */ }
@@ -591,6 +620,18 @@ function toVerboseValidation(
     passed: r.passed,
     detail: r.message,
   }));
+}
+
+/**
+ * Format a one-line summary footer for a completed Claude CLI run.
+ * Pure function — unit-testable without CLI.
+ * Format: `status=<ok|error> duration=<X>s cost=$<Y> turns=<N>`
+ */
+export function formatFooter(output: ClaudeCliOutput): string {
+  const status = output.is_error ? "error" : "ok";
+  const duration = (output.duration_ms / 1000).toFixed(1);
+  const cost = output.total_cost_usd.toFixed(4);
+  return `status=${status} duration=${duration}s cost=$${cost} turns=${output.num_turns}`;
 }
 
 function sleep(ms: number): Promise<void> {

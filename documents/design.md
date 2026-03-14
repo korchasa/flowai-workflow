@@ -241,7 +241,16 @@ graph LR
     `streamLogPath` accepted as required parameter in `executeClaudeProcess()`.
     Append semantics: multiple invocations (continuation) with same path
     produce concatenated JSONL. `--verbose` flag removed from
-    `buildClaudeArgs()` (unrelated to streaming, changes stderr globally)
+    `buildClaudeArgs()` (unrelated to streaming, changes stderr globally).
+    **Turn separators and summary footer (FR-39):** `executeClaudeProcess()`
+    maintains `turnCount` counter. On each `event.type === "assistant"`:
+    increments counter, writes `--- turn N ---` line to `logFile` via
+    `stampLines()` (timestamped, consistent with existing log writes). After
+    `result` event extraction: writes `--- end ---` + one-line summary via
+    `formatFooter(output: ClaudeCliOutput): string`. Footer format:
+    `status=<ok|error> duration=<X>s cost=$<Y> turns=<N>`. Both separators and
+    footer are log-file-only (terminal `onOutput` callback unchanged).
+    `formatFooter()` is a pure function — unit-testable without CLI
   - `loop.ts` — loop node execution with condition extraction, per-iteration
     `AgentResult` accumulation into `LoopResult.bodyResults`.
     `buildLoopBodyOrder()` reads from inline `nodes` sub-object (replaces

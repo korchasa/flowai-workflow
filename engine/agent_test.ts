@@ -1,7 +1,9 @@
 import { assertEquals } from "@std/assert";
 import {
   buildClaudeArgs,
+  extractClaudeOutput,
   formatEventForOutput,
+  formatFooter,
   stampLines,
   tsPrefix,
 } from "./agent.ts";
@@ -473,4 +475,216 @@ Deno.test("stampLines — empty lines pass through without timestamp", () => {
     true,
     `line 2: ${lines[2]}`,
   );
+});
+
+Deno.test("formatFooter — normal case produces correct format", () => {
+  const output = extractClaudeOutput({
+    result: "done",
+    session_id: "sess-1",
+    is_error: false,
+    subtype: "success",
+    total_cost_usd: 0.0123,
+    duration_ms: 5000,
+    duration_api_ms: 4000,
+    num_turns: 3,
+  });
+  const footer = formatFooter(output);
+  assertEquals(footer, "status=ok duration=5.0s cost=$0.0123 turns=3");
+});
+
+Deno.test("formatFooter — error case uses status=error", () => {
+  const output = extractClaudeOutput({
+    result: "failed",
+    session_id: "sess-2",
+    is_error: true,
+    subtype: "error",
+    total_cost_usd: 0.005,
+    duration_ms: 2500,
+    duration_api_ms: 2000,
+    num_turns: 1,
+  });
+  const footer = formatFooter(output);
+  assertEquals(footer, "status=error duration=2.5s cost=$0.0050 turns=1");
+});
+
+Deno.test("formatFooter — zero values produce valid footer", () => {
+  const output = extractClaudeOutput({
+    result: "",
+    session_id: "",
+    is_error: false,
+    subtype: "success",
+    total_cost_usd: 0,
+    duration_ms: 0,
+    duration_api_ms: 0,
+    num_turns: 0,
+  });
+  const footer = formatFooter(output);
+  assertEquals(footer, "status=ok duration=0.0s cost=$0.0000 turns=0");
+});
+
+Deno.test("turn separators + footer — stream log integration", async () => {
+  const tmpPath = await Deno.makeTempFile({ suffix: ".jsonl" });
+  try {
+    const logFile = await Deno.open(tmpPath, {
+      write: true,
+      create: true,
+      append: true,
+    });
+    const encoder = new TextEncoder();
+
+    // Simulate the same logic as executeClaudeProcess
+    let turnCount = 0;
+    let resultEvent: ReturnType<typeof extractClaudeOutput> | undefined;
+
+    const events: Record<string, unknown>[] = [
+      { type: "system", subtype: "init", model: "test-model" },
+      {
+        type: "assistant",
+        message: { content: [{ type: "text", text: "turn 1 response" }] },
+      },
+      {
+        type: "assistant",
+        message: { content: [{ type: "text", text: "turn 2 response" }] },
+      },
+      {
+        type: "result",
+        subtype: "success",
+        result: "done",
+        session_id: "sess-test",
+        is_error: false,
+        total_cost_usd: 0.01,
+        duration_ms: 3000,
+        duration_api_ms: 2500,
+        num_turns: 2,
+      },
+    ];
+
+    for (const event of events) {
+      if (event.type === "assistant") {
+        turnCount++;
+        await logFile.write(
+          encoder.encode(stampLines(`--- turn ${turnCount} ---`) + "\n"),
+        );
+      }
+      if (event.type === "result") {
+        resultEvent = extractClaudeOutput(event);
+      }
+      const summary = formatEventForOutput(event);
+      if (summary) {
+        await logFile.write(encoder.encode(stampLines(summary) + "\n"));
+      }
+      if (event.type === "result" && resultEvent) {
+        await logFile.write(encoder.encode(stampLines("--- end ---") + "\n"));
+        await logFile.write(
+          encoder.encode(stampLines(formatFooter(resultEvent)) + "\n"),
+        );
+      }
+    }
+    logFile.close();
+
+    const content = await Deno.readTextFile(tmpPath);
+    const lines = content.split("\n").filter((l) => l.trim());
+
+    // Verify timestamps on all lines
+    for (const line of lines) {
+      assertEquals(
+        /^\[\d{2}:\d{2}:\d{2}\] /.test(line),
+        true,
+        `line missing timestamp: ${line}`,
+      );
+    }
+
+    // Verify turn separators appear in order
+    const separatorLines = lines.filter((l) => l.includes("--- turn "));
+    assertEquals(separatorLines.length, 2, "expected 2 turn separators");
+    assertEquals(separatorLines[0].includes("--- turn 1 ---"), true);
+    assertEquals(separatorLines[1].includes("--- turn 2 ---"), true);
+
+    // Verify footer
+    const endLine = lines.find((l) => l.includes("--- end ---"));
+    assertEquals(endLine !== undefined, true, "expected --- end --- line");
+    const footerLine = lines.find((l) => l.includes("status=ok"));
+    assertEquals(footerLine !== undefined, true, "expected footer line");
+    assertEquals(footerLine!.includes("duration=3.0s"), true);
+    assertEquals(footerLine!.includes("cost=$0.0100"), true);
+    assertEquals(footerLine!.includes("turns=2"), true);
+
+    // Verify order: turn separators before footer
+    const sep1Idx = lines.findIndex((l) => l.includes("--- turn 1 ---"));
+    const sep2Idx = lines.findIndex((l) => l.includes("--- turn 2 ---"));
+    const endIdx = lines.findIndex((l) => l.includes("--- end ---"));
+    assertEquals(sep1Idx < sep2Idx, true, "turn 1 should precede turn 2");
+    assertEquals(sep2Idx < endIdx, true, "turn 2 should precede end");
+  } finally {
+    await Deno.remove(tmpPath);
+  }
+});
+
+Deno.test("turn separators + footer — append semantics: two invocations", async () => {
+  const tmpPath = await Deno.makeTempFile({ suffix: ".jsonl" });
+  try {
+    const encoder = new TextEncoder();
+    const resultEventData = {
+      type: "result",
+      subtype: "success",
+      result: "done",
+      session_id: "sess-x",
+      is_error: false,
+      total_cost_usd: 0.005,
+      duration_ms: 1000,
+      duration_api_ms: 800,
+      num_turns: 1,
+    };
+
+    // First invocation
+    for (let inv = 0; inv < 2; inv++) {
+      const logFile = await Deno.open(tmpPath, {
+        write: true,
+        create: true,
+        append: true,
+      });
+      let turnCount = 0;
+      const assistantEvent = {
+        type: "assistant",
+        message: { content: [{ type: "text", text: `inv ${inv} response` }] },
+      };
+      // Turn separator
+      turnCount++;
+      await logFile.write(
+        encoder.encode(stampLines(`--- turn ${turnCount} ---`) + "\n"),
+      );
+      // Content
+      const summary = formatEventForOutput(assistantEvent);
+      if (summary) {
+        await logFile.write(encoder.encode(stampLines(summary) + "\n"));
+      }
+      // Footer
+      const resultOut = extractClaudeOutput(resultEventData);
+      await logFile.write(encoder.encode(stampLines("--- end ---") + "\n"));
+      await logFile.write(
+        encoder.encode(stampLines(formatFooter(resultOut)) + "\n"),
+      );
+      logFile.close();
+    }
+
+    const content = await Deno.readTextFile(tmpPath);
+    const separatorLines = content.split("\n").filter((l) =>
+      l.includes("--- turn ")
+    );
+    assertEquals(
+      separatorLines.length,
+      2,
+      "two invocations should produce 2 turn separators in appended log",
+    );
+    const endLines = content.split("\n").filter((l) =>
+      l.includes("--- end ---")
+    );
+    assertEquals(
+      endLines.length,
+      2,
+      "two invocations should produce 2 end markers",
+    );
+  } finally {
+    await Deno.remove(tmpPath);
+  }
 });
