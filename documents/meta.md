@@ -1,12 +1,12 @@
 # Meta-Agent Memory
 
 ## Agent Baselines
-- pm (specification): 14t/$0.89/289s — cost up (was $0.65)
-- architect (design): 17t/$0.52/94s — turns up (was 11t), cost stable
-- tech-lead (decision): 18t/$0.84/301s — regressed (was 13t/$0.50)
-- developer (build): 29t/$1.39/253s — major regression (was 16t/$0.51)
-- qa (verify): 16t/$0.83/241s — slightly up (was 19t/$0.73)
-- Total run cost: $4.46 (up from $2.88)
+- pm (specification): 22t/$1.04/164s — cost up (was 14t/$0.89)
+- architect (design): 16t/$0.70/97s — cost up (was 17t/$0.52)
+- tech-lead (decision): 23t/$0.87/159s — turns up (was 18t/$0.84)
+- developer (build): 31t/$2.24/361s — major cost regression (was 29t/$1.39)
+- qa (verify): 33t/$0.88/189s — turns DOUBLED (was 16t/$0.83)
+- Total run cost: $5.72 (up from $4.46)
 - 1 iteration (QA passed first try)
 
 ## Active Patterns
@@ -16,14 +16,21 @@
 - cross-run-path-confusion: RESOLVED (3rd clean run: 172829).
 - tech-lead-design-reread: RESOLVED (2nd clean run: 172829).
 - developer-bash-whitelist-violation: RESOLVED (2nd clean run: 172829).
-- scope-unaware-doc-reads: NEW, first seen 20260314T172829. All agents read ALL
-  4 SRS/SDS docs regardless of issue scope. For engine-scope task, developer
-  read SRS-sdlc + SDS-sdlc (2 wasted), tech-lead read SRS-sdlc + SDS-sdlc +
-  AGENTS.md (3 wasted), architect read SRS-sdlc + SDS-sdlc (2 wasted).
-  Fix: added scope-aware read algorithm to architect, tech-lead, developer.
-- developer-grep-after-read-v2: NEW, first seen 20260314T172829. Developer
-  Grepped requirements-engine.md 4× and design-engine.md 2× AFTER Reading them.
-  Rule exists but was ignored. Updated evidence to reference this run.
+- scope-unaware-doc-reads: WATCHING, first seen 172829, last seen 175521.
+  Root cause identified in 175521: pipeline YAML task_template hardcodes
+  "Read documents/requirements-sdlc.md and documents/design-sdlc.md" for
+  architect, tech-lead, developer — overrides scope-aware prompt algorithms.
+  Fix: replaced hardcoded doc refs in pipeline.yaml with "Read ONLY
+  scope-relevant SRS/SDS docs". Also added scope-aware STEP 3 to PM prompt.
+- developer-grep-after-read-v2: WATCHING, first seen 172829. Not seen in 175521
+  (developer had 0 Grep calls). Watching for confirmation.
+- qa-source-exploration: NEW, first seen 175521. QA made 9 Grep calls on
+  engine/*.ts source files after reading them + ran `deno test` separately
+  after `deno task check` + searched merged PRs. 33t vs target 15t.
+  Fix: added HARD STOP on source code Grep, prohibited `deno test` separately,
+  added `deno test` and `gh pr list --state merged` to Bash forbidden list.
+- pm-file-reread: NEW, first seen 175521. PM read requirements-engine.md 4×
+  (22t/$1.04 vs target 8t). Fix: added ONE READ PER FILE hard stop to PM.
 
 ## Resolved Patterns
 - pm-tool-results-reread: RESOLVED (3+ clean runs)
@@ -53,6 +60,11 @@
 - 20260314T172829: architect + tech-lead + developer — added scope-aware doc
   reading (read ONLY scope-relevant SRS/SDS based on spec frontmatter `scope:`
   field). developer — updated Grep-after-Read evidence with this run's data.
+- 20260314T175521: pipeline.yaml — replaced hardcoded sdlc doc refs in
+  architect/tech-lead/developer task_template with scope-aware instructions.
+  PM — added scope-aware STEP 3 + ONE READ PER FILE hard stop (was reading
+  requirements-engine.md 4×). QA — added HARD STOP on source code Grep (9
+  calls), prohibited `deno test` separately, added to Bash forbidden list.
 
 ## Lessons Learned
 - Total pipeline cost baseline for S-effort issue: ~$2.50.
@@ -62,7 +74,7 @@
 - **Rule placement matters.** HARD STOP before Responsibilities = strongest.
 - **Cross-agent patterns:** Fix in one agent, apply to ALL.
 - **Positive algorithms > prohibition.** Algorithm approach works better.
-- **Cost trajectory:** $5.09→$2.31→$2.24→$2.76→$4.11→$2.50→$2.88→$4.46.
+- **Cost trajectory:** $5.09→$2.31→$2.24→$2.76→$4.11→$2.50→$2.88→$4.46→$5.72.
 - **Scope-aware reads save ~25k tokens/agent.** Out-of-scope SRS/SDS docs add
   context that inflates cost per turn. Biggest impact on developer (most turns).
 - **Scope enforcement needs explicit file path deny-lists.**
@@ -77,3 +89,9 @@
   eliminates gap between "don't use bash grep" and knowing the alternative.
 - **ToolSearch for built-in tools is a cross-agent anti-pattern.**
 - **Background Bash is an anti-pattern for short commands.**
+- **Pipeline YAML task_template overrides prompt rules.** If the task message
+  explicitly says "Read file X", agents follow it even when their prompt says
+  not to. Task templates must align with prompt scope-aware algorithms.
+- **QA source-code Grep is exploratory waste.** QA's job is verifying
+  acceptance criteria, not code review. If `deno task check` passes and files
+  are read once, Grep on source adds no value.

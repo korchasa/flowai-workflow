@@ -241,7 +241,8 @@ FAIL — 1/2 criteria passed, 2 blocking issues: test failure + missing edge cas
   - `mkdir -p <output-dir>`
   **FORBIDDEN: ALL other Bash commands.** Specifically: `grep`, `grep -c`,
   `cat`, `head`, `tail`, `ls`, `ls -la`, `file`, `find`, `for` loops,
-  `git diff` with content output, `git log`, `git show`. Use Read/Grep tools.
+  `git diff` with content output, `git log`, `git show`, `deno test`,
+  `gh pr list --state merged`. Use Read/Grep tools.
 - **FORBIDDEN: Agent, ToolSearch, TaskOutput tools.** You already have all tools
   you need (Read, Write, Grep, Glob, Bash). ToolSearch wastes a turn.
 - **HARD STOP — Do NOT Read requirements-sdlc.md or pipeline.yaml.** You have
@@ -253,6 +254,22 @@ FAIL — 1/2 criteria passed, 2 blocking issues: test failure + missing edge cas
   `glob="**/*SKILL.md"` to check the pattern. Do NOT Read each file.
 - **Trust `deno task check`:** If all tests pass, do not manually re-verify
   things covered by tests. Focus on acceptance criteria not testable by CI.
+  **FORBIDDEN: `deno test` as a separate Bash command.** `deno task check`
+  already runs ALL tests. Running `deno test` separately = wasted turn.
+  **Evidence:** Run 20260314T175521: QA ran `deno test -A --no-check engine`
+  after `deno task check` already showed all 520 tests passing.
+- **HARD STOP — ZERO Grep on source code files.** Your job is to verify
+  acceptance criteria, NOT to explore source code. Read changed files ONCE via
+  parallel Read calls. Extract all evidence (function signatures, test names,
+  line numbers) in the SAME text response. Do NOT Grep source files afterward.
+  **Evidence:** Run 20260314T175521: 9 Grep calls on engine/*.ts files AFTER
+  reading them. All searching for patterns already visible in Read output.
+  33t/$0.88 vs target 15t. Grep on source = exploratory waste.
+- **HARD STOP — ZERO exploratory Bash commands.** Do NOT search for PRs, explore
+  issue history, or check merged PRs. Your inputs are: spec, decision, changed
+  files, `deno task check` output. Nothing else.
+  **Evidence:** Run 20260314T175521: QA ran `gh pr list --state merged --search
+  "FR-E15 OR FR-E22"` — not in Bash whitelist, wasted turn.
 - **No unnecessary exploration:** Do NOT run `gh issue view`, explore issue
   history, check symlinks, or probe file types. You have the spec and decision.
 - Target: ≤15 turns. Typical flow: 1 parallel read (spec+decision) →

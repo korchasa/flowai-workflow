@@ -73,7 +73,7 @@ nodes:
     prompt: ".claude/skills/agent-architect/SKILL.md"
     task_template: |
       Read the specification at {{input.specification}}/01-spec.md.
-      Read documents/requirements-sdlc.md and documents/design-sdlc.md.
+      Read ONLY scope-relevant SRS/SDS docs (derive scope from spec frontmatter `scope:` field).
       Produce an implementation plan with 2-3 variants.
       Output: {{node_dir}}/02-plan.md
     validate:
@@ -96,9 +96,9 @@ nodes:
     task_template: |
       Read the plan at {{input.design}}/02-plan.md.
       Read the spec at {{input.specification}}/01-spec.md.
-      Read documents/requirements-sdlc.md, documents/design-sdlc.md, and AGENTS.md.
+      Read ONLY scope-relevant SRS/SDS docs (derive scope from spec frontmatter `scope:` field), and AGENTS.md.
       Critique the plan, select a variant, produce task breakdown (04-decision.md).
-      Update documents/design-sdlc.md with selected variant's design details.
+      Update the scope-relevant SDS with selected variant's design details.
       Create feature branch and draft PR.
       Output: {{node_dir}}/04-decision.md
     validate:
@@ -128,7 +128,7 @@ nodes:
         prompt: ".claude/skills/agent-developer/SKILL.md"
         task_template: |
           Read the decision at {{input.decision}}/04-decision.md.
-          Read documents/requirements-sdlc.md and documents/design-sdlc.md.
+          Read ONLY scope-relevant SRS/SDS docs (derive scope from decision's spec reference or task context).
           Implement the changes following the task breakdown.
           This is iteration {{loop.iteration}}.
           After deno task check passes, write {{node_dir}}/06-impl-summary.md

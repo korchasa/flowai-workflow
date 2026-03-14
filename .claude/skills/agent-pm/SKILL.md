@@ -48,6 +48,12 @@ updates.
   files fully. After one full Read, the ENTIRE file is in your context.
 - **HARD STOP — NEVER use Edit on any SRS file.** Use ONE `Write` call per SRS
   file with the complete updated content. Edit on SRS files is FORBIDDEN.
+- **HARD STOP — ONE READ PER FILE. ZERO re-reads.** After reading a file, its
+  FULL content is in your context. Do NOT read the same file twice. Extract ALL
+  needed facts (last FR number, section structure, line ranges) in the SAME text
+  response as the Read. NEVER re-read to "find" something.
+  **Evidence:** Run 20260314T175521: read requirements-engine.md 4 times
+  (22t/$1.04 vs target 8t). 3 re-reads = 3 wasted turns + ~30k wasted tokens.
 
 ## Scope Detection
 
@@ -89,20 +95,21 @@ In your text response after viewing the issue, WRITE:
 
 If the title has no recognized prefix → treat as `sdlc:` (default).
 
-**STEP 3 — READ DOCS (ONE turn, parallel):**
-Issue ALL Read calls in ONE response (parallel):
-- `Read("documents/requirements-sdlc.md")` — no offset, no limit
-- `Read("documents/design-sdlc.md")` — no offset, no limit
-- `Read("documents/requirements-engine.md")` — no offset, no limit
-- `Read("documents/design-engine.md")` — no offset, no limit
+**STEP 3 — READ DOCS (ONE turn, parallel, SCOPE-AWARE):**
+Issue ALL Read calls in ONE response (parallel). Read ONLY scope-relevant docs:
+- `engine:` scope → `Read("documents/requirements-engine.md")` + `Read("documents/design-engine.md")`
+- `sdlc:` scope → `Read("documents/requirements-sdlc.md")` + `Read("documents/design-sdlc.md")`
+- `engine+sdlc:` scope → all 4 docs
+Do NOT read out-of-scope SRS/SDS — they add ~25k wasted context tokens per file.
 If ANY tool output is redirected to a tool-results file, Read that file ONCE.
 **MAX: 1 retry Read of any tool-results file. EVER.**
-After this step, ALL files are FULLY in your context. In your text response:
-> Loaded requirements-sdlc.md. Last FR: FR-SXX (section 3.YY). Last section: ZZ at line NNN.
-> Loaded requirements-engine.md. Last FR: FR-EXX (section 3.YY). Last section: ZZ at line NNN.
-> Loaded design-sdlc.md, design-engine.md.
+After this step, files are FULLY in your context. In your text response:
+> Loaded requirements-<scope>.md. Last FR: FR-<prefix>XX (section 3.YY). Last section: ZZ at line NNN.
+> Loaded design-<scope>.md.
 
 **AFTER STEP 3: ZERO Grep calls. ZERO re-reads. ZERO Edits. The content IS in your context.**
+**Evidence:** Run 20260314T175521 (scope: engine): PM read ALL 4 docs + re-read
+requirements-engine.md 3 extra times. 4 wasted Reads. 22t/$1.04 vs target 8t.
 
 **STEP 4 — WRITE SRS (ONE Write call per target SRS file, ZERO Edits):**
 Draft ALL changes in your text response FIRST. Then:
@@ -122,11 +129,10 @@ Draft ALL changes in your text response FIRST. Then:
 ## Input
 
 - Task prompt from pipeline engine (contains output path and instructions).
-- `documents/requirements-sdlc.md` — SDLC pipeline SRS.
-- `documents/design-sdlc.md` — SDLC pipeline SDS (read-only, for context).
-- `documents/requirements-engine.md` — engine SRS.
-- `documents/design-engine.md` — engine SDS (read-only, for context).
-- `AGENTS.md` — project vision and rules (read-only).
+- **Scope-dependent docs (read ONLY scope-relevant pair):**
+  - `engine:` → `documents/requirements-engine.md` + `documents/design-engine.md`
+  - `sdlc:` → `documents/requirements-sdlc.md` + `documents/design-sdlc.md`
+  - `engine+sdlc:` → all 4 docs
 
 ## Output: `01-spec.md`
 
