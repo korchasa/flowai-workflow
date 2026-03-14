@@ -270,7 +270,7 @@ graph LR
     loop-node log saving via `onNodeComplete` callback,
     phase registry init (`setPhaseRegistry()` before `ensureRunDirs()` in both
     fresh and resume paths), phase subdir creation in `ensureRunDirs()`,
-    pre-post-pipeline `on_failure_script` execution + failed-node-id extraction.
+    pre-post-pipeline `on_failure_script` execution.
     Dry-run path (FR-28): applies `collectPostPipelineNodes()` +
     `sortPostPipelineNodes()` + level filtering before calling
     `dryRunPlan()`, passing filtered levels and post-pipeline node IDs with
