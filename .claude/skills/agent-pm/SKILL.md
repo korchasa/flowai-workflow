@@ -120,10 +120,16 @@ Define what is NOT included in this issue's scope:
   and do NOT use `grep` via Bash on it. You already have the content in context.
 - **FORBIDDEN: `gh issue list` on `sdlc/issue-*` branch.** The branch name
   already tells you the issue number. Running `gh issue list` wastes 2+ turns.
-- **ONE WRITE for SRS updates (MANDATORY).** When updating requirements.md,
-  collect ALL changes, then use ONE Write call to rewrite the file. Do NOT use
-  multiple Edit calls. In run 20260313T234144, PM used 3 Edits on
-  requirements.md — should have been 1 Write (saves 2 turns).
+- **ONE WRITE for SRS updates (MANDATORY — ZERO EXCEPTIONS).**
+  **STEP-BY-STEP ENFORCEMENT:**
+  1. Read requirements.md once (via parallel Read in step 3).
+  2. In your text response, draft ALL SRS changes as a complete updated file.
+  3. Use exactly ONE `Write` tool call to write the entire updated file.
+  **NEVER use Edit on requirements.md.** Edit calls on requirements.md are
+  BLOCKED — each one wastes a turn and inflates cost.
+  **Evidence:** Run 20260314T000902 used 13 Edit calls on requirements.md
+  (31 turns, $1.51). Run 20260313T234144 used 3 Edits (17 turns, $0.99).
+  Target with 1 Write: ≤8 turns, ~$0.50.
 - **Target: ≤8 turns.** Branch shortcut = 1 turn (git branch + skip to issue
   view). Issue view = 1 turn. Parallel read docs = 1 turn. SRS Write + spec
   Write = 2 turns. Comment = 1 turn. Total = 6 turns + 2 buffer.

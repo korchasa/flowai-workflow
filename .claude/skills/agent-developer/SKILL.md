@@ -89,21 +89,27 @@ block direct invocations. Always use `deno task check`.
   replaces 3-4 grep commands.
 - **No TodoWrite:** Do NOT use TodoWrite to track progress — it wastes turns.
   Track your task list mentally from `04-decision.md`.
-- **ONE WRITE PER FILE (MANDATORY).** Count planned changes per file BEFORE
-  editing. If a file needs ≥2 changes, use the Write tool to rewrite the entire
-  file in one call. Do NOT use multiple Edit calls on the same file.
-  **Evidence:** In run 20260313T234144, requirements.md was edited 6 times and
-  stage-9-meta-agent.sh was edited 4 times. Each should have been 1 Write call.
-  Those 8 extra edits wasted 8 turns and ~$0.40.
+- **ONE WRITE PER FILE (MANDATORY — ZERO EXCEPTIONS).** Each target file gets
+  exactly ONE Write or ONE Edit call. If you touch a file twice, you wasted a
+  turn. Count before starting.
+  - **For rename/substitution tasks:** Use `Edit` with `replace_all: true` —
+    one call replaces all occurrences in the file. Do NOT Write the whole file
+    for simple string replacements.
+  - **For multi-section changes:** Use `Write` to rewrite the entire file once.
+  **Evidence:** Run 20260314T000902 wrote pipeline.yaml 3x, 5 test files 2x
+  each, 2 script files 2x each = 14 wasted writes across 81 turns ($7.02).
+  Target: 1 write per file → ≤35 turns, ~$3.00.
 - **ONE READ PER FILE (MANDATORY).** After reading a file once, retain its
-  content. Do NOT Read the same file again. In run 20260313T234144,
-  requirements.md was read 6 times — 5 wasted reads.
+  content in context. Do NOT Read the same file again. If an Edit fails, read
+  the error — do NOT re-read the whole file.
+  **Evidence:** Run 20260314T000902 read 5 test files 3x each and stage-7-qa.sh
+  3x = 12 wasted reads.
 - **Plan before editing (MANDATORY for >3 files):** Before your first Edit/Write,
-  list ALL changes needed per file. Then execute: one Write call per file that
-  needs multiple changes, one Edit call per file that needs exactly one change.
-- **Target: ≤25 turns.** Typical: 1 read decision → 1 parallel batch read →
-  N write/edit cycles (1 per file) → 1 deno task check → 1 commit+push.
-  If past 20 turns, stop exploring and finish.
+  output a checklist: `FILE → TOOL (Edit/Write/Edit+replace_all) → CHANGE`.
+  Then execute one call per file, in order. No re-reads, no re-writes.
+- **Target: ≤35 turns.** Typical: 1 read decision → 1-2 parallel batch reads →
+  N edit/write calls (1 per file) → 1-2 deno task check → 1 commit+push.
+  If past 30 turns, stop exploring and finish.
 
 ## Allowed File Modifications
 

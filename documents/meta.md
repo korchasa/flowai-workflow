@@ -1,24 +1,26 @@
 # Meta-Agent Memory
 
 ## Agent Baselines
-- pm (specification): 17t/$0.99/233s — improved from 22t; branch shortcut works
-- architect (design): 8t/$0.52/133s (stable, no fix needed)
-- tech-lead (decision): 17t/$0.59/113s — improved from 25t; whitelist works
-- developer (build): 53t/$3.01/593s — down from 67t but still 2x target
-- qa (verify): 27t/$0.89/146s — 1 iteration (PASS), down from 34t
-- Total run cost: ~$6.00 (stable vs $6.20 last run)
+- pm (specification): 31t/$1.51/212s — REGRESSED from 17t (13 Edits on SRS)
+- architect (design): 8t/$0.51/735s (stable)
+- tech-lead (decision): 26t/$0.72/121s — slight increase from 17t
+- developer (build): 81t/$7.02/1798s — REGRESSED from 53t (re-read/re-write waste)
+- qa (verify): 24t/$0.77/123s — improved from 27t/$0.89
+- Total run cost: $10.53 (regressed from ~$6.00)
 - 1 iteration (QA passed first try)
 
 ## Active Patterns
-- pm-multi-edit-srs: NEW, first seen 20260313T234144. 3 Edits on requirements.md
-  instead of 1 Write. Fix: added "ONE WRITE for SRS" rule.
-- developer-multi-edit-waste: PERSISTS, first seen 20260313T230627,
-  last seen 20260313T234144. requirements.md edited 6x (should be 1 Write),
-  stage-9 edited 4x. "FORBIDDEN multiple edits" ignored. Fix: reworded to
-  "ONE WRITE PER FILE (MANDATORY)" with concrete evidence.
-- qa-reread-waste: NEW, first seen 20260313T234144. deno check output read 7x
-  (6 wasted). 5 Grep after Read on requirements.md. Fix: added explicit
-  "ONE READ PER FILE" rule + "FORBIDDEN Grep after Read" with evidence.
+- pm-multi-edit-srs: ESCALATED, first seen 20260313T234144,
+  last seen 20260314T000902. 13 Edits on requirements.md (was 3). "ONE WRITE"
+  rule ignored entirely. Fix: step-by-step enforcement + "NEVER use Edit".
+- developer-multi-edit-waste: ESCALATED, first seen 20260313T230627,
+  last seen 20260314T000902. pipeline.yaml written 3x, 5 test files 2x.
+  81t/$7.02 (was 53t/$3.01). Fix: added replace_all guidance + mandatory
+  pre-edit checklist.
+- developer-reread-waste: NEW, first seen 20260314T000902. 5 test files read
+  3x each, stage-7-qa.sh 3x = 12 wasted reads despite ONE READ rule.
+- qa-reread-waste: WATCHING, first seen 20260313T234144. 24t/$0.77 (improved
+  from 27t/$0.89). Rule appears to be working — continue monitoring.
 - pm-branch-shortcut-regression: RESOLVED (3 consecutive runs with shortcut
   working: 22→17t, no gh issue list on branch).
 - tech-lead-bash-exploration: RESOLVED (all 8 Bash commands whitelisted,
@@ -36,11 +38,12 @@
 - 20260313T230627: tech-lead — Bash WHITELIST → RESOLVED (all 8 cmds valid)
 - 20260313T230627: developer — FORBIDDEN multi-edit + re-reads → FAILED (ignored)
 - 20260313T230627: qa — Bash WHITELIST → RESOLVED (6 cmds, all valid)
-- 20260313T234144: developer — ONE WRITE PER FILE mandatory, pre-edit planning,
-  evidence from this run (req.md 6x edit, stage-9 4x edit). Target ≤25 → WATCHING
-- 20260313T234144: qa — ONE READ PER FILE mandatory, FORBIDDEN Grep after Read
-  with evidence (check output 7x read, 5 Grep after Read). Target ≤10 → WATCHING
-- 20260313T234144: pm — ONE WRITE for SRS mandatory, target adjusted ≤8 → WATCHING
+- 20260313T234144: developer — ONE WRITE PER FILE mandatory → FAILED (81t, 22 writes)
+- 20260313T234144: qa — ONE READ PER FILE mandatory → IMPROVED (24t from 27t)
+- 20260313T234144: pm — ONE WRITE for SRS mandatory → FAILED (13 Edits, worse)
+- 20260314T000902: pm — step-by-step enforcement: draft→Write, NEVER Edit → WATCHING
+- 20260314T000902: developer — replace_all for renames, mandatory checklist,
+  evidence from this run (81t/$7.02, 14 wasted writes, 12 wasted reads) → WATCHING
 
 ## Lessons Learned
 - PM/SDS-update scope overlap resolved by explicit constraints in PM prompt.
@@ -59,3 +62,10 @@
 - **Re-read waste is a distinct pattern from multi-edit waste.** QA re-reads
   tool output files (not source files) — need explicit rule covering ALL file
   types including tool-result temp files.
+- **"ONE WRITE/READ" rules alone are insufficient.** Developer ignored them at
+  81 turns. Root cause: agent doesn't plan ahead — edits file, runs check,
+  re-reads to fix, re-writes. Fix: mandatory pre-edit checklist + replace_all
+  for rename tasks.
+- **PM ignores "ONE WRITE" when task has many SRS sections to update.**
+  Root cause: Edit feels easier per-section. Fix: make Edit on SRS explicitly
+  forbidden + enforce step-by-step (draft in text → one Write).
