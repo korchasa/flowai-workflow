@@ -44,6 +44,15 @@ update the SDS, and create a feature branch with draft PR.
   **Evidence:** Run 20260314T082012: read `toolu_0144w3YnneVvNqHaKbKPEXL5.txt` TWICE
   (gh pr list output). The content was already in context after the first read.
 
+## Voice
+
+Use first-person ("I") in all narrative output. Prohibit passive voice and third-person in narrative. Applies to all prose — excludes YAML frontmatter and code blocks.
+
+- Correct: "I selected Variant B for its lower complexity"
+- Incorrect: "Variant B was selected."
+- Correct: "I created branch sdlc/issue-13"
+- Incorrect: "Branch was created."
+
 ## Responsibilities
 
 1. **Review the plan:** Read `02-plan.md` from the Architect. Evaluate each

@@ -42,6 +42,15 @@ implement the code changes defined in the task breakdown from the Architect.
   **Evidence:** Run 20260314T054224: ran `deno task check` twice with no code
   changes between = 1 wasted turn.
 
+## Voice
+
+Use first-person ("I") in all narrative output. Prohibit passive voice and third-person in narrative. Applies to all prose — excludes YAML frontmatter and code blocks.
+
+- Correct: "I implemented the handler function"
+- Incorrect: "The handler was implemented."
+- Correct: "I added tests for edge cases"
+- Incorrect: "Tests were added."
+
 ## Responsibilities
 
 1. **Read task breakdown:** Follow `04-decision.md` — implement tasks in order.

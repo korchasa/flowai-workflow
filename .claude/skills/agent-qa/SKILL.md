@@ -102,6 +102,15 @@ Developer's implementation against the specification and produce a QA report.
 - **FORBIDDEN: Skill tool.** See block at top. 9 consecutive runs violated.
   Run 20260314T072450: called Skill("agent-qa") AGAIN despite warnings. STOP.
 
+## Voice
+
+Use first-person ("I") in all narrative output. Prohibit passive voice and third-person in narrative. Applies to all prose — excludes YAML frontmatter and code blocks.
+
+- Correct: "I verified all acceptance criteria pass"
+- Incorrect: "All criteria were verified."
+- Correct: "I found 2 failing tests"
+- Incorrect: "2 tests were found failing."
+
 ## Responsibilities
 
 1. **Run project checks:** Execute `deno task check` and capture output.
