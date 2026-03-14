@@ -56,7 +56,7 @@ graph TD
     end
 
     Dispatch --> Validate["Validation<br/>file checks"]
-    Dispatch --> Output["Output<br/>3 verbosity levels"]
+    Dispatch --> Output["Output<br/>4 verbosity levels"]
 ```
 
 ### 2.3 Pipeline DAG (FR-26, FR-33)
@@ -197,7 +197,8 @@ graph LR
     `RunState.total_cost_usd` (FR-32 aggregated run cost),
     `PipelineDefaults.on_failure_script` (FR-34 configurable failure hook),
     `HitlConfig.artifact_source` (renamed from `issue_source`),
-    `HitlConfig.exclude_login` (renamed from `bot_login`))
+    `HitlConfig.exclude_login` (renamed from `bot_login`),
+    `Verbosity` union: `"quiet"|"normal"|"semi-verbose"|"verbose"` (FR-41))
   - `template.ts` — `{{var}}` interpolation for prompts/paths
   - `config.ts` — YAML parsing, schema validation, defaults merge,
     `run_on` normalization. `validateNode()`: if `run_on` present, must be
@@ -250,7 +251,14 @@ graph LR
     `formatFooter(output: ClaudeCliOutput): string`. Footer format:
     `status=<ok|error> duration=<X>s cost=$<Y> turns=<N>`. Both separators and
     footer are log-file-only (terminal `onOutput` callback unchanged).
-    `formatFooter()` is a pure function — unit-testable without CLI
+    `formatFooter()` is a pure function — unit-testable without CLI.
+    **Semi-verbose filtering (FR-41):** `formatEventForOutput(event,
+    verbosity?)` accepts optional `Verbosity` param. When
+    `verbosity === "semi-verbose"`, skips `tool_use` content blocks in
+    `assistant` events — emits only `text` blocks. Default `undefined` =
+    all blocks (backward-compatible). Log file writes call without verbosity
+    (full output preserved). `onOutput` callback path passes verbosity from
+    `AgentRunOptions` so terminal output is filtered at source
   - `loop.ts` — loop node execution with condition extraction, per-iteration
     `AgentResult` accumulation into `LoopResult.bodyResults`.
     `buildLoopBodyOrder()` reads from inline `nodes` sub-object (replaces
@@ -265,8 +273,12 @@ graph LR
   - ~~`git.ts`~~ — **deleted** (FR-29: domain-specific git code removed from
     engine). Functions relocated to `.sdlc/scripts/rollback-uncommitted.sh`.
     Failure handling replaced by configurable `on_failure_script` hook
-  - `output.ts` — terminal output manager (quiet/normal/verbose), verbose
-    methods for detailed agent-node diagnostics.
+  - `output.ts` — terminal output manager (quiet/normal/semi-verbose/verbose),
+    verbose methods for detailed agent-node diagnostics.
+    `nodeOutput()` gate: shown when `verbosity === "verbose"` or
+    `verbosity === "semi-verbose"`. In semi-verbose, tool-call lines already
+    excluded upstream by `formatEventForOutput()` — `nodeOutput()` passes
+    through whatever it receives.
     `dryRunPlan(levels, labels, postPipelineNodeIds?, runOnMap?)`: renders
     regular DAG levels, then optional "Post-pipeline" section listing `run_on`
     nodes with their conditions (FR-28).
@@ -295,7 +307,7 @@ graph LR
   - `mod.ts` — public API re-exports
 - **Interfaces:**
   - CLI: `deno task run [--prompt <text>] [--config <path>] [--resume <run-id>]
-    [--dry-run] [-v|-q] [--env KEY=VAL] [--skip nodes] [--only nodes]`
+    [--dry-run] [-v|-s|-q] [--env KEY=VAL] [--skip nodes] [--only nodes]`
   - Config: `.sdlc/pipeline.yaml` (YAML, version "1")
   - State: `.sdlc/runs/<run-id>/state.json` (JSON)
 - **Node types:** `agent`, `merge`, `loop` (with inline `nodes` sub-object

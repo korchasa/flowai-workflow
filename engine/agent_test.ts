@@ -522,6 +522,103 @@ Deno.test("formatFooter — zero values produce valid footer", () => {
   assertEquals(footer, "status=ok duration=0.0s cost=$0.0000 turns=0");
 });
 
+Deno.test("formatEventForOutput — semi-verbose suppresses tool_use blocks", () => {
+  const out = formatEventForOutput(
+    {
+      type: "assistant",
+      message: {
+        content: [
+          { type: "text", text: "Hello" },
+          { type: "tool_use", name: "Bash", input: { command: "ls" } },
+        ],
+      },
+    },
+    "semi-verbose",
+  );
+  assertEquals(out, "[stream] text: Hello");
+  assertEquals(out.includes("tool"), false);
+});
+
+Deno.test("formatEventForOutput — semi-verbose emits text blocks only", () => {
+  const out = formatEventForOutput(
+    {
+      type: "assistant",
+      message: {
+        content: [
+          { type: "tool_use", name: "Read", input: { file_path: "/a.ts" } },
+          { type: "text", text: "Done" },
+          { type: "tool_use", name: "Write", input: { file_path: "/b.ts" } },
+        ],
+      },
+    },
+    "semi-verbose",
+  );
+  assertEquals(out, "[stream] text: Done");
+});
+
+Deno.test("formatEventForOutput — semi-verbose with only tool_use returns empty", () => {
+  const out = formatEventForOutput(
+    {
+      type: "assistant",
+      message: {
+        content: [
+          { type: "tool_use", name: "Bash", input: { command: "pwd" } },
+        ],
+      },
+    },
+    "semi-verbose",
+  );
+  assertEquals(out, "");
+});
+
+Deno.test("formatEventForOutput — undefined verbosity emits all blocks (backward-compat)", () => {
+  const out = formatEventForOutput({
+    type: "assistant",
+    message: {
+      content: [
+        { type: "text", text: "Hi" },
+        { type: "tool_use", name: "Bash", input: { command: "ls" } },
+      ],
+    },
+  });
+  assertEquals(out.includes("[stream] text: Hi"), true);
+  assertEquals(out.includes("[stream] tool: Bash"), true);
+});
+
+Deno.test("formatEventForOutput — verbose verbosity emits all blocks", () => {
+  const out = formatEventForOutput(
+    {
+      type: "assistant",
+      message: {
+        content: [
+          { type: "text", text: "Hi" },
+          { type: "tool_use", name: "Bash", input: { command: "ls" } },
+        ],
+      },
+    },
+    "verbose",
+  );
+  assertEquals(out.includes("[stream] text: Hi"), true);
+  assertEquals(out.includes("[stream] tool: Bash"), true);
+});
+
+Deno.test("formatEventForOutput — normal verbosity emits all blocks", () => {
+  const out = formatEventForOutput(
+    {
+      type: "assistant",
+      message: {
+        content: [
+          { type: "text", text: "Hi" },
+          { type: "tool_use", name: "Bash", input: { command: "ls" } },
+        ],
+      },
+    },
+    "normal",
+  );
+  assertEquals(out.includes("[stream] text: Hi"), true);
+  assertEquals(out.includes("[stream] tool: Bash"), true);
+});
+
 Deno.test("turn separators + footer — stream log integration", async () => {
   const tmpPath = await Deno.makeTempFile({ suffix: ".jsonl" });
   try {
