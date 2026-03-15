@@ -162,10 +162,10 @@ Fields:
      **Evidence:** Run 20260314T054224: `git checkout -b` failed (branch exists),
      then used `git checkout --theirs` (FORBIDDEN) + retried `git checkout -b`
      = 3 wasted Bash calls. Run 20260314T044647: same pattern.
-2. Commit decision artifact + SDS changes (single commit).
+2. Commit decision artifact + SDS changes + own memory (single commit).
    **IMPORTANT:** `.auto-flow/runs/` is gitignored. ALWAYS use `git add -f` for ALL
    files in that directory. Chain add+commit in ONE Bash call:
-   `git add -f <run-artifact-path> && git add documents/design-*.md && git commit -m "..."`
+   `git add -f <run-artifact-path> && git add documents/design-*.md .auto-flow/memory/agent-tech-lead.md .auto-flow/memory/agent-tech-lead-history.md && git commit -m "..."`
    Do NOT try `git add` without `-f` first — it WILL fail silently.
    **Evidence:** Run 20260314T074859: first commit failed (no -f), then git
    status, then retry with -f = 2 wasted calls. Same in build agent.
@@ -258,5 +258,6 @@ Follow `.auto-flow/agents/reflection-protocol.md`.
   - `engine+sdlc` → both SDS files
 - Git operations: branch creation, commits, push, draft PR.
 - `.auto-flow/memory/agent-tech-lead.md` (reflection memory).
+- `.auto-flow/memory/agent-tech-lead-history.md` (reflection history).
 
 Do NOT modify source code, tests, SRS, or any other files.

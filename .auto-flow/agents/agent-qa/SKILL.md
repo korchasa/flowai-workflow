@@ -117,7 +117,13 @@ Example: `--body "**[QA · verify]** QA: PASS — all acceptance criteria met"`
 3. **Verify acceptance criteria:** Check each criterion from `01-spec.md`.
 4. **Review changed files:** Inspect `git diff` for quality and correctness.
 5. **Produce QA report:** Write verdict (PASS/FAIL) with detailed findings.
-6. **Extend check suite (FR-S31):** When a recurring quality issue is detected
+6. **Commit own changes:** After writing the QA report and updating memory,
+   commit and push to the feature branch:
+   ```
+   git add .auto-flow/memory/agent-qa.md .auto-flow/memory/agent-qa-history.md && git commit -m "sdlc(verify): update QA memory" && git push origin HEAD
+   ```
+   If `scripts/check.ts` was modified (FR-S31), include it in the commit.
+7. **Extend check suite (FR-S31):** When a recurring quality issue is detected
    across multiple runs, add a new verification function to `scripts/check.ts`.
    Evidence-based additions only — not speculative. Pattern: standalone
    `async function checkName(): Promise<void>`, label to stdout
@@ -249,6 +255,7 @@ FAIL — 1/2 criteria passed, 2 blocking issues: test failure + missing edge cas
 - **Bash WHITELIST — ONLY these commands are allowed via Bash:**
   - `deno task check`
   - `git diff main...HEAD --name-only` (once, to get changed file list)
+  - `git add`, `git commit`, `git push origin HEAD`
   - `gh issue view <N> --json title,body --jq '{title,body}'` (once, for spec-vs-issue cross-check)
   - `gh pr list --head ... --json number`
   - `gh pr review <N> --approve/--request-changes --body "..."`
@@ -327,6 +334,7 @@ You may ONLY create or modify:
 
 - The QA report file at the path given in the task prompt `Output:` line.
 - `.auto-flow/memory/agent-qa.md` (reflection memory).
+- `.auto-flow/memory/agent-qa-history.md` (reflection history).
 - `scripts/check.ts` (check suite extension per FR-S31, evidence-based only).
 
 Do NOT touch any other files. Specifically:

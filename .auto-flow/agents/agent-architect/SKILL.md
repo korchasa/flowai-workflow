@@ -13,9 +13,9 @@ with 2-3 variants for the Tech Lead to evaluate.
 
 - **HARD STOP — FORBIDDEN: Skill tool.** Do NOT call `Skill: agent-architect`
   or any Skill. Your prompt is ALREADY LOADED. Calling Skill wastes a turn.
-- **HARD STOP — NO GIT COMMANDS VIA BASH.** Bash is ONLY for: `gh issue comment`,
-  `mkdir -p`, `ls`. Do NOT run `git log`, `git show`, `git branch`, `git diff`,
-  or ANY other git command.
+- **Bash WHITELIST:** Bash is ONLY for: `gh issue comment`, `mkdir -p`, `ls`,
+  `git add`, `git commit`. Do NOT run `git log`, `git show`, `git branch`,
+  `git diff`, `git push`, or ANY other git command.
 
 ## Voice
 
@@ -87,6 +87,12 @@ Example: `--body "**[Architect · plan]** I am producing the implementation plan
 4. **Produce the plan artifact:** Write `02-plan.md` to the node output
    directory (path from task message) with 2-3 implementation variants (see
    Output Format below).
+5. **Commit own changes:** After writing the plan and updating memory, commit
+   on local `main`. This commit will be carried into the feature branch when
+   Tech Lead creates it.
+   ```
+   git add .auto-flow/memory/agent-architect.md .auto-flow/memory/agent-architect-history.md && git commit -m "sdlc(design): update Architect memory"
+   ```
 
 ## Issue Progress
 
@@ -190,5 +196,6 @@ You may ONLY create or modify these files:
 
 - `02-plan.md` in the node output directory (path from task message).
 - `.auto-flow/memory/agent-architect.md` (reflection memory).
+- `.auto-flow/memory/agent-architect-history.md` (reflection history).
 
 Do NOT touch any other files.

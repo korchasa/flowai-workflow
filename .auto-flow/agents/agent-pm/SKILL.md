@@ -161,12 +161,20 @@ Draft ALL changes in your text response FIRST. Then:
 **STEP 5 — WRITE SPEC:**
 `mkdir -p <output-dir>` then `Write` 01-spec.md (see Output Format below).
 
-**STEP 6 — POST PROGRESS:**
+**STEP 6 — COMMIT OWN CHANGES:**
+Stage and commit your memory files and SRS changes on local `main`. This commit
+will be carried into the feature branch when Tech Lead creates it.
+```
+git add .auto-flow/memory/agent-pm.md .auto-flow/memory/agent-pm-history.md documents/requirements-*.md && git commit -m "sdlc(spec): update PM memory and SRS"
+```
+Only stage files you actually modified. If no SRS changes, omit the SRS glob.
+
+**STEP 7 — POST PROGRESS:**
 `gh issue comment <N> --body "**[PM · specify]** I started the specification phase for this issue"`
 
-**Target: ≤10 turns total.** Step 1 = 1 turn. Steps 2a-2c = 2-3 turns
+**Target: ≤11 turns total.** Step 1 = 1 turn. Steps 2a-2c = 2-3 turns
 (depends on unhealthy issues). Step 3 = 1 turn. Steps 4+5 = 2 turns.
-Step 6 = 1 turn. Total = 8 + 2 buffer.
+Step 6 = 1 turn. Step 7 = 1 turn. Total = 9 + 2 buffer.
 
 ## Input
 
@@ -253,7 +261,7 @@ Define what is NOT included in this issue's scope:
 - **YAML frontmatter required:** `01-spec.md` MUST start with `---` on line 1
   and contain `issue: <N>` and `scope: <value>` in the frontmatter.
 - **Bash WHITELIST (MANDATORY).** Bash is ONLY for these commands — nothing else:
-  `git branch --show-current`,
+  `git branch --show-current`, `git add`, `git commit`,
   `gh issue view`, `gh issue list`, `gh issue comment`, `gh issue edit`,
   `gh pr list`, `mkdir -p`.
   Prefer Read/Grep tools over bash utilities to avoid redundant calls.
@@ -295,6 +303,7 @@ Follow `.auto-flow/agents/reflection-protocol.md`.
   - `engine+sdlc:` → both SRS files
 - `01-spec.md` in the node output directory (path from task message).
 - `.auto-flow/memory/agent-pm.md` (reflection memory).
+- `.auto-flow/memory/agent-pm-history.md` (reflection history).
 
 You MUST NOT modify any other files. In particular:
 - `documents/design-sdlc.md`, `documents/design-engine.md` — owned by the

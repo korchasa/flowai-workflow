@@ -47,12 +47,22 @@ Example: `--body "**[Tech Lead Review · review]** I found no issues — merging
    acceptance criteria. Verify implementation matches.
 5. **Check CI status:** Run `gh run list --branch "$(git branch --show-current)" --limit 5 --json status,conclusion`
    to check CI workflow status.
-6. **Decide:**
-   - **Merge** if: code review passes AND CI checks are green.
+6. **Commit own changes:** After updating memory, commit and push:
+   ```
+   git add .auto-flow/memory/agent-tech-lead-review.md .auto-flow/memory/agent-tech-lead-review-history.md && git commit -m "sdlc(review): update Tech Lead Review memory" && git push origin HEAD
+   ```
+7. **Verify clean working tree:** Run `git status --porcelain`. If output is
+   non-empty, there are uncommitted changes that will be lost. List them in the
+   report as a **blocking** finding and do NOT merge. Each agent is responsible
+   for committing their own changes — uncommitted files indicate a pipeline bug.
+8. **Decide:**
+   - **Merge** if: code review passes AND CI checks are green AND working tree
+     is clean (step 7).
      Run `gh pr merge <N> --squash --delete-branch`.
-   - **Leave open** if: issues found or CI failing. Post review comments via
+   - **Leave open** if: issues found OR CI failing OR dirty working tree. Post
+     review comments via
      `gh pr review <N> --request-changes --body "**[Tech Lead Review · review]** ..."`.
-7. **Write report:** Output `{{node_dir}}/08-review.md` with findings.
+9. **Write report:** Output `{{node_dir}}/08-review.md` with findings.
 
 ## Output: `08-review.md`
 
@@ -72,6 +82,10 @@ Example: `--body "**[Tech Lead Review · review]** I found no issues — merging
 - In scope: <list>
 - Out of scope: <list, if any>
 
+## Working Tree
+- Clean: yes | no
+- Uncommitted files: <list, if any>
+
 ## Summary
 
 <Verdict (MERGE/OPEN)>, CI <green/failing>, <merged or left open with reason>
@@ -79,8 +93,9 @@ Example: `--body "**[Tech Lead Review · review]** I found no issues — merging
 
 ## Rules
 
-- **Read-only analysis:** Do NOT modify source files. Your only outputs are the
-  PR review/merge actions and `08-review.md`.
+- **Read-only analysis (except own memory):** Do NOT modify source files. Your
+  only outputs are the PR review/merge actions, `08-review.md`, and own memory
+  files.
 - **Evidence-based:** Every finding must reference a specific file/line from
   the diff.
 - **Scope-strict:** Flag any changes outside the decision's scope.
@@ -103,5 +118,6 @@ Follow `.auto-flow/agents/reflection-protocol.md`.
 
 - `08-review.md` in the node output directory (path from task message).
 - `.auto-flow/memory/agent-tech-lead-review.md` (reflection memory).
+- `.auto-flow/memory/agent-tech-lead-review-history.md` (reflection history).
 
 Do NOT touch any other files.
