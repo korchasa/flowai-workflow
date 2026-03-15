@@ -663,11 +663,11 @@
 
 ### 3.29 FR-S29: AGENTS.md Agent List Accuracy
 
-- **Description:** `AGENTS.md` must accurately list the 7 active pipeline agents: PM, Architect, Tech Lead, Developer, QA, Tech Lead Review, Meta-Agent. Deprecated agents (Reviewer, SDS Update, Presenter) must not appear as active agents.
-- **Motivation:** Stale agent references in `AGENTS.md` mislead contributors about pipeline composition. Presenter was absorbed into Tech Lead and Tech Lead Review per FR-S15; formal requirement ensures accuracy is maintained across refactors.
+- **Description:** `AGENTS.md` must list exactly the 7 active pipeline agents: PM, Architect, Tech Lead, Developer, QA, Tech Lead Review, Meta-Agent. Deprecated/absorbed agents (e.g., Presenter, absorbed into Tech Lead + Tech Lead Review per FR-S15) must not appear as active agents.
+- **Rationale:** Stale agent references in `AGENTS.md` mislead contributors about pipeline structure. Presenter agent was absorbed into Tech Lead + Tech Lead Review per FR-S15 but persists in `AGENTS.md:44-45`, creating confusion.
 - **Acceptance criteria:**
-  - [ ] `AGENTS.md` Project Vision section lists exactly 7 agents: PM, Architect, Tech Lead, Developer, QA, Tech Lead Review, Meta-Agent.
-  - [ ] No deprecated agents (Presenter, Reviewer, SDS Update) appear as active pipeline agents in `AGENTS.md`.
+  - [ ] `AGENTS.md` agent list contains exactly: PM, Architect, Tech Lead, Developer, QA, Tech Lead Review, Meta-Agent (7 agents total).
+  - [ ] No reference to "Presenter" as an active agent in `AGENTS.md`.
   - [ ] `deno task check` passes.
 
 ## 4. Non-functional requirements
