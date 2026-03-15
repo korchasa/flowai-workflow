@@ -160,6 +160,18 @@ graph LR
   correct/incorrect example pair per file. Applies to: handoff artifacts,
   PR/issue comments, QA reports, spec files. Excludes: YAML frontmatter,
   code blocks, structured data, tables.
+- **Comment Identification (FR-S29):** Each SKILL.md contains a
+  `## Comment Identification` section defining the prefix rule: all `gh issue
+  comment` and `gh pr review` body strings MUST start with
+  `**[<Agent> · <phase>]**`. Each agent's section specifies its prefix value:
+  PM→`**[PM · specify]**`, Architect→`**[Architect · plan]**`,
+  Tech Lead→`**[Tech Lead · decide]**`, Developer→`**[Developer · implement]**`,
+  QA→`**[QA · verify]**`, Tech Lead Review→`**[Tech Lead Review · review]**`,
+  Meta-Agent→`**[Meta-Agent · optimize]**`. Section is separate from `## Voice`
+  (FR-S22/FR-43) — Voice governs tone, Comment Identification governs
+  attribution. Covers both hardcoded templates and dynamically generated comment
+  bodies. Developer has no existing templates; section serves as instruction for
+  future `gh` calls.
 - **Deps:** None (static content, versioned in git).
 
 ### 3.4.1 Per-Agent Reflection Memory (FR-S28)
