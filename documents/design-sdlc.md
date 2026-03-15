@@ -22,18 +22,17 @@ graph LR
     Design --> Decision["decision<br/>(critique+branch+PR)"]
     Decision --> Loop["implementation<br/>(build→verify)"]
     Loop -.-> Review["tech-lead-review<br/>(run_on:always)"]
-    Loop -.-> Optimize["optimize<br/>(run_on:always)"]
 ```
 
 - **Node ID convention (FR-33):** Activity-based IDs reflect what work is done,
   not who does it. Mapping: `pm`→`specification`, `architect`→`design`,
   `tech-lead`→`decision`, `impl-loop`→`implementation`, `developer`→`build`,
-  `qa`→`verify`, `tech-lead-review`→`tech-lead-review`, `meta-agent`→`optimize`.
+  `qa`→`verify`, `tech-lead-review`→`tech-lead-review`.
 - **Phases (FR-33):** Top-level `phases:` key in `pipeline.yaml` declares named
   phase groups. Each phase lists member stage IDs:
   - `plan`: [specification, design, decision]
   - `impl`: [implementation]
-  - `report`: [tech-lead-review, optimize]
+  - `report`: [tech-lead-review]
   Phase grouping is declarative config; engine treats it as opaque data. Enables
   future phase-level `run_on` semantics and cleaner artifact reporting.
 
@@ -86,7 +85,7 @@ graph LR
   `../../.auto-flow/agents/agent-<name>` for Claude Code interactive discovery.
   Dual-use: pipeline-driven (via engine `prompt:` config) and interactive (via
   Claude Code `/agent-<name>` slash commands through symlinks).
-- **Directory structure:** `.auto-flow/agents/agent-<name>/SKILL.md` — 7 agents:
+- **Directory structure:** `.auto-flow/agents/agent-<name>/SKILL.md` — 6 agents:
   - `agent-pm` — triages open GitHub issues, selects highest-priority, produces
     spec. **Issue Author Filter (FR-S31):** PM filters candidates by author at
     two points: (1) `gh issue list --author korchasa` in STEP 2a (triage path),
@@ -106,9 +105,16 @@ graph LR
     (`gh pr review`: approve/request-changes).
   - `agent-tech-lead-review` — post-pipeline: final code review + CI gate
     check + merge. `run_on: always`. Handles missing-PR case gracefully.
-  - `agent-meta-agent` — prompt optimization, failure analysis.
 - **Removed agents (FR-26):** `tech-lead-reviewer`, `tech-lead-sds`,
   `committer`, `code-reviewer`.
+- **Removed agents (FR-S9, issue #127):** `agent-meta-agent` — prompt
+  optimization removed due to unreviewed SKILL.md edit risk and marginal value.
+  Superseded by two-layer per-agent reflection (FR-S32).
+- **Shared Reflection Protocol (FR-S32):**
+  `.auto-flow/agents/reflection-protocol.md` — single source of truth for
+  two-layer reflection protocol (MEMORY + HISTORY). Referenced by each agent's
+  `## Reflection Memory` section in SKILL.md and reinforced via `task_template`
+  in `pipeline.yaml`. See §3.4.1 for details.
 - **SKILL.md frontmatter (agentskills.io-compliant):**
   ```yaml
   ---
@@ -131,15 +137,15 @@ graph LR
     `.claude/skills/agent-<name>` → `../../.auto-flow/agents/agent-<name>`.
     User invokes `/agent-<name>`. Symlinks required (canonical location moved
     from `.claude/skills/` per FR-S26).
-- **Agent Execution Summary (FR-40, FR-42):** All 7 agents must produce a `## Summary`
-  section in their output artifacts. Content: 2-5 bullet points (actions taken,
-  key decisions, artifacts produced, issues encountered). 6 agents (PM,
-  Architect, Tech Lead, QA, Meta-Agent, Tech Lead Review) append `## Summary`
+- **Agent Execution Summary (FR-40, FR-42):** All 6 agents must produce a
+  `## Summary` section in their output artifacts. Content: 2-5 bullet points
+  (actions taken, key decisions, artifacts produced, issues encountered).
+  5 agents (PM, Architect, Tech Lead, QA, Tech Lead Review) append `## Summary`
   to their markdown artifact files. Developer includes summary in commit message
   body (no separate artifact file). Pipeline enforces via `contains_section:
-  Summary` validation on 6 nodes (`specification`, `design`, `decision`,
-  `verify`, `optimize`, `tech-lead-review`). Developer (`build`) excluded from
-  file-based validation — uses existing `custom_script: deno task check`.
+  Summary` validation on 5 nodes (`specification`, `design`, `decision`,
+  `verify`, `tech-lead-review`). Developer (`build`) excluded from file-based
+  validation — uses existing `custom_script: deno task check`.
 - **Voice Convention (FR-40, FR-43):** Each SKILL.md contains a `## Voice`
   section (after `# Role:` heading, before `## Responsibilities`) mandating
   first-person narrative ("I") in all agent outputs. Scope explicitly includes
@@ -170,37 +176,53 @@ graph LR
   `**[<Agent> · <phase>]**`. Each agent's section specifies its prefix value:
   PM→`**[PM · specify]**`, Architect→`**[Architect · plan]**`,
   Tech Lead→`**[Tech Lead · decide]**`, Developer→`**[Developer · implement]**`,
-  QA→`**[QA · verify]**`, Tech Lead Review→`**[Tech Lead Review · review]**`,
-  Meta-Agent→`**[Meta-Agent · optimize]**`. Section is separate from `## Voice`
-  (FR-S22/FR-43) — Voice governs tone, Comment Identification governs
-  attribution. Covers both hardcoded templates and dynamically generated comment
-  bodies. Developer has no existing templates; section serves as instruction for
-  future `gh` calls.
+  QA→`**[QA · verify]**`, Tech Lead Review→`**[Tech Lead Review · review]**`.
+  Section is separate from `## Voice` (FR-S22/FR-43) — Voice governs tone,
+  Comment Identification governs attribution. Covers both hardcoded templates
+  and dynamically generated comment bodies. Developer has no existing templates;
+  section serves as instruction for future `gh` calls.
 - **Deps:** None (static content, versioned in git).
 
-### 3.4.1 Per-Agent Reflection Memory (FR-S28)
+### 3.4.1 Two-Layer Agent Reflection Memory (FR-S28, FR-S32)
 
-- **Purpose:** Cross-run learning via per-agent memory files. Replaces shared
-  `documents/meta.md` with isolated `.auto-flow/memory/<agent-name>.md` per
-  agent. Eliminates merge conflicts, git noise, and scope violation (pipeline
-  state now in `.auto-flow/`, not `documents/`).
-- **Directory:** `.auto-flow/memory/` — 7 files, one per agent:
-  `agent-pm.md`, `agent-architect.md`, `agent-tech-lead.md`,
-  `agent-developer.md`, `agent-qa.md`, `agent-meta-agent.md`,
-  `agent-tech-lead-review.md`.
-- **Lifecycle:** Read at session start → execute task → full rewrite at session
-  end. Current-state snapshot, not append log. <=50 lines, agent-curated.
-- **Content categories:** Anti-patterns encountered, effective strategies,
-  environment quirks, baseline metrics.
-- **Meta-agent:** Full memory management logic in SKILL.md — reads own memory,
-  analyzes run, rewrites with compressed current-state patterns.
-- **Other 6 agents:** Shared ~10-line `## Reflection Memory` convention block
-  in each SKILL.md. Same template for all 6 — no per-agent customization.
-  Memory format evolves organically via meta-agent runs.
+- **Purpose:** Cross-run learning via per-agent memory and history files.
+  Replaces single-layer reflection (FR-S28) with two-layer design (FR-S32).
+  Eliminates meta-agent dependency — each agent manages its own learning.
+- **Shared Protocol:** `.auto-flow/agents/reflection-protocol.md` — single
+  source of truth for the two-layer reflection protocol. Referenced by each
+  agent's `## Reflection Memory` section in SKILL.md (~3-5 line reference
+  block) and reinforced via `task_template` in `pipeline.yaml`. Contains:
+  - Layer 1 (MEMORY) format and rules
+  - Layer 2 (HISTORY) format and rules
+  - Lifecycle instructions
+  - Size constraints
+- **Layer 1 — MEMORY** (edit-in-place operative knowledge):
+  - **Directory:** `.auto-flow/memory/` — 6 files, one per agent:
+    `agent-pm.md`, `agent-architect.md`, `agent-tech-lead.md`,
+    `agent-developer.md`, `agent-qa.md`, `agent-tech-lead-review.md`.
+  - **Lifecycle:** Read at session start → execute task → full rewrite at
+    session end. Current-state snapshot, not append log. <=50 lines.
+  - **Content categories:** Anti-patterns encountered, effective strategies,
+    environment quirks, baseline metrics.
+- **Layer 2 — HISTORY** (append-only run log):
+  - **Directory:** `.auto-flow/memory/` — 6 files:
+    `agent-pm-history.md`, `agent-architect-history.md`, etc.
+  - **Lifecycle:** Read at session start → append one entry at session end.
+    FIFO trim to <=20 most recent entries.
+  - **Entry format:** Timestamp, issue#, turns, cost, outcome, key learnings.
+    Agent-specific fields (e.g., PM: issue selected; QA: verdict).
+  - **Purpose:** Enables trend detection — recurring errors, metric drift,
+    pattern identification across runs.
+- **SKILL.md integration:** Each agent's `## Reflection Memory` section
+  replaced with ~3-5 line reference block:
+  - "Follow `.auto-flow/agents/reflection-protocol.md`."
+  - Memory path: `.auto-flow/memory/<agent>.md`
+  - History path: `.auto-flow/memory/<agent>-history.md`
+  - Agent-specific HISTORY format hint.
 - **Pipeline integration:** Each agent's `task_template` in `pipeline.yaml`
-  includes memory path hint as reinforcement alongside SKILL.md convention.
-- **Git tracking:** Memory files are git-tracked (not gitignored). Each agent
-  rewrites only its own file — no cross-agent memory reads.
+  includes both memory and history file paths as reinforcement.
+- **Git tracking:** Memory and history files are git-tracked (not gitignored).
+  Each agent reads/writes only its own files — no cross-agent access.
 - **Interfaces:** File I/O only. No engine awareness — memory is pipeline-level
   concern. Agents read/write via standard file tools.
 - **Deps:** None (static files, versioned in git).
@@ -308,7 +330,7 @@ graph LR
   Exported `printUsage()`/`checkArgs()` for unit testing
 - **Interfaces:**
   - CLI: `deno task dashboard --run-dir <path>`
-  - Hook: `after:` on `optimize` node (`|| true` suffix for non-fatal)
+  - Hook: `after:` on `tech-lead-review` node (`|| true` suffix for non-fatal)
 - **Deps:** `engine/types.ts` (imports `RunState`, `ClaudeCliOutput` types
   for parsing). No runtime engine dependency — reads JSON files directly.
 
@@ -361,17 +383,17 @@ graph LR
 
 ### 3.11 AGENTS.md Agent List Validation (FR-S29)
 
-- **Purpose:** Validate `AGENTS.md` lists exactly 7 active agents with no
+- **Purpose:** Validate `AGENTS.md` lists exactly 6 active agents with no
   deprecated entries. Runs as part of `deno task check` alongside
   `pipelineIntegrity()` (§3.8).
 - **Implementation:** `agentListAccuracy()` in `scripts/check.ts`:
   1. Reads `AGENTS.md` content.
   2. Extracts agent list from Project Vision section (parenthetical list after
      "specialized AI agents").
-  3. Verifies all 7 expected agents present: PM, Architect, Tech Lead,
-     Developer, QA, Tech Lead Review, Meta-Agent.
+  3. Verifies all 6 expected agents present: PM, Architect, Tech Lead,
+     Developer, QA, Tech Lead Review.
   4. Verifies no deprecated agent names appear as active: Presenter, Reviewer,
-     SDS Update.
+     SDS Update, Meta-Agent.
   5. Reports pass/fail with descriptive messages per check.
 - **Validation flow:** `agentListAccuracy()` → `Deno.readTextFile("AGENTS.md")`
   → string matching against expected/deprecated lists → error collection →
@@ -414,15 +436,6 @@ graph LR
 - **Secret Detection**: `gitleaks detect --no-git` runs as part of
   `deno task check` (`scripts/check.ts`). `allowFailure=true` — skips if
   gitleaks binary not found. Engine-level `safetyCheckDiff()` removed.
-- **Meta-Agent Trigger**: Engine executes meta-agent via `run_on: "always"`.
-  After all DAG levels complete (success or failure), engine collects
-  post-pipeline nodes, sorts topologically, filters by condition, and executes
-  in order. Meta-agent identifies failed nodes via `state.json`
-  (`nodes[*].status === "failed"`). Edits `.auto-flow/agents/agent-*/SKILL.md`
-  to fix diagnosed problems. Produces minimal `07-changelog.md` listing applied
-  fixes. Updates own reflection memory in
-  `.auto-flow/memory/agent-meta-agent.md` (FR-S28). Posts 2-3 line
-  summary to GitHub issue.
 - **Tech-Lead-Review Node**: Post-pipeline agent (`run_on: always`). Performs
   final code review, checks CI gates, merges PR if all pass. Handles
   missing-PR case gracefully (no-op with clear message when pipeline failed
@@ -443,7 +456,7 @@ graph LR
   6. Engine resumes agent: `claude --resume <session_id> -p "<reply>"
      --output-format json`. Agent sees full previous context + reply as new
      user message.
-  7. On `timeout` exceeded: node marked `failed`, Meta-Agent triggered.
+  7. On `timeout` exceeded: node marked `failed`.
   Pipeline config:
   ```yaml
   defaults:
@@ -458,15 +471,11 @@ graph LR
 - **Rules:**
   - Artifacts overwritten on re-run (git history preserves previous).
   - QA iteration numbering restarts on re-run.
-  - Meta-Agent runs on both success and failure.
-  - Meta-Agent auto-applies prompt improvements to `.auto-flow/agents/agent-*/SKILL.md`.
-    Human review at PR merge via tech-lead-review.
 
 ## 6. Non-Functional
 
 - **Scale:** Single pipeline per issue. Sequential stages (no parallel agents).
-- **Fault:** Stage failure stops pipeline, Meta-Agent analyzes, failure reported
-  on issue.
+- **Fault:** Stage failure stops pipeline, failure reported on issue.
 - **Sec:** Secret detection via `gitleaks detect --no-git` in `deno task check`
   (`scripts/check.ts`). Engine-level scope checks removed. Agents run with
   local user's permissions.
@@ -498,17 +507,17 @@ All FR evidence for issue #15 is complete:
 - **FR-40 (Dashboard Stream Log Links):** Implemented. SRS section 3.39
   evidence recorded — `scripts/generate-dashboard.ts` (`streamLogHref`,
   `.log-link` CSS). Tests in `scripts/generate-dashboard_test.ts`.
-- **FR-42 (Agent Output Summary):** Already implemented. All 7 agent SKILL.md
+- **FR-42 (Agent Output Summary):** Already implemented. All 6 agent SKILL.md
   files document `## Summary` in output format. `pipeline.yaml` enforces
-  `contains_section: Summary` on 6 agent nodes (`specification`, `design`,
-  `decision`, `verify`, `optimize`, `tech-lead-review`); Developer (`build`)
-  enforced via `custom_script: deno task check`. Evidence:
-  `.auto-flow/agents/agent-*/SKILL.md` (7 files), `.auto-flow/pipeline.yaml` (7 rules).
+  `contains_section: Summary` on 5 agent nodes (`specification`, `design`,
+  `decision`, `verify`, `tech-lead-review`); Developer (`build`) enforced via
+  `custom_script: deno task check`. Evidence:
+  `.auto-flow/agents/agent-*/SKILL.md` (6 files), `.auto-flow/pipeline.yaml`.
 - **FR-43 (Agent First-Person Voice — GitHub Interactions):** Voice sections
   strengthened with explicit GitHub interaction scope + third example pair per
   agent. Hardcoded `gh issue comment --body` templates in PM, Architect, Tech
   Lead SKILL.md files updated to first-person. Evidence:
-  `.auto-flow/agents/agent-*/SKILL.md` (7 files, `## Voice` sections).
+  `.auto-flow/agents/agent-*/SKILL.md` (6 files, `## Voice` sections).
 
 FR-S1 evidence (issue #100):
 
