@@ -26,21 +26,6 @@ export interface VerboseValidationResult {
   detail?: string;
 }
 
-/**
- * Extract a multi-line excerpt from agent result text (FR-E15).
- * Filters empty lines, takes first maxLines non-empty lines,
- * joins with " | ", truncates to maxChars.
- */
-export function extractResultExcerpt(
-  text: string,
-  maxLines = 3,
-  maxChars = 400,
-): string {
-  const nonEmpty = text.split("\n").filter((l) => l.trim() !== "");
-  const excerpt = nonEmpty.slice(0, maxLines).join(" | ");
-  return excerpt.slice(0, maxChars);
-}
-
 /** Terminal output manager with configurable verbosity levels. */
 export class OutputManager {
   private verbosity: Verbosity;
@@ -191,15 +176,25 @@ export class OutputManager {
     }
   }
 
-  /** Show one-line agent result summary after node completion (FR-30). Suppressed in quiet mode. */
+  /**
+   * Show multi-line agent result after node completion (FR-30).
+   * Suppressed in quiet mode. Format:
+   *   [HH:MM:SS] <nodeId padded>  RESULT:
+   *     <each non-empty line of output.result indented 2 spaces>
+   *     cost=$X.XXXX | duration=Xs | turns=N
+   */
   nodeResult(nodeId: string, output: ClaudeCliOutput): void {
     if (this.verbosity === "quiet") return;
-    const excerpt = extractResultExcerpt(output.result ?? "");
+    const time = this.timestamp();
+    const paddedId = nodeId.padEnd(16);
+    this.write(`[${time}] ${paddedId}  RESULT:\n`);
+    for (const line of (output.result ?? "").split("\n")) {
+      if (line.trim()) this.write(`  ${line}\n`);
+    }
     const cost = output.total_cost_usd.toFixed(4);
     const durationS = Math.round(output.duration_ms / 1000);
-    this.status(
-      nodeId,
-      `  RESULT: ${excerpt} | cost=$${cost} | duration=${durationS}s | turns=${output.num_turns}`,
+    this.write(
+      `  cost=$${cost} | duration=${durationS}s | turns=${output.num_turns}\n`,
     );
   }
 

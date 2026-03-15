@@ -17,7 +17,7 @@ import { terminalInput } from "./human.ts";
 import type { UserInput } from "./human.ts";
 import { acquireLock, defaultLockPath, releaseLock } from "./lock.ts";
 import { onShutdown } from "./process-registry.ts";
-import { extractResultExcerpt, OutputManager } from "./output.ts";
+import { OutputManager } from "./output.ts";
 import type { RunSummary } from "./output.ts";
 import {
   collectPostPipelineNodes,
@@ -359,7 +359,12 @@ export class Engine {
           nodeId,
           lastAgentResult?.output?.total_cost_usd,
           lastAgentResult?.output
-            ? extractResultExcerpt(lastAgentResult.output.result)
+            ? (lastAgentResult.output.result ?? "")
+              .split("\n")
+              .filter((l) => l.trim())
+              .slice(0, 3)
+              .join(" | ")
+              .slice(0, 400)
             : undefined,
         );
         const duration = this.state.nodes[nodeId].duration_ms ?? 0;

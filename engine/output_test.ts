@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { extractResultExcerpt, OutputManager } from "./output.ts";
+import { OutputManager } from "./output.ts";
 import type { RunSummary } from "./output.ts";
 
 /** Capture output lines from an OutputManager. */
@@ -128,58 +128,6 @@ Deno.test("verboseContinuation — emits continuation context in verbose mode", 
   assertEquals(cap.lines.some((l) => l.includes("output.md")), true);
 });
 
-// --- extractResultExcerpt tests (FR-E15) ---
-
-Deno.test("extractResultExcerpt — empty string returns empty string", () => {
-  assertEquals(extractResultExcerpt(""), "");
-});
-
-Deno.test("extractResultExcerpt — single line returns that line", () => {
-  assertEquals(
-    extractResultExcerpt("Implementation complete"),
-    "Implementation complete",
-  );
-});
-
-Deno.test("extractResultExcerpt — multi-line joins first 3 with separator", () => {
-  const result = extractResultExcerpt(
-    "Line one\nLine two\nLine three\nLine four",
-  );
-  assertEquals(result, "Line one | Line two | Line three");
-});
-
-Deno.test("extractResultExcerpt — filters blank lines", () => {
-  const result = extractResultExcerpt("\nLine one\n\nLine two\n");
-  assertEquals(result, "Line one | Line two");
-});
-
-Deno.test("extractResultExcerpt — filters whitespace-only lines", () => {
-  const result = extractResultExcerpt("   \nLine one\n\t\nLine two");
-  assertEquals(result, "Line one | Line two");
-});
-
-Deno.test("extractResultExcerpt — more than 3 non-empty lines takes first 3", () => {
-  const result = extractResultExcerpt("A\nB\nC\nD\nE");
-  assertEquals(result, "A | B | C");
-});
-
-Deno.test("extractResultExcerpt — truncates to 400 chars", () => {
-  const longLine = "X".repeat(500);
-  const result = extractResultExcerpt(longLine);
-  assertEquals(result.length, 400);
-  assertEquals(result, "X".repeat(400));
-});
-
-Deno.test("extractResultExcerpt — respects custom maxLines", () => {
-  const result = extractResultExcerpt("A\nB\nC\nD", 2);
-  assertEquals(result, "A | B");
-});
-
-Deno.test("extractResultExcerpt — respects custom maxChars", () => {
-  const result = extractResultExcerpt("Hello world", 3, 5);
-  assertEquals(result, "Hello");
-});
-
 // --- nodeResult tests (FR-30) ---
 
 Deno.test("nodeResult — emits result line in normal mode", () => {
@@ -235,12 +183,11 @@ Deno.test("nodeResult — emits result line in verbose mode", () => {
   assertEquals(joined.includes("turns=2"), true);
 });
 
-Deno.test("nodeResult — truncates excerpt to 400 chars", () => {
+Deno.test("nodeResult — skips empty and whitespace-only lines in result", () => {
   const cap = createCapture();
   const out = new OutputManager("normal", cap.writer);
-  const longLine = "A".repeat(500);
   out.nodeResult("developer", {
-    result: longLine,
+    result: "First\n\n   \nSecond",
     session_id: "s1",
     total_cost_usd: 0.01,
     duration_ms: 1000,
@@ -248,9 +195,10 @@ Deno.test("nodeResult — truncates excerpt to 400 chars", () => {
     num_turns: 1,
     is_error: false,
   });
-  const joined = cap.lines.join("");
-  assertEquals(joined.includes("A".repeat(400)), true);
-  assertEquals(joined.includes("A".repeat(401)), false);
+  assertEquals(cap.lines.some((l) => l === "  First\n"), true);
+  assertEquals(cap.lines.some((l) => l === "  Second\n"), true);
+  // No blank content lines emitted
+  assertEquals(cap.lines.filter((l) => l.trim() === "").length, 0);
 });
 
 Deno.test("nodeResult — includes multiple non-empty lines in excerpt", () => {
@@ -286,6 +234,29 @@ Deno.test("nodeResult — handles empty result string", () => {
   const joined = cap.lines.join("");
   assertEquals(joined.includes("RESULT:"), true);
   assertEquals(joined.includes("cost=$0.0000"), true);
+});
+
+Deno.test("nodeResult — multi-line format: header, indented content, footer", () => {
+  const cap = createCapture();
+  const out = new OutputManager("normal", cap.writer);
+  out.nodeResult("developer", {
+    result: "Line one\nLine two",
+    session_id: "s1",
+    total_cost_usd: 0.0050,
+    duration_ms: 3000,
+    duration_api_ms: 2800,
+    num_turns: 2,
+    is_error: false,
+  });
+  // Header line contains RESULT:
+  assertEquals(cap.lines.some((l) => l.includes("RESULT:")), true);
+  // Content lines are indented with 2 spaces
+  assertEquals(cap.lines.some((l) => l === "  Line one\n"), true);
+  assertEquals(cap.lines.some((l) => l === "  Line two\n"), true);
+  // Footer contains cost, duration, turns
+  assertEquals(cap.lines.some((l) => l.includes("cost=$0.0050")), true);
+  assertEquals(cap.lines.some((l) => l.includes("duration=3s")), true);
+  assertEquals(cap.lines.some((l) => l.includes("turns=2")), true);
 });
 
 // --- nodeOutput gating tests ---

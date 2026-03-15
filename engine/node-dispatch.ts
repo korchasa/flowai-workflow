@@ -11,7 +11,6 @@ import { runHuman } from "./human.ts";
 import type { UserInput } from "./human.ts";
 import { saveAgentLog } from "./log.ts";
 import { runLoop } from "./loop.ts";
-import { extractResultExcerpt } from "./output.ts";
 import type { OutputManager } from "./output.ts";
 import {
   getNodeDir,
@@ -196,9 +195,12 @@ export async function executeLoopNode(
         if (result.output) {
           eng.output.nodeResult(id, result.output);
           if (id in eng.state.nodes) {
-            eng.state.nodes[id].result = extractResultExcerpt(
-              result.output.result,
-            );
+            eng.state.nodes[id].result = (result.output.result ?? "")
+              .split("\n")
+              .filter((l) => l.trim())
+              .slice(0, 3)
+              .join(" | ")
+              .slice(0, 400);
           }
         }
       } else {
