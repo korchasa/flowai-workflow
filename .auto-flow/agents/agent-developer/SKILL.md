@@ -111,9 +111,19 @@ Example: `--body "**[Developer · implement]** I completed implementation of FR-
      (e.g., `engine/log.ts`) — NOT old run data.
 4. **Write code and tests:** Follow TDD (tests first), project code style.
 5. **Commit and push:** After all checks pass, stage and commit in ONE chained
-   Bash call. `.auto-flow/runs/` is gitignored — use `git add -f` for files there:
-   `git add -f <run-artifacts> && git add -A && git commit -m "..."`.
+   Bash call. `.auto-flow/runs/` is gitignored — use `git add -f` for files there.
+   **SCOPE-STRICT STAGING (MANDATORY):** Do NOT use `git add -A` or `git add .`.
+   Stage ONLY: (a) files listed in `04-decision.md` `tasks[].files`, (b) your
+   own memory file `.auto-flow/memory/agent-developer.md`, (c) run artifacts
+   via `git add -f`. If `deno fmt` fixed out-of-scope files (e.g., other agents'
+   memory files), do NOT stage them — let the owning agent handle formatting.
+   ```
+   git add -f <run-artifacts> && git add <task-files> .auto-flow/memory/agent-developer.md && git commit -m "..."
+   ```
    Then push: `git push origin HEAD`. One commit per run.
+   **Evidence:** Run 20260315T003418: `git add -A` staged 3 out-of-scope memory
+   files (agent-architect.md, agent-pm.md, agent-tech-lead.md) that `deno fmt`
+   auto-fixed. Result: scope-violating commit with files not in task breakdown.
    Commit format:
    ```
    sdlc(impl): <brief one-line summary>
