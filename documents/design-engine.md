@@ -215,6 +215,11 @@ graph TD
   - `mod.ts` — barrel re-export serving as `deno doc --lint` entry point
     (not a runtime public API; sole non-redundant consumer is
     `scripts/check.ts` JSDoc validation)
+- **Legacy Test Task Removal (FR-E29):** Verified complete. No `test:*` tasks
+  referencing `.sdlc/scripts/stage-*_test.ts` remain in `deno.json`. No "Stage
+  Scripts" section in SDS (§3.2 is Phase Registry). No `.sdlc/scripts/stage-*`
+  references in this document. Current valid test tasks: `test`, `test:lib`,
+  `test:engine`.
 - **Test Suite Integrity (FR-E27):** Every `engine/` test function must
   contain ≥1 explicit assertion. `lock_test.ts` "releaseLock — no error if
   lock file already removed" test: `assertEquals(result, undefined)` +
