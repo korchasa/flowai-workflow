@@ -661,6 +661,15 @@
   - [ ] At least one end-to-end pipeline run completes with agents reading/writing their own memory files.
   - [ ] `deno task check` passes after changes.
 
+### 3.29 FR-S29: AGENTS.md Agent List Accuracy
+
+- **Description:** `AGENTS.md` must accurately list the 7 active pipeline agents: PM, Architect, Tech Lead, Developer, QA, Tech Lead Review, Meta-Agent. Deprecated agents (Reviewer, SDS Update, Presenter) must not appear as active agents.
+- **Motivation:** Stale agent references in `AGENTS.md` mislead contributors about pipeline composition. Presenter was absorbed into Tech Lead and Tech Lead Review per FR-S15; formal requirement ensures accuracy is maintained across refactors.
+- **Acceptance criteria:**
+  - [ ] `AGENTS.md` Project Vision section lists exactly 7 agents: PM, Architect, Tech Lead, Developer, QA, Tech Lead Review, Meta-Agent.
+  - [ ] No deprecated agents (Presenter, Reviewer, SDS Update) appear as active pipeline agents in `AGENTS.md`.
+  - [ ] `deno task check` passes.
+
 ## 4. Non-functional requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution is not supported.
@@ -773,3 +782,4 @@ engine/                                # Deno/TypeScript pipeline engine
 | —      | FR-S26 | Pipeline Asset Directory Consolidation |
 | —      | FR-S27 | CLI Help for SDLC Utility Scripts |
 | —      | FR-S28 | Per-Agent Reflection Memory |
+| —      | FR-S29 | AGENTS.md Agent List Accuracy |
