@@ -401,6 +401,78 @@ export class FileReadTracker {
   }
 }
 
+/** Mutable state bag for processStreamEvent() — holds all stream-processing state. */
+export interface StreamProcessorState {
+  /** Count of assistant turns seen so far (increments on each assistant event). */
+  turnCount: number;
+  /** Extracted result event; populated when a "result" event is processed. */
+  resultEvent: ClaudeCliOutput | undefined;
+  /** Tracks per-path file read counts to detect repeated reads. */
+  tracker: FileReadTracker;
+  /** Open log file handle for writing formatted summaries (undefined = no log). */
+  logFile: Deno.FsFile | undefined;
+  /** Text encoder shared across writes. */
+  encoder: TextEncoder;
+  /** Callback for forwarding verbosity-filtered event summaries to terminal. */
+  onOutput?: (line: string) => void;
+  /** Verbosity level controls which event types reach terminal output. */
+  verbosity?: Verbosity;
+}
+
+/**
+ * Process a single stream-json event: update mutable state, write to log file,
+ * and forward filtered summaries to terminal. Extracted from executeClaudeProcess()
+ * to enable unit testing without spawning the Claude CLI.
+ */
+export async function processStreamEvent(
+  // deno-lint-ignore no-explicit-any
+  event: Record<string, any>,
+  state: StreamProcessorState,
+): Promise<void> {
+  if (event.type === "assistant") {
+    state.turnCount++;
+    if (state.logFile) {
+      await state.logFile.write(
+        state.encoder.encode(stampLines(`--- turn ${state.turnCount} ---`) + "\n"),
+      );
+    }
+    const contents = event.message?.content;
+    if (Array.isArray(contents)) {
+      for (const block of contents) {
+        if (block.type === "tool_use" && block.name === "Read") {
+          const warn = state.tracker.track(block.input?.file_path);
+          if (warn && state.logFile) {
+            await state.logFile.write(
+              state.encoder.encode(stampLines(warn) + "\n"),
+            );
+          }
+        }
+      }
+    }
+  }
+  if (event.type === "result") {
+    state.resultEvent = extractClaudeOutput(event);
+  }
+  const logSummary = formatEventForOutput(event);
+  if (state.logFile && logSummary) {
+    await state.logFile.write(
+      state.encoder.encode(stampLines(logSummary) + "\n"),
+    );
+  }
+  if (event.type === "result" && state.resultEvent && state.logFile) {
+    await state.logFile.write(
+      state.encoder.encode(stampLines("--- end ---") + "\n"),
+    );
+    await state.logFile.write(
+      state.encoder.encode(stampLines(formatFooter(state.resultEvent)) + "\n"),
+    );
+  }
+  if (state.onOutput) {
+    const termSummary = formatEventForOutput(event, state.verbosity);
+    if (termSummary) state.onOutput(termSummary);
+  }
+}
+
 /**
  * Execute the claude CLI process with stream-json output.
  * Processes NDJSON events in real-time: writes readable formatted summaries
@@ -452,12 +524,17 @@ async function executeClaudeProcess(
     }
 
     // Process stdout as stream-json NDJSON
-    let resultEvent: ClaudeCliOutput | undefined;
+    const state: StreamProcessorState = {
+      turnCount: 0,
+      resultEvent: undefined,
+      tracker: new FileReadTracker(),
+      logFile,
+      encoder: new TextEncoder(),
+      onOutput,
+      verbosity,
+    };
     const stdoutDecoder = new TextDecoder();
-    const encoder = new TextEncoder();
     let buffer = "";
-    let turnCount = 0;
-    const tracker = new FileReadTracker();
 
     const stdoutReader = process.stdout.getReader();
     const stdoutDone = (async () => {
@@ -470,55 +547,10 @@ async function executeClaudeProcess(
           buffer = lines.pop()!;
           for (const line of lines) {
             if (!line.trim()) continue;
-            // Parse and extract result event
             try {
               // deno-lint-ignore no-explicit-any
               const event = JSON.parse(line) as Record<string, any>;
-              if (event.type === "assistant" && logFile) {
-                turnCount++;
-                await logFile.write(
-                  encoder.encode(
-                    stampLines(`--- turn ${turnCount} ---`) + "\n",
-                  ),
-                );
-                // Track repeated file reads
-                const contents = event.message?.content;
-                if (Array.isArray(contents)) {
-                  for (const block of contents) {
-                    if (block.type === "tool_use" && block.name === "Read") {
-                      const warn = tracker.track(block.input?.file_path);
-                      if (warn) {
-                        await logFile.write(
-                          encoder.encode(stampLines(warn) + "\n"),
-                        );
-                      }
-                    }
-                  }
-                }
-              }
-              if (event.type === "result") {
-                resultEvent = extractClaudeOutput(event);
-              }
-              // Write full unfiltered summary to log file
-              const logSummary = formatEventForOutput(event);
-              if (logFile && logSummary) {
-                await logFile.write(
-                  encoder.encode(stampLines(logSummary) + "\n"),
-                );
-              }
-              if (event.type === "result" && resultEvent && logFile) {
-                await logFile.write(
-                  encoder.encode(stampLines("--- end ---") + "\n"),
-                );
-                await logFile.write(
-                  encoder.encode(stampLines(formatFooter(resultEvent)) + "\n"),
-                );
-              }
-              // Forward verbosity-filtered summary to terminal
-              if (onOutput) {
-                const termSummary = formatEventForOutput(event, verbosity);
-                if (termSummary) onOutput(termSummary);
-              }
+              await processStreamEvent(event, state);
             } catch {
               // Skip malformed JSON lines
             }
@@ -529,47 +561,7 @@ async function executeClaudeProcess(
           try {
             // deno-lint-ignore no-explicit-any
             const event = JSON.parse(buffer) as Record<string, any>;
-            if (event.type === "assistant" && logFile) {
-              turnCount++;
-              await logFile.write(
-                encoder.encode(stampLines(`--- turn ${turnCount} ---`) + "\n"),
-              );
-              // Track repeated file reads
-              const contents = event.message?.content;
-              if (Array.isArray(contents)) {
-                for (const block of contents) {
-                  if (block.type === "tool_use" && block.name === "Read") {
-                    const warn = tracker.track(block.input?.file_path);
-                    if (warn) {
-                      await logFile.write(
-                        encoder.encode(stampLines(warn) + "\n"),
-                      );
-                    }
-                  }
-                }
-              }
-            }
-            if (event.type === "result") {
-              resultEvent = extractClaudeOutput(event);
-            }
-            const logSummary = formatEventForOutput(event);
-            if (logFile && logSummary) {
-              await logFile.write(
-                encoder.encode(stampLines(logSummary) + "\n"),
-              );
-            }
-            if (event.type === "result" && resultEvent && logFile) {
-              await logFile.write(
-                encoder.encode(stampLines("--- end ---") + "\n"),
-              );
-              await logFile.write(
-                encoder.encode(stampLines(formatFooter(resultEvent)) + "\n"),
-              );
-            }
-            if (onOutput) {
-              const termSummary = formatEventForOutput(event, verbosity);
-              if (termSummary) onOutput(termSummary);
-            }
+            await processStreamEvent(event, state);
           } catch { /* skip */ }
         }
       } catch { /* stream closed */ }
@@ -609,8 +601,8 @@ async function executeClaudeProcess(
     };
     const stderr = new TextDecoder().decode(concat(stderrChunks)).trim();
 
-    if (resultEvent) {
-      return resultEvent;
+    if (state.resultEvent) {
+      return state.resultEvent;
     }
 
     if (!status.success) {
