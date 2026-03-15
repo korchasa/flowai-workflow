@@ -215,6 +215,11 @@ graph TD
   - `mod.ts` — barrel re-export serving as `deno doc --lint` entry point
     (not a runtime public API; sole non-redundant consumer is
     `scripts/check.ts` JSDoc validation)
+- **Test Suite Integrity (FR-E27):** Every `engine/` test function must
+  contain ≥1 explicit assertion. `lock_test.ts` "releaseLock — no error if
+  lock file already removed" test: `assertEquals(result, undefined)` +
+  `Deno.stat` file-absence verification (asserting `NotFound` error).
+  Pattern consistent with adjacent test at line 122-138.
 - **`scripts/check.ts` CLI help (FR-E23):** `printUsage()` static function
   outputs: description of checks performed, usage line, note about no accepted
   options, example. `--help`/`-h` in `Deno.args` → `printUsage()` +
