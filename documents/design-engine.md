@@ -133,6 +133,19 @@ graph TD
     `status=<ok|error> duration=<X>s cost=$<Y> turns=<N>`. Both separators and
     footer are log-file-only (terminal `onOutput` callback unchanged).
     `formatFooter()` is a pure function — unit-testable without CLI.
+    **Stream event processor extraction (FR-E30):** `processStreamEvent(event,
+    state): Promise<void>` — extracted helper consolidating duplicated event-
+    processing logic from main loop and buffer-remainder block in
+    `executeClaudeProcess()`. Receives parsed JSON event + mutable
+    `StreamProcessorState` bag (`turnCount`, `resultEvent`, `tracker:
+    FileReadTracker`, `logFile`, `encoder`, `onOutput?`, `verbosity?`).
+    Performs: turn counting + separator writing, file-read tracking (warns on
+    repeated reads), result event extraction, log file writes via `stampLines()`,
+    footer generation via `formatFooter()`, terminal output forwarding via
+    `onOutput` callback (with optional semi-verbose filtering). Both call sites
+    in `executeClaudeProcess()` reduce to: parse JSON → `await
+    processStreamEvent(parsed, state)`. Net ~40-line reduction. Pure-ish
+    function — unit-testable with synthetic events, no CLI spawn.
     **Repeated file read warning (FR-40):** `executeClaudeProcess()` maintains
     `readCounts: Map<string, number>` tracking per-path `Read` tool-use events.
     On each `assistant` event: iterates `message.content` blocks, detects

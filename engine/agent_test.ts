@@ -1,15 +1,18 @@
 import { assertEquals } from "@std/assert";
+import type { AgentRunOptions } from "./agent.ts";
+import { buildClaudeArgs } from "./claude-process.ts";
+import type { InvokeOptions } from "./claude-process.ts";
+import { OutputManager } from "./output.ts";
 import {
-  buildClaudeArgs,
   extractClaudeOutput,
   FileReadTracker,
   formatEventForOutput,
   formatFooter,
+  processStreamEvent,
   stampLines,
   tsPrefix,
-} from "./agent.ts";
-import type { AgentRunOptions, InvokeOptions } from "./agent.ts";
-import { OutputManager } from "./output.ts";
+} from "./stream.ts";
+import type { StreamProcessorState } from "./stream.ts";
 import type { NodeConfig, NodeSettings, TemplateContext } from "./types.ts";
 
 // Note: Full integration tests for runAgent require a real claude CLI.
@@ -927,6 +930,141 @@ Deno.test("FileReadTracker — integration: repeated reads written to log file",
       true,
       `warning missing timestamp: ${lines[0]}`,
     );
+  } finally {
+    await Deno.remove(tmpPath);
+  }
+});
+
+// --- processStreamEvent unit tests ---
+
+function makeStreamState(
+  overrides?: Partial<StreamProcessorState>,
+): StreamProcessorState {
+  return {
+    turnCount: 0,
+    resultEvent: undefined,
+    tracker: new FileReadTracker(),
+    logFile: undefined,
+    encoder: new TextEncoder(),
+    onOutput: undefined,
+    verbosity: undefined,
+    ...overrides,
+  };
+}
+
+Deno.test("processStreamEvent — turn counting increments on assistant events", async () => {
+  const state = makeStreamState();
+  await processStreamEvent(
+    { type: "assistant", message: { content: [{ type: "text", text: "hi" }] } },
+    state,
+  );
+  assertEquals(state.turnCount, 1);
+  await processStreamEvent(
+    { type: "assistant", message: { content: [{ type: "text", text: "hi" }] } },
+    state,
+  );
+  assertEquals(state.turnCount, 2);
+  // non-assistant event does not increment
+  await processStreamEvent(
+    { type: "system", subtype: "init", model: "x" },
+    state,
+  );
+  assertEquals(state.turnCount, 2);
+});
+
+Deno.test("processStreamEvent — FileReadTracker warning written to log on repeated Read tool_use", async () => {
+  const tmpPath = await Deno.makeTempFile({ suffix: ".jsonl" });
+  try {
+    const logFile = await Deno.open(tmpPath, {
+      write: true,
+      create: true,
+      append: true,
+    });
+    const state = makeStreamState({ logFile });
+    const readEvent = (path: string) => ({
+      type: "assistant",
+      message: {
+        content: [{
+          type: "tool_use",
+          name: "Read",
+          input: { file_path: path },
+        }],
+      },
+    });
+    // 3 reads of same path → warning on 3rd
+    await processStreamEvent(readEvent("/x.ts"), state);
+    await processStreamEvent(readEvent("/x.ts"), state);
+    await processStreamEvent(readEvent("/x.ts"), state); // 3rd: triggers warning
+    logFile.close();
+    const content = await Deno.readTextFile(tmpPath);
+    const warnLines = content.split("\n").filter((l) =>
+      l.includes("[WARN] repeated file read: /x.ts")
+    );
+    assertEquals(warnLines.length, 1, "expected exactly 1 warning line");
+  } finally {
+    await Deno.remove(tmpPath);
+  }
+});
+
+Deno.test("processStreamEvent — result event populates state.resultEvent", async () => {
+  const state = makeStreamState();
+  assertEquals(state.resultEvent, undefined);
+  await processStreamEvent(
+    {
+      type: "result",
+      subtype: "success",
+      result: "done",
+      session_id: "s1",
+      is_error: false,
+      total_cost_usd: 0.01,
+      duration_ms: 1000,
+      duration_api_ms: 800,
+      num_turns: 2,
+    },
+    state,
+  );
+  assertEquals(state.resultEvent !== undefined, true);
+  assertEquals(state.resultEvent!.result, "done");
+  assertEquals(state.resultEvent!.num_turns, 2);
+});
+
+Deno.test("processStreamEvent — footer written to log after result event", async () => {
+  const tmpPath = await Deno.makeTempFile({ suffix: ".jsonl" });
+  try {
+    const logFile = await Deno.open(tmpPath, {
+      write: true,
+      create: true,
+      append: true,
+    });
+    const state = makeStreamState({ logFile });
+    await processStreamEvent(
+      {
+        type: "result",
+        subtype: "success",
+        result: "done",
+        session_id: "s1",
+        is_error: false,
+        total_cost_usd: 0.0123,
+        duration_ms: 5000,
+        duration_api_ms: 4000,
+        num_turns: 3,
+      },
+      state,
+    );
+    logFile.close();
+    const content = await Deno.readTextFile(tmpPath);
+    assertEquals(
+      content.includes("--- end ---"),
+      true,
+      "expected --- end --- marker",
+    );
+    assertEquals(content.includes("status=ok"), true, "expected footer status");
+    assertEquals(
+      content.includes("duration=5.0s"),
+      true,
+      "expected footer duration",
+    );
+    assertEquals(content.includes("turns=3"), true, "expected footer turns");
   } finally {
     await Deno.remove(tmpPath);
   }
