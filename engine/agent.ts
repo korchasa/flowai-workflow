@@ -433,7 +433,9 @@ export async function processStreamEvent(
     state.turnCount++;
     if (state.logFile) {
       await state.logFile.write(
-        state.encoder.encode(stampLines(`--- turn ${state.turnCount} ---`) + "\n"),
+        state.encoder.encode(
+          stampLines(`--- turn ${state.turnCount} ---`) + "\n",
+        ),
       );
     }
     const contents = event.message?.content;

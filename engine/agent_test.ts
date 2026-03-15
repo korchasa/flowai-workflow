@@ -967,7 +967,10 @@ Deno.test("processStreamEvent — turn counting increments on assistant events",
   );
   assertEquals(state.turnCount, 2);
   // non-assistant event does not increment
-  await processStreamEvent({ type: "system", subtype: "init", model: "x" }, state);
+  await processStreamEvent(
+    { type: "system", subtype: "init", model: "x" },
+    state,
+  );
   assertEquals(state.turnCount, 2);
 });
 
@@ -983,7 +986,11 @@ Deno.test("processStreamEvent — FileReadTracker warning written to log on repe
     const readEvent = (path: string) => ({
       type: "assistant",
       message: {
-        content: [{ type: "tool_use", name: "Read", input: { file_path: path } }],
+        content: [{
+          type: "tool_use",
+          name: "Read",
+          input: { file_path: path },
+        }],
       },
     });
     // 3 reads of same path → warning on 3rd
@@ -1048,9 +1055,17 @@ Deno.test("processStreamEvent — footer written to log after result event", asy
     );
     logFile.close();
     const content = await Deno.readTextFile(tmpPath);
-    assertEquals(content.includes("--- end ---"), true, "expected --- end --- marker");
+    assertEquals(
+      content.includes("--- end ---"),
+      true,
+      "expected --- end --- marker",
+    );
     assertEquals(content.includes("status=ok"), true, "expected footer status");
-    assertEquals(content.includes("duration=5.0s"), true, "expected footer duration");
+    assertEquals(
+      content.includes("duration=5.0s"),
+      true,
+      "expected footer duration",
+    );
     assertEquals(content.includes("turns=3"), true, "expected footer turns");
   } finally {
     await Deno.remove(tmpPath);
