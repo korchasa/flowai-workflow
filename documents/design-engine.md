@@ -188,15 +188,13 @@ graph TD
     `dryRunPlan(levels, labels, postPipelineNodeIds?, runOnMap?)`: renders
     regular DAG levels, then optional "Post-pipeline" section listing `run_on`
     nodes with their conditions (FR-28).
-    `extractResultExcerpt(text: string, maxLines?: number, maxChars?: number): string`
-    (FR-E15): pure function — filters empty lines, takes first N non-empty
-    (default 3), joins with ` | ` separator, truncates to maxChars (default
-    400). Used by `nodeResult()` and `engine.ts` for state persistence.
-    `nodeResult(nodeId, output: ClaudeCliOutput)`: one-line agent result
-    summary (FR-E15). Guarded by `verbosity !== "quiet"`. Format:
-    `[HH:MM:SS] <nodeId padded>  RESULT: <excerpt ≤400 chars> | cost=$X.XXXX | duration=Xs | turns=N`.
-    Uses `extractResultExcerpt()` for multi-line extraction (replaces
-    first-line-only `split("\n")[0].slice(0, 120)` truncation).
+    `nodeResult(nodeId, output: ClaudeCliOutput)`: multi-line agent result
+    display (FR-E15). Guarded by `verbosity !== "quiet"`. Format:
+    line 1: `[HH:MM:SS] <nodeId padded>  RESULT:` (header),
+    lines 2..N: each non-empty line of `output.result` indented 2 spaces,
+    last line: `  cost=$X.XXXX | duration=Xs | turns=N` (footer).
+    `extractResultExcerpt()` removed — excerpt logic inlined at state-
+    persistence call sites in `engine.ts` and `node-dispatch.ts`.
     `RunSummary.nodeResults?: Record<string, string>` (FR-E22): optional
     per-node result excerpts. `summary()` renders per-node result lines after
     "Nodes:" when `nodeResults` present: `  <nodeId padded>  <excerpt>`.
@@ -425,8 +423,9 @@ graph TD
     prevent disconnected graph with arbitrary order).
   - NodeState: `{ ..., cost_usd?: number, result?: string }` — per-node cost
     from `ClaudeCliOutput.total_cost_usd` and result excerpt (≤400 chars) from
-    `extractResultExcerpt()`, both set at completion via
-    `markNodeCompleted()` optional params (FR-32, FR-E22)
+    inline excerpt logic (filter empty → take 3 → join ` | ` → truncate 400),
+    both set at completion via `markNodeCompleted()` optional params (FR-32,
+    FR-E22)
   - RunState: `{ ..., total_cost_usd?: number }` — sum of all
     `nodes[*].cost_usd`, recomputed by `updateRunCost()` on each node
     completion (FR-32)
@@ -483,16 +482,15 @@ graph TD
     break loop execution. `runDir` resolved via `getRunDir(this.state.run_id)`
     (already in engine scope).
   - **Node Result Summary** (FR-E15, FR-E22): After agent node completion,
-    engine displays one-line result summary via `OutputManager.nodeResult()`.
-    `nodeResult()` uses `extractResultExcerpt()` for multi-line extraction
-    (≤3 non-empty lines, ≤400 chars, collapsed via ` | ` separator).
-    Two call sites: (1) `executeNode()` — after `markNodeCompleted()`, for
-    top-level agent nodes; `executeAgentNode()` returns `AgentResult | null`
-    (was `boolean`), `executeNode()` extracts `.output` field. Passes
-    `extractResultExcerpt(result.output.result)` to `markNodeCompleted()`
-    for state persistence.
-    (2) `executeLoopNode()` `onNodeComplete` callback — calls `nodeResult()`
-    when `result.output` exists; passes excerpt to `markNodeCompleted()`.
+    engine displays multi-line result via `OutputManager.nodeResult()`.
+    `nodeResult()` renders: RESULT header on its own line, each non-empty
+    result line indented 2 spaces (preserving original line breaks), footer
+    line with cost/duration/turns. `extractResultExcerpt()` removed from
+    `output.ts`. Excerpt logic for state persistence inlined at 2 call sites:
+    (1) `executeNode()` in `engine.ts` — inline lambda computes compact
+    excerpt (filter empty → take 3 → join ` | ` → truncate 400) passed to
+    `markNodeCompleted()`. (2) `executeLoopNode()` `onNodeComplete` callback
+    in `node-dispatch.ts` — same inline lambda.
     Suppressed in quiet mode. Shown in default and verbose modes.
     `printSummary()` builds `nodeResults` from persisted `state.nodes[*].result`
     and passes to `summary()` for per-node result lines in final summary block.
