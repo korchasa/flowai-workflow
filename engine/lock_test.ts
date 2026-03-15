@@ -142,7 +142,15 @@ Deno.test("releaseLock — no error if lock file already removed", async () => {
   const lockPath = `${tmpDir}/.lock`;
 
   // Should not throw even if file doesn't exist
-  await releaseLock(lockPath);
+  assertEquals(await releaseLock(lockPath), undefined);
+
+  let exists = true;
+  try {
+    await Deno.stat(lockPath);
+  } catch {
+    exists = false;
+  }
+  assertEquals(exists, false);
 
   await Deno.remove(tmpDir, { recursive: true });
 });

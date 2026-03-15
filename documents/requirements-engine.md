@@ -597,6 +597,14 @@
   - [x] Empty `.auto-flow/runs/*/implementation` directories are not git-tracked; `.gitignore` covers `runs/` directory.
   - [x] All existing engine tests pass after changes. Evidence: `deno task check` PASS
 
+### 3.27 FR-E27: Test Suite Integrity
+
+- **Description:** Every test function in `engine/` test files must contain ≥1 explicit assertion. Tests with no assertions pass trivially, provide zero coverage value, and mask implementation errors.
+- **Motivation:** `engine/lock_test.ts:143` — test "releaseLock - no error if lock file already removed" contained no assertions, silently passing while verifying nothing.
+- **Acceptance criteria:**
+  - [ ] Test "releaseLock - no error if lock file already removed" in `engine/lock_test.ts` includes `assertEquals(await releaseLock(lockPath), undefined)`. Evidence: `engine/lock_test.ts:143`
+  - [ ] All engine tests pass after change. Evidence: `deno task check` PASS
+
 ## 4. Non-Functional Requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution is not supported.
@@ -649,3 +657,4 @@
 | —      | FR-E24 | Pre-Run Script (`pre_run`) |
 | —      | FR-E25 | Graceful Shutdown (Signal Handling) |
 | —      | FR-E26 | Engine Codebase Housekeeping |
+| —      | FR-E27 | Test Suite Integrity |
