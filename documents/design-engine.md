@@ -212,7 +212,9 @@ graph TD
     node; passes to `runAgent()`. For loop nodes: passes path pattern to
     loop executor for iteration-qualified derivation
   - `cli.ts` — CLI entry point: argument parsing, .env loading
-  - `mod.ts` — public API re-exports
+  - `mod.ts` — barrel re-export serving as `deno doc --lint` entry point
+    (not a runtime public API; sole non-redundant consumer is
+    `scripts/check.ts` JSDoc validation)
 - **`scripts/check.ts` CLI help (FR-E23):** `printUsage()` static function
   outputs: description of checks performed, usage line, note about no accepted
   options, example. `--help`/`-h` in `Deno.args` → `printUsage()` +
