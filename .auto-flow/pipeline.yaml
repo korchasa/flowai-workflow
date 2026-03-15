@@ -5,6 +5,7 @@
 
 name: "auto-flow-sdlc"
 version: "1"
+pre_run: ".auto-flow/scripts/reset-to-main.sh"
 
 defaults:
   max_parallel: 2
@@ -38,7 +39,7 @@ nodes:
     prompt: ".auto-flow/agents/agent-pm/SKILL.md"
     task_template: |
       Read your reflection memory at .auto-flow/memory/agent-pm.md before starting. Update it when done.
-      Select a GitHub issue to implement. Prefer issues labeled "in-progress"; fall back to any open issue.
+      Triage open GitHub issues: check health (no merged PRs, no needs-triage label), select best candidate by priority.
       Output:
         - {{node_dir}}/01-spec.md (YAML frontmatter with `issue: <N>` and `scope: <engine|sdlc|engine+sdlc>`,
           then problem, affected requirements, SRS changes, scope boundaries)
