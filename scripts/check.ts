@@ -132,7 +132,7 @@ async function pipelineIntegrity(): Promise<void> {
 /**
  * Validates AGENTS.md content for agent list accuracy.
  *
- * Checks that the Project Vision section lists all 7 active pipeline agents
+ * Checks that the Project Vision section lists all 6 active pipeline agents
  * and that no deprecated agent names appear anywhere in the document.
  * Returns an array of error messages; empty array means validation passed.
  */
@@ -144,9 +144,13 @@ export function validateAgentListContent(content: string): string[] {
     "Developer",
     "QA",
     "Tech Lead Review",
+  ];
+  const deprecatedAgents = [
+    "Presenter",
+    "Reviewer",
+    "SDS Update",
     "Meta-Agent",
   ];
-  const deprecatedAgents = ["Presenter", "Reviewer", "SDS Update"];
   const errors: string[] = [];
 
   const visionMatch = content.match(
@@ -186,7 +190,7 @@ async function agentListAccuracy(): Promise<void> {
     console.error("FAILED: AGENTS.md agent list is inaccurate");
     Deno.exit(1);
   }
-  console.log("  AGENTS.md agent list valid (7 active agents, no deprecated).");
+  console.log("  AGENTS.md agent list valid (6 active agents, no deprecated).");
 }
 
 export function printUsage(): string {
