@@ -88,7 +88,10 @@ graph LR
   Claude Code `/agent-<name>` slash commands through symlinks).
 - **Directory structure:** `.auto-flow/agents/agent-<name>/SKILL.md` — 7 agents:
   - `agent-pm` — triages open GitHub issues, selects highest-priority, produces
-    spec.
+    spec. **Issue Author Filter (FR-S31):** PM filters candidates by author at
+    two points: (1) `gh issue list --author korchasa` in STEP 2a (triage path),
+    (2) `gh issue view --json author` + fail-fast guard in STEP 2c (resume/
+    direct-branch path). Hardcoded `korchasa`; configurability deferred.
   - `agent-architect` — design-solution role: produces implementation plan with
     2-3 variants, affected files, effort estimates, risk analysis.
   - `agent-tech-lead` — critique + decision + SDS update + branch creation
@@ -232,6 +235,10 @@ graph LR
 
 - **Purpose:** Single entry point for pipeline. PM agent autonomously triages
   open GitHub issues.
+- **Author constraint (FR-S31):** Only issues authored by `korchasa` are valid
+  pipeline inputs. Enforced in PM agent prompt (§3.4), not engine-level.
+  Two enforcement points: `gh issue list --author` (triage) and
+  `gh issue view --json author` (resume guard).
 - **Interfaces:** CLI: `deno task run [--prompt "..."]`. PM selects
   highest-priority open issue via `gh`.
 - **Deps:** Devcontainer, Claude CLI auth (OAuth or API key), `GITHUB_TOKEN`.
