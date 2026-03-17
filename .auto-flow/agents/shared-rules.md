@@ -27,6 +27,15 @@ take precedence on conflict.
 - **Parallel reads:** Issue ALL Read calls in ONE response when possible.
   Reading files one-per-turn wastes turns.
 
+## Tool Call Efficiency
+
+- **Parallel tool calls:** When multiple independent tool calls are needed,
+  issue ALL of them in a SINGLE response. Do not serialize independent calls
+  across turns.
+- **Context compression:** The system auto-compresses prior messages near
+  context limits. Write down important facts from tool results in your text
+  response — original tool results may be cleared later.
+
 ## Scope-Aware Doc Reads
 
 Read `scope` from spec frontmatter (`01-spec.md`). Read ONLY scope-relevant
@@ -61,8 +70,13 @@ directory. Without `-f`, git add silently skips them.
 ## Bash
 
 Use Bash ONLY for commands in your agent-specific whitelist (defined in
-SKILL.md). Prefer Read/Grep tools over bash grep/sed/awk. Do NOT re-search
-files already in context via Bash.
+SKILL.md). Prefer dedicated tools over Bash equivalents:
+- **Read** (not cat/head/tail) for file contents
+- **Grep** (not grep/rg) for content search
+- **Glob** (not find/ls) for file search
+- **Edit** (not sed/awk) for file edits
+- **Write** (not echo redirection) for file creation
+Do NOT re-search files already in context via Bash.
 
 ## Reflection Memory
 
