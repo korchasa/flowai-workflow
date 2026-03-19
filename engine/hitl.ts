@@ -5,6 +5,7 @@ import type {
   NodeSettings,
   TemplateContext,
 } from "./types.ts";
+import { interpolate } from "./template.ts";
 import type { AgentResult } from "./agent.ts";
 import type { InvokeOptions } from "./claude-process.ts";
 import type { OutputManager } from "./output.ts";
@@ -148,6 +149,7 @@ export async function runHitlLoop(
       runId,
       nodeId,
       config,
+      opts.ctx,
       question,
     );
 
@@ -185,6 +187,7 @@ export async function runHitlLoop(
       runId,
       nodeId,
       config,
+      opts.ctx,
     );
 
     const checkResult = await runner(config.check_script, checkArgs);
@@ -251,13 +254,14 @@ function buildScriptArgs(
   runId: string,
   nodeId: string,
   config: HitlConfig,
+  ctx: TemplateContext,
   question?: HitlQuestion,
 ): string[] {
   const args = [
     "--run-dir",
     runDir,
     "--artifact-source",
-    config.artifact_source ?? "",
+    interpolate(config.artifact_source ?? "", ctx),
     "--run-id",
     runId,
     "--node-id",

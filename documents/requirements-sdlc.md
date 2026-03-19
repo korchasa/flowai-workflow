@@ -785,6 +785,39 @@
   - [x] `deno task check` passes. Evidence: PASS (509 tests, run
     `20260319T194808`).
 
+### 3.35 FR-S35: HITL Artifact Source Node Reference
+
+- **Description:** `defaults.hitl.artifact_source` in `pipeline.yaml` MUST
+  reference the upstream node via `{{input.<node-id>}}/…` template syntax
+  instead of a hardcoded relative path. Engine interpolates the template at
+  runtime in `buildScriptArgs()`. SDLC-level validator emits a parse-time error
+  if a hardcoded path (no `{{input.`) is detected. HITL polling behavior and
+  timing remain unchanged.
+- **Extends:** FR-S24 (Pipeline Config Validation) — concrete application of
+  config validation for `hitl.artifact_source`.
+- **Acceptance criteria:**
+  - [x] `pipeline.yaml` `defaults.hitl.artifact_source` uses
+    `{{input.specification}}/01-spec.md` template syntax. Evidence:
+    `.auto-flow/pipeline.yaml:23`.
+  - [x] `interpolate()` applied to `artifact_source` in
+    `engine/hitl.ts:buildScriptArgs()` before passing value to scripts; ctx
+    threaded through `HitlRunOptions`. Evidence: `engine/hitl.ts:257,264`.
+  - [x] `validateHitlArtifactSource(config)` exported pure function: returns
+    error message for hardcoded path (no `{{`), empty array for template or
+    absent field. Evidence: `scripts/check.ts:110–118`.
+  - [x] `hitlArtifactSource()` validation function in `scripts/check.ts` reads
+    pipeline config, calls `validateHitlArtifactSource()`, emits error and
+    exits 1 on hardcoded path. Evidence: `scripts/check.ts:120–146`.
+  - [x] Test `runHitlLoop — artifact_source template resolved via ctx` in
+    `engine/hitl_test.ts` verifies `{{input.specification}}/01-spec.md` →
+    `/runs/abc/specification/01-spec.md`. Evidence:
+    `engine/hitl_test.ts:232–277`.
+  - [x] Tests in `scripts/check_test.ts` cover: valid template path (pass),
+    hardcoded path (fail), absent field (skip/pass), empty string (skip/pass).
+    Evidence: `scripts/check_test.ts:109–130`.
+  - [x] `deno task check` passes. Evidence: PASS (519 tests, run
+    `20260319T204544`).
+
 ## 4. Non-functional requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution is not supported.
@@ -902,3 +935,4 @@ engine/                                # Deno/TypeScript pipeline engine
 | —      | FR-S32 | SDLC Artifact File Numbering Standard |
 | —      | FR-S33 | Remove Stale Agent Symlinks from .claude/skills/ |
 | —      | FR-S34 | Dashboard Diagnostic Enhancements |
+| —      | FR-S35 | HITL Artifact Source Node Reference |

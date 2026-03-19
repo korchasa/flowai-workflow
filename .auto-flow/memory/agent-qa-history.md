@@ -104,6 +104,17 @@
   - State test at line 408 retains "falls back" name semantically (implies old dual-mechanism), but body is correct — non-blocking.
   - 514 tests (up from 509) confirms new config_test.ts + state_test.ts tests added.
 
+## 2026-03-19T27:XX — Issue #151 (iteration 1)
+
+- **Turns:** ~5
+- **Cost:** ~$0.14 (est)
+- **Verdict:** FAIL
+- **Outcome:** 7/9 acceptance criteria passed. 519 tests, 0 failures. All 5 implementation tasks correct: pipeline.yaml uses `{{input.specification}}/01-spec.md` (line 23), `interpolate()` in `hitl.ts:buildScriptArgs()` (line 264), template resolution test in `hitl_test.ts` (lines 232–277), `validateHitlArtifactSource()` + `hitlArtifactSource()` in `check.ts` (lines 110–146), 4 tests in `check_test.ts` (lines 109–130). Blocking: `documents/requirements-sdlc.md` not in diff, 0 matches for FR-S35 — PM agent never added section 3.35 or Appendix C row. Self-approval failed → used `gh issue comment` fallback on issue #151.
+- **Key learnings:**
+  - PM-stage SRS persistence failure confirmed again (6th consecutive issue: #147, #148, #149, #150, #151). Grep for FR number as 1st action after git diff — pattern is 100% reliable now.
+  - 519 tests (up from 514) confirms new hitl_test + check_test tests were added.
+  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S35) in one turn gives full picture immediately.
+
 ## 2026-03-19T26:XX — Issue #150 (iteration 2)
 
 - **Turns:** ~6
@@ -115,3 +126,14 @@
   - When SRS file IS in diff and grep confirms FR presence at all promised locations, proceed directly to source file read — no further SRS investigation needed.
   - Pipeline.yaml fix (removing dual-mechanism usage) is always expected when engine adds a new validation rule that rejects it.
   - 10 ACs across SRS + config implementation + state implementation + tests is the correct decomposition for this class of issue.
+
+## 2026-03-19T28:XX — Issue #151 (iteration 2)
+
+- **Turns:** ~6
+- **Cost:** ~$0.16 (est)
+- **Verdict:** PASS
+- **Outcome:** All 9 acceptance criteria passed. 519 tests, 0 failures. FR-S35 present at line 788 (section 3.35) and Appendix C at line 938. Implementation: pipeline.yaml `{{input.specification}}/01-spec.md` (line 23), `interpolate()` in `hitl.ts:buildScriptArgs()` (line 264), `validateHitlArtifactSource()` + `hitlArtifactSource()` in `check.ts` (lines 110–146), tests in `hitl_test.ts` + `check_test.ts`. Self-approval failed → used `gh issue comment` fallback on issue #151.
+- **Key learnings:**
+  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S35) confirmed PASS in one parallel turn — blocking issue from iter 1 resolved.
+  - When SRS file IS in diff and grep confirms FR at all promised locations, source file reads confirm the rest — optimal pattern for fix iterations.
+  - 6 consecutive PM-stage SRS persistence failures (#147–151); the grep-first strategy is now the mandatory first verification step.

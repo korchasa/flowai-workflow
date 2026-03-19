@@ -1,5 +1,10 @@
 import { assertEquals } from "@std/assert";
-import { checkArgs, printUsage, validateAgentListContent } from "./check.ts";
+import {
+  checkArgs,
+  printUsage,
+  validateAgentListContent,
+  validateHitlArtifactSource,
+} from "./check.ts";
 
 // --- printUsage ---
 
@@ -96,5 +101,30 @@ Deno.test("validateAgentListContent — missing Project Vision section fails", (
 Deno.test("validateAgentListContent — real AGENTS.md passes", async () => {
   const content = await Deno.readTextFile("AGENTS.md");
   const errors = validateAgentListContent(content);
+  assertEquals(errors, []);
+});
+
+// --- validateHitlArtifactSource ---
+
+Deno.test("validateHitlArtifactSource — valid template path passes", () => {
+  const errors = validateHitlArtifactSource(
+    "{{input.specification}}/01-spec.md",
+  );
+  assertEquals(errors, []);
+});
+
+Deno.test("validateHitlArtifactSource — hardcoded path fails", () => {
+  const errors = validateHitlArtifactSource("plan/specification/01-spec.md");
+  assertEquals(errors.length > 0, true);
+  assertEquals(errors.some((e: string) => e.includes("artifact_source")), true);
+});
+
+Deno.test("validateHitlArtifactSource — absent field skips (passes)", () => {
+  const errors = validateHitlArtifactSource(undefined);
+  assertEquals(errors, []);
+});
+
+Deno.test("validateHitlArtifactSource — empty string skips (passes)", () => {
+  const errors = validateHitlArtifactSource("");
   assertEquals(errors, []);
 });

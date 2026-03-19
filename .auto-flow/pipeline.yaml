@@ -20,7 +20,7 @@ defaults:
   hitl:
     ask_script: .auto-flow/scripts/hitl-ask.sh
     check_script: .auto-flow/scripts/hitl-check.sh
-    artifact_source: plan/specification/01-spec.md
+    artifact_source: "{{input.specification}}/01-spec.md"
     poll_interval: 60
     timeout: 7200
     exclude_login: "github-actions[bot]"

@@ -102,6 +102,50 @@ async function pipelineIntegrity(): Promise<void> {
 }
 
 /**
+ * Validates that defaults.hitl.artifact_source uses template syntax.
+ *
+ * Returns error messages if a hardcoded path is detected (no `{{` present).
+ * Returns empty array when the field is absent, empty, or contains a template.
+ */
+export function validateHitlArtifactSource(
+  artifactSource: string | undefined,
+): string[] {
+  if (!artifactSource) return [];
+  if (artifactSource.includes("{{")) return [];
+  return [
+    `pipeline.yaml: defaults.hitl.artifact_source "${artifactSource}" is a hardcoded path; use template syntax (e.g. {{input.<node>}}/...)`,
+  ];
+}
+
+async function hitlArtifactSource(): Promise<void> {
+  console.log("\n--- HITL Artifact Source Validation ---");
+  const pipelinePath = ".auto-flow/pipeline.yaml";
+  const { loadConfig } = await import("../engine/config.ts");
+  let config;
+  try {
+    config = await loadConfig(pipelinePath);
+  } catch (err) {
+    // loadConfig errors are already reported by pipelineIntegrity(); skip here
+    console.log(
+      `  Skipped (pipeline config invalid): ${(err as Error).message}`,
+    );
+    return;
+  }
+  const artifactSource = config.defaults?.hitl?.artifact_source;
+  const errors = validateHitlArtifactSource(artifactSource);
+  if (errors.length > 0) {
+    for (const err of errors) {
+      console.error(`  ${err}`);
+    }
+    console.error(
+      "FAILED: HITL artifact_source must use template syntax ({{input.<node>}})",
+    );
+    Deno.exit(1);
+  }
+  console.log("  HITL artifact_source uses template syntax.");
+}
+
+/**
  * Validates AGENTS.md content for agent list accuracy.
  *
  * Checks that the Project Vision section lists all 6 active pipeline agents
@@ -181,6 +225,7 @@ Checks performed:
   - Doc lint: JSDoc, private-type-ref, circular deps (deno doc --lint)
   - Pipeline integrity check
   - AGENTS.md agent list accuracy
+  - HITL artifact_source template validation
   - Comment marker scan (TODO/FIXME/HACK/XXX)
 
 No options accepted.
@@ -261,6 +306,7 @@ if (import.meta.main) {
   );
 
   await pipelineIntegrity();
+  await hitlArtifactSource();
   await agentListAccuracy();
   await commentScan();
 
