@@ -61,6 +61,7 @@ type: feedback
 - Run 20260319T180115: ~9 turns, scope engine, issue #146 (FR-E33), 5 files changed — PASS (pre-existing fmt in committed tech-lead-history.md needed direct Write fix; stash not applicable for committed files)
 - Run 20260319T182156 iter1: ~15 turns, scope sdlc, issue #147 (FR-S32), 9 files changed — PASS (pure rename; SDS already updated by tech-lead; deno fmt table alignment painful for wide markdown columns — binary-search col widths)
 - Run 20260319T182156 iter2: ~5 turns, scope sdlc, issue #147 (FR-S32) QA fix — PASS (PM's FR-S32 SRS addition dropped in iter 1; added section 3.32 + Appendix C row)
+- Run 20260319T192055: ~5 turns, scope sdlc, issue #148 (FR-S33), 7 files changed — PASS (delete-only + block removal; SDS already correct from tech-lead)
 - Target: ≤35 turns. Key lesson: commit before deno task check; stash pattern for pre-existing fmt issues.
 
 ## QA-Fix Pattern
