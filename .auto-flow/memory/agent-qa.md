@@ -56,3 +56,5 @@ type: feedback
 - Seventeenth session (issue #154, iteration 2): ~5 turns, PASS verdict (FR-S36 present at line 821 + Appendix C line 968; wrapper script + pipeline.yaml correct; 528 tests)
 - Eighteenth session (issue #155, iteration 1): ~5 turns, FAIL verdict (FR-E36 absent from requirements-engine.md; FR-S37 absent from requirements-sdlc.md; both SRS files not in diff; PM agent never persisted either)
 - Nineteenth session (issue #155, iteration 2): ~5 turns, PASS verdict (FR-E36 at line 756 + Appendix 854; FR-S37 at line 850 + Appendix 983; both SRS files in diff; 533 tests, 10/10 ACs)
+- Twentieth session (issue #156, iteration 1): ~5 turns, FAIL verdict (FR-S38 absent from requirements-sdlc.md; not in diff; 0 grep matches; PM-stage persistence failure, 10th consecutive)
+- Twenty-first session (issue #156, iteration 2): ~5 turns, PASS verdict (FR-S38 at line 864 §3.38 + Appendix C line 1001; requirements-sdlc.md in diff; pipeline.yaml all 6 nodes migrated; 533 tests, 4/4 ACs)

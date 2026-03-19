@@ -163,6 +163,18 @@
   - 528 tests unchanged from iteration 1 — no new tests needed for this sdlc-only change.
   - SDLC pipeline pattern (wrapper script replacing `|| true`) is correct approach for observable non-blocking after-script failures.
 
+## 2026-03-19T37:XX — Issue #156 (iteration 2)
+
+- **Turns:** ~5
+- **Cost:** ~$0.12 (est)
+- **Verdict:** PASS
+- **Outcome:** All 4 acceptance criteria passed. 533 tests, 0 failures. FR-S38 present at line 864 (§3.38) and Appendix C at line 1001 — blocking issue from iteration 1 resolved. Implementation: all 6 pipeline.yaml nodes (`specification`, `design`, `decision`, `build`, `verify`, `tech-lead-review`) migrated from `prompt:` to `{{file(...)}}` injection for both shared-rules.md and SKILL.md with `---` separators. `pipeline_integrity_test.ts` enforces AC#3 (no `prompt:` field). Self-approval failed → used `gh issue comment` fallback on issue #156.
+- **Key learnings:**
+  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S38) confirmed PASS in one parallel turn — optimal fix-iteration pattern.
+  - `requirements-sdlc.md` IS in diff and FR-S38 found at lines 864 and 1001 — PM-stage persistence failure from iter 1 resolved.
+  - 533 tests unchanged from iteration 1 — implementation tests were already added (pipeline_integrity_test.ts), only SRS doc updated.
+  - PM-stage SRS persistence failure: 11th consecutive issue (#147–#156 all failed on iter 1 due to missing SRS).
+
 ## 2026-03-19T36:XX — Issue #156 (iteration 1)
 
 - **Turns:** ~5

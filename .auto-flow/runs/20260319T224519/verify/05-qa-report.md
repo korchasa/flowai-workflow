@@ -1,5 +1,5 @@
 ---
-verdict: FAIL
+verdict: PASS
 ---
 
 ## Check Results
@@ -10,8 +10,9 @@ verdict: FAIL
 - Tests: PASS (533 passed, 0 failed)
 - CLI Smoke Test: PASS
 - Doc Lint: PASS
-- Pipeline Integrity: PASS
+- Pipeline Integrity: PASS (`pipeline.yaml` valid, no `prompt:` fields)
 - HITL Artifact Source Validation: PASS
+- AGENTS.md Agent List Accuracy: PASS
 - Comment Scan: PASS
 - **Overall: All checks passed**
 
@@ -25,36 +26,44 @@ Issue requirements:
 3. No agent node in pipeline.yaml MUST use the `prompt` field — **implemented** ✅
 4. `deno task check` MUST pass after changes — **passes** ✅
 
-Spec alignment: correct scope, no spec drift from issue. However, the spec also mandates an SRS change:
-- `FR-S38: Pipeline Agent Context via file() Injection in task_template` added to `documents/requirements-sdlc.md` (section 3.38) + Appendix C row.
-- **`documents/requirements-sdlc.md` is NOT in `git diff main...HEAD`** and grep for "FR-S38" returns 0 matches — PM-stage SRS persistence failure (recurring pattern).
+SRS Changes verified:
+- `documents/requirements-sdlc.md` IS in `git diff main...HEAD --name-only` ✅
+- FR-S38 section 3.38 present at line 864 ✅
+- Appendix C FR-S38 row present at line 1001 ✅
+
+No spec drift from issue. All spec-mandated changes implemented.
 
 ## Acceptance Criteria
 
-FR-S38 specifies 4 acceptance criteria (derived from spec §Affected Requirements, issue body):
+FR-S38 specifies 4 acceptance criteria:
 
 - [x] **AC#1**: All 6 agent nodes include `{{file(".auto-flow/agents/shared-rules.md")}}` in `task_template`
-  - `specification` (line 39), `design` (line 77), `decision` (line 102), `build` (line 138), `verify` (line 162), `tech-lead-review` (line 191) — all confirmed ✅
+  - `specification` (pipeline.yaml:39), `design` (pipeline.yaml:77), `decision` (pipeline.yaml:102),
+    `build` (pipeline.yaml:138), `verify` (pipeline.yaml:162), `tech-lead-review` (pipeline.yaml:191) ✅
 - [x] **AC#2**: All 6 agent nodes include `{{file(".auto-flow/agents/agent-<name>/SKILL.md")}}` in `task_template`
-  - `agent-pm` (line 41), `agent-architect` (line 79), `agent-tech-lead` (line 104), `agent-developer` (line 140), `agent-qa` (line 164), `agent-tech-lead-review` (line 193) — all confirmed ✅
+  - `agent-pm` (pipeline.yaml:41), `agent-architect` (pipeline.yaml:79), `agent-tech-lead` (pipeline.yaml:104),
+    `agent-developer` (pipeline.yaml:140), `agent-qa` (pipeline.yaml:164), `agent-tech-lead-review` (pipeline.yaml:193) ✅
 - [x] **AC#3**: No agent node in `pipeline.yaml` uses the `prompt:` field
-  - `pipeline_integrity_test.ts` test "pipeline.yaml — no agent node uses prompt: field (FR-S38 AC#3)" passes ✅; visual inspection confirms no `prompt:` lines in any of the 6 nodes ✅
-- [x] **AC#4**: `deno task check` passes after changes — 533 tests, 0 failures ✅
-- [ ] **SRS**: `documents/requirements-sdlc.md` contains FR-S38 section 3.38 and Appendix C row — **ABSENT** ❌ (blocking)
+  - `pipeline_integrity_test.ts` test "pipeline.yaml — no agent node uses prompt: field (FR-S38 AC#3)" passes ✅
+  - Visual inspection of all 213 lines of pipeline.yaml confirms no `prompt:` field in any node ✅
+- [x] **AC#4** (SRS): `documents/requirements-sdlc.md` contains FR-S38 section 3.38 + Appendix C row
+  - Section 3.38 at line 864, Appendix C row at line 1001 ✅; file present in diff ✅
 
 ## Issues Found
 
-1. **FR-S38 missing from `documents/requirements-sdlc.md`**
-   - File: `documents/requirements-sdlc.md`
-   - Severity: **blocking**
-   - Spec §SRS Changes states: "New requirement added: FR-S38 … (section 3.38). Status: `[ ]` (pending implementation). … Appendix C updated: FR-S38 row added to cross-reference table. File updated: `documents/requirements-sdlc.md`."
-   - `git diff main...HEAD --name-only` does not include `documents/requirements-sdlc.md`. `grep -n "FR-S38" documents/requirements-sdlc.md` returns 0 matches.
-   - Root cause: PM-stage SRS persistence failure (recurring pattern — issues #147, #148, #149, #150, #151, #153, #154, #155, now #156). The PM agent described the SRS change in the spec artifact but never wrote it to the actual file.
+None.
 
 ## Verdict Details
 
-FAIL: 1 blocking issue. The `pipeline.yaml` migration (4/4 implementation ACs) is correct and complete — all 6 nodes use `{{file(...)}}` injection, no `prompt:` field remains, `deno task check` passes with 533 tests. However, the spec mandates that FR-S38 be formally added to `documents/requirements-sdlc.md` (section 3.38 + Appendix C row), and that change is absent. This is a PM-stage SRS persistence failure: the PM agent generated the spec artifact correctly but did not persist the new FR to the SRS file. The developer correctly implemented the pipeline.yaml changes (and added a `pipeline_integrity_test.ts` test for AC#3), but the SRS document remains incomplete.
+PASS: All 4 acceptance criteria satisfied. The `pipeline.yaml` migration is correct and complete — all 6
+agent nodes (`specification`, `design`, `decision`, `build`, `verify`, `tech-lead-review`) use
+`{{file(...)}}` injection for both shared-rules.md and their respective SKILL.md, separated by `---`,
+with no remaining `prompt:` fields. The `pipeline_integrity_test.ts` enforces AC#3 structurally.
+`documents/requirements-sdlc.md` now formally documents FR-S38 (section 3.38 + Appendix C), resolving
+the blocking issue from iteration 1. `deno task check` passes with 533 tests, 0 failures.
 
 ## Summary
 
-FAIL — 4/5 criteria passed (all implementation ACs satisfied), 1 blocking issue: `FR-S38` section absent from `documents/requirements-sdlc.md` (not in diff, 0 grep matches). Fix required: PM agent must add section 3.38 and Appendix C row to `requirements-sdlc.md`.
+PASS — 4/4 criteria passed, 0 blocking issues. All 6 pipeline.yaml agent nodes migrated from `prompt:`
+to `{{file(...)}}` injection in `task_template` (FR-S38). FR-S38 formally documented in
+`requirements-sdlc.md` (§3.38 + Appendix C). 533 tests, 0 failures.
