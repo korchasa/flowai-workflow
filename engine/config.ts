@@ -129,6 +129,24 @@ function validateSchema(config: Record<string, unknown>): void {
       }
     }
   }
+
+  // Validate mutual exclusivity: phases block and per-node phase field cannot coexist
+  if (config.phases) {
+    const nodesWithPhaseField: string[] = [];
+    for (const [nid, rawNode] of Object.entries(nodes)) {
+      if ((rawNode as Record<string, unknown>).phase !== undefined) {
+        nodesWithPhaseField.push(nid);
+      }
+    }
+    if (nodesWithPhaseField.length > 0) {
+      throw new Error(
+        `Phase assignment conflict: top-level 'phases:' block and per-node 'phase:' field cannot coexist. ` +
+          `Affected node(s): ${
+            nodesWithPhaseField.join(", ")
+          }. Use one mechanism only.`,
+      );
+    }
+  }
 }
 
 /**

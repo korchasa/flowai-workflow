@@ -66,7 +66,15 @@ type: feedback
 - Run 20260319T192055 iter2: ~8 turns, scope sdlc, issue #148 (FR-S33) QA fix — PASS (SRS: added §3.33, NFR §4, Appendix B/C, stale FR-S13/FR-S15 ACs; same pattern as iter2 of issue #147)
 - Run 20260319T194808: ~7 turns, scope sdlc, issue #149 (FR-S34), 2 files changed — PASS (Write both files; deno-lint-ignore inside for-loop header not recognized → extract cast to separate variable before loop)
 - Run 20260319T194808 iter2: ~5 turns, scope sdlc, issue #149 (FR-S34) QA fix — PASS (SRS: added §3.34, Appendix C FR-S34 row; same PM persistence failure pattern as #147/#148)
+- Run 20260319T201620: ~10 turns, scope engine, issue #150 (FR-E33), 5 files changed — PASS (mutual-exclusivity validation; pipeline.yaml used both mechanisms → necessary fix outside tasks[].files; task breakdown should always include all affected files)
+- Run 20260319T201620 iter2: ~5 turns, scope engine, issue #150 QA fix — PASS (SRS: added §3.33, updated FR-E9 criterion, Appendix row; fourth consecutive PM persistence failure across #147/#148/#149/#150)
 - Target: ≤35 turns. Key lesson: commit before deno task check; stash pattern for pre-existing fmt issues.
+
+## Pipeline.yaml Coexistence Pattern
+
+- When engine validation is tightened to reject a config pattern, the reference pipeline.yaml may use that pattern and must be fixed simultaneously.
+- Tech-lead task breakdown should include `pipeline.yaml` when validation changes affect it.
+- Fix: remove the redundant mechanism (per-node `phase:` fields when top-level `phases:` block is authoritative).
 
 ## QA-Fix Pattern
 

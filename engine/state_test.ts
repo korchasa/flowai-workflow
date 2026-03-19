@@ -413,19 +413,22 @@ Deno.test("setPhaseRegistry — falls back to per-node phase field", () => {
   clearPhaseRegistry();
 });
 
-Deno.test("setPhaseRegistry — top-level phases take priority over per-node phase", () => {
+Deno.test("setPhaseRegistry — phases block only: builds registry from phases block", () => {
   clearPhaseRegistry();
-  const config: PipelineConfig = {
-    name: "test",
-    version: "1",
-    phases: { plan: ["spec"] },
-    nodes: {
-      spec: { type: "agent", label: "spec", phase: "wrong-phase" },
-    },
-  };
+  const config = makeConfig({ plan: ["spec", "design"] });
   setPhaseRegistry(config);
-  // Top-level phases declaration wins
   assertEquals(getPhaseForNode("spec"), "plan");
+  assertEquals(getPhaseForNode("design"), "plan");
+  assertEquals(getPhaseForNode("other"), undefined);
+  clearPhaseRegistry();
+});
+
+Deno.test("setPhaseRegistry — phase-field-only: builds registry from per-node phase fields", () => {
+  clearPhaseRegistry();
+  const config = makeConfig(undefined, { spec: "plan", build: "impl" });
+  setPhaseRegistry(config);
+  assertEquals(getPhaseForNode("spec"), "plan");
+  assertEquals(getPhaseForNode("build"), "impl");
   clearPhaseRegistry();
 });
 

@@ -34,7 +34,6 @@ nodes:
   # Stage 1: Project Manager — specification
   specification:
     type: agent
-    phase: plan
     label: "Project Manager — Specification"
     prompt: ".auto-flow/agents/agent-pm/SKILL.md"
     task_template: |
@@ -68,7 +67,6 @@ nodes:
   # Stage 2: Architect — design-solution plan with variants
   design:
     type: agent
-    phase: plan
     label: "Architect — Design-Solution Plan"
     model: claude-opus-4-6
     inputs: [specification]
@@ -91,7 +89,6 @@ nodes:
   # Stage 3: Tech Lead — critique, decision, SDS update, branch + draft PR
   decision:
     type: agent
-    phase: plan
     label: "Tech Lead — Decision + Branch + PR"
     model: claude-opus-4-6
     inputs: [specification, design]
@@ -117,7 +114,6 @@ nodes:
   # Stages 4-5: Developer + QA loop (body nodes defined inline)
   implementation:
     type: loop
-    phase: impl
     label: "Developer+QA Implementation Loop"
     inputs: [decision]
     condition_node: verify
@@ -170,7 +166,6 @@ nodes:
   # Post-pipeline: Tech Lead Review — final review + CI gate + merge
   tech-lead-review:
     type: agent
-    phase: report
     label: "Tech Lead Review — Final Review + CI + Merge"
     inputs: [specification, decision]
     prompt: ".auto-flow/agents/agent-tech-lead-review/SKILL.md"

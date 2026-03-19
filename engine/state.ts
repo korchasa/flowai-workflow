@@ -21,23 +21,25 @@ const _phaseRegistry = new Map<string, string>();
 
 /**
  * Build phase registry from pipeline config.
- * Merges top-level `phases:` declaration (authoritative) with per-node `phase:` fields.
+ * Config validation (parseConfig) guarantees mutual exclusivity: either a top-level
+ * `phases:` block is present OR per-node `phase:` fields are used, never both.
  * Called once at run start, before ensureRunDirs().
  */
 export function setPhaseRegistry(config: PipelineConfig): void {
   _phaseRegistry.clear();
-  // Top-level phases declaration is authoritative
   if (config.phases) {
+    // Top-level phases block is the sole mechanism
     for (const [phase, nodeIds] of Object.entries(config.phases)) {
       for (const nodeId of nodeIds) {
         _phaseRegistry.set(nodeId, phase);
       }
     }
-  }
-  // Per-node phase fields as fallback for nodes not in top-level phases
-  for (const [nodeId, node] of Object.entries(config.nodes)) {
-    if (node.phase && !_phaseRegistry.has(nodeId)) {
-      _phaseRegistry.set(nodeId, node.phase);
+  } else {
+    // Per-node phase fields are the sole mechanism when no phases block is present
+    for (const [nodeId, node] of Object.entries(config.nodes)) {
+      if (node.phase) {
+        _phaseRegistry.set(nodeId, node.phase);
+      }
     }
   }
 }

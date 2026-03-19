@@ -90,7 +90,14 @@ graph TD
     `validateValidationRule()` (FR-E33): `"artifact"` added to `validTypes`.
     When `type === "artifact"`: validates `sections` is present, is array,
     non-empty, all elements are strings. Missing/invalid → config error at
-    parse time
+    parse time.
+    **Phase mutual-exclusivity validation (FR-E33):** After existing `phases:`
+    block structure validation (~line 128), new pass iterates all nodes checking
+    for `phase:` field while `config.phases` is defined. If both mechanisms
+    detected: throws diagnostic error naming both mechanisms and ≥1 affected
+    node ID. Format: `"Config uses both 'phases' block and per-node 'phase'
+    field (node '<id>'). Use one mechanism only."`. Runs in `mergeDefaults()`
+    alongside existing validation passes.
     `normalizeRunOn()` pass (in `mergeDefaults()`):
     if `node.run_always === true && !node.run_on` → sets `run_on = "always"`;
     if both present, `run_on` wins; deletes `run_always` from config
@@ -369,11 +376,15 @@ graph TD
 - **Purpose:** Module-scoped mapping from nodeId → phase string, enabling
   `getNodeDir()` to resolve phase-aware artifact paths without signature change.
 - **Data:** `phaseRegistry: Map<string, string>` — populated from
-  `PipelineConfig` nodes' `phase` fields.
+  `PipelineConfig` via exactly one mechanism (mutual exclusivity enforced by
+  config validation — FR-E33).
 - **Interfaces:**
-  - `setPhaseRegistry(config: PipelineConfig)` — iterates config nodes, builds
-    map from `nodeId → node.phase` (skips nodes without `phase`). Called once at
-    engine init (both fresh-run and `--resume` paths).
+  - `setPhaseRegistry(config: PipelineConfig)` — exclusive if/else: if
+    `config.phases` exists, populates registry from `phases:` block (iterates
+    phase→nodeIds mapping); else iterates config nodes, builds map from
+    `nodeId → node.phase` (skips nodes without `phase`). Dual-mechanism merge
+    logic removed — config validation guarantees only one mechanism is present.
+    Called once at engine init (both fresh-run and `--resume` paths).
   - `clearPhaseRegistry()` — resets map. Used in tests for isolation.
   - `getPhaseForNode(nodeId: string): string | undefined` — lookup.
   - `getNodeDir(runId, nodeId)` — signature unchanged. Internally: if registry
@@ -597,9 +608,11 @@ graph TD
     Caught by `run()` error handler → state saved → pipeline aborts.
     Resume runs skip entirely (environment already prepared).
   - **Phase Registry Init**: `setPhaseRegistry(config)` called at engine
-    startup before `ensureRunDirs()` in `engine.ts` `run()`. `getNodeDir()`
-    resolves phase-aware paths: `${runDir}/${phase}/${nodeId}` when phase
-    registered, `${runDir}/${nodeId}` otherwise. Evidence:
+    startup before `ensureRunDirs()` in `engine.ts` `run()`. Uses exclusive
+    if/else (FR-E33): populates from `phases:` block OR per-node `phase:`
+    fields — never both (config validation rejects mixed configs at parse time).
+    `getNodeDir()` resolves phase-aware paths: `${runDir}/${phase}/${nodeId}`
+    when phase registered, `${runDir}/${nodeId}` otherwise. Evidence:
     `engine/state.ts:20-36`, `engine/engine.ts:135`.
   - **Failure Hook Before Post-Pipeline Nodes (FR-34)**: When
     `pipelineSuccess === false`, engine executes `config.defaults.on_failure_script`

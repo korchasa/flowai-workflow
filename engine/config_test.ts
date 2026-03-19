@@ -666,6 +666,71 @@ nodes:
   );
 });
 
+// --- phases mutual-exclusivity validation tests (FR-E33) ---
+
+Deno.test(
+  "parseConfig — phases block + per-node phase field coexist → diagnostic error naming node ID",
+  () => {
+    const yaml = `
+name: test
+version: "1"
+phases:
+  plan: [a]
+nodes:
+  a:
+    type: agent
+    label: A
+    task_template: "do A"
+    phase: wrong-phase
+`;
+    assertThrows(
+      () => parseConfig(yaml),
+      Error,
+      "cannot coexist",
+    );
+  },
+);
+
+Deno.test("parseConfig — phases block only (no per-node phase fields) → accepted", () => {
+  const yaml = `
+name: test
+version: "1"
+phases:
+  plan: [a]
+nodes:
+  a:
+    type: agent
+    label: A
+    task_template: "do A"
+`;
+  const config = parseConfig(yaml);
+  assertEquals(config.phases!.plan, ["a"]);
+});
+
+Deno.test(
+  "parseConfig — per-node phase fields only (no phases block) → accepted",
+  () => {
+    const yaml = `
+name: test
+version: "1"
+nodes:
+  a:
+    type: agent
+    label: A
+    task_template: "do A"
+    phase: plan
+`;
+    const config = parseConfig(yaml);
+    assertEquals(config.nodes.a.phase, "plan");
+  },
+);
+
+Deno.test("parseConfig — neither phases mechanism → accepted", () => {
+  const config = parseConfig(MINIMAL_AGENT);
+  assertEquals(config.phases, undefined);
+  assertEquals(config.nodes.spec.phase, undefined);
+});
+
 // --- validatePromptPaths tests (FR-31) ---
 
 Deno.test("parseConfig — missing prompt file throws with file path", () => {

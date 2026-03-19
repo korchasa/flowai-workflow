@@ -91,3 +91,27 @@
   - When FR is found in grep output, check all 4 spec-promised sub-sections (FR section, NFR, Appendix B, Appendix C) in the same grep output — saves a turn vs separate reads.
   - FR-S13 AC semantics evolve as system changes — check for cross-FR contradictions whenever a feature is removed.
   - `tail -40` is sufficient to get final check summary lines (vs `tail -80`).
+
+## 2026-03-19T25:XX — Issue #150 (iteration 1)
+
+- **Turns:** ~6
+- **Cost:** ~$0.16 (est)
+- **Verdict:** FAIL
+- **Outcome:** 7/10 acceptance criteria passed. 514 tests, 0 failures. Implementation correct: mutual-exclusivity validation added to `engine/config.ts` (lines 133–149), `setPhaseRegistry()` simplified to exclusive if/else in `engine/state.ts`, 4 new tests in `config_test.ts`, 2 new tests in `state_test.ts`. `.auto-flow/pipeline.yaml` fixed (necessary — engine now rejects both mechanisms). Blocking: `documents/requirements-engine.md` not in diff, 0 matches for FR-E33 — PM agent never added section 3.33, FR-E9 update, or Appendix cross-reference row. Self-approval failed → used `gh issue comment` fallback on issue #150.
+- **Key learnings:**
+  - PM-stage SRS persistence failure now extends to engine scope (requirements-engine.md), not just sdlc scope. Same grep-first strategy applies.
+  - `pipeline.yaml` modification is expected and necessary when engine enforcement would break it — not out-of-scope.
+  - State test at line 408 retains "falls back" name semantically (implies old dual-mechanism), but body is correct — non-blocking.
+  - 514 tests (up from 509) confirms new config_test.ts + state_test.ts tests added.
+
+## 2026-03-19T26:XX — Issue #150 (iteration 2)
+
+- **Turns:** ~6
+- **Cost:** ~$0.16 (est)
+- **Verdict:** PASS
+- **Outcome:** All 10 acceptance criteria passed. 514 tests, 0 failures. FR-E33 present at line 665 (section 3.33), FR-E9 updated at line 180, Appendix row at line 751. Implementation confirmed: mutual-exclusivity validation in config.ts (lines 133–149), setPhaseRegistry() exclusive if/else in state.ts (lines 28–45), 4 config tests + 2 state tests all passing. pipeline.yaml fixed. One non-blocking: stale test name "falls back" at state_test.ts:408 (body correct). Self-approval failed → used `gh issue comment` fallback on issue #150.
+- **Key learnings:**
+  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-E33) confirmed PASS in one parallel turn — all SRS changes present.
+  - When SRS file IS in diff and grep confirms FR presence at all promised locations, proceed directly to source file read — no further SRS investigation needed.
+  - Pipeline.yaml fix (removing dual-mechanism usage) is always expected when engine adds a new validation rule that rejects it.
+  - 10 ACs across SRS + config implementation + state implementation + tests is the correct decomposition for this class of issue.
