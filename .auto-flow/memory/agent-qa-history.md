@@ -13,6 +13,17 @@
   - Self-approval fails → use `gh issue comment` fallback immediately.
   - Memory + history files empty on first session — normal.
 
+## 2026-03-19T19:XX — Issue #147
+
+- **Turns:** ~11
+- **Cost:** ~$0.25 (est)
+- **Verdict:** FAIL
+- **Outcome:** 10/12 acceptance criteria passed. 493 tests, 0 failures. All artifact file renames correct (zero grep matches for old names). Blocking issue: FR-S32 section absent from `documents/requirements-sdlc.md` (spec says PM added it; developer's Task 3 rewrite dropped it). Self-approval failed → used `gh issue comment` fallback.
+- **Key learnings:**
+  - When spec's "SRS Changes" says a new FR section was added, verify it exists even if `deno task check` is green — a full-file rewrite by developer silently drops PM additions.
+  - `documents/requirements-sdlc.md` too large for inline display; use `tail + Grep` pattern.
+  - Grep-sweeping for old artifact names is fast and conclusive — do it early.
+
 ## 2026-03-19T18:XX — Issue #146
 
 - **Turns:** ~8
