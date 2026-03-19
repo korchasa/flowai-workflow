@@ -52,3 +52,4 @@ type: feedback
 - Fourteenth session (issue #153, iteration 1): ~5 turns, FAIL verdict (FR-E35 absent from requirements-engine.md; PM agent never added §3.35 or Appendix row)
 - Fifteenth session (issue #153, iteration 2): ~5 turns, PASS verdict (FR-E35 at line 727; Appendix at line 816; 528 tests, 5/5 ACs)
 - Sixteenth session (issue #154, iteration 1): ~5 turns, FAIL verdict (FR-S36 absent from requirements-sdlc.md; PM agent never persisted it)
+- Seventeenth session (issue #154, iteration 2): ~5 turns, PASS verdict (FR-S36 present at line 821 + Appendix C line 968; wrapper script + pipeline.yaml correct; 528 tests)

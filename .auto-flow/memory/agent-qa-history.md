@@ -151,6 +151,18 @@
   - 528 tests (same as iteration 1) — no new tests needed since tests were already added in iter 1.
   - Reading the existing (FAIL) QA report before overwriting is required by the Write tool — add Read step to plan.
 
+## 2026-03-19T33:XX — Issue #154 (iteration 2)
+
+- **Turns:** ~5
+- **Cost:** ~$0.12 (est)
+- **Verdict:** PASS
+- **Outcome:** All 7 acceptance criteria passed. 528 tests, 0 failures. FR-S36 present at line 821 (section 3.36) and Appendix C at line 968 — blocking issue from iteration 1 resolved. Implementation: `run-dashboard.sh` wrapper (warns on failure, exits 0), `pipeline.yaml` `after:` updated to `.auto-flow/scripts/run-dashboard.sh {{run_dir}}` (line 180), `on_error: continue` and `run_on: always` retained. Self-approval failed → used `gh issue comment` fallback on issue #154.
+- **Key learnings:**
+  - PM-stage SRS persistence failure for issue #154 was fixed in iteration 2 — `requirements-sdlc.md` IS in diff and FR-S36 found at lines 821 and 968.
+  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S36) confirmed PASS in one parallel turn — optimal pattern for fix iterations.
+  - 528 tests unchanged from iteration 1 — no new tests needed for this sdlc-only change.
+  - SDLC pipeline pattern (wrapper script replacing `|| true`) is correct approach for observable non-blocking after-script failures.
+
 ## 2026-03-19T32:XX — Issue #154 (iteration 1)
 
 - **Turns:** ~5
