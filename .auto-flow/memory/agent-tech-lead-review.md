@@ -20,3 +20,4 @@ type: feedback
 - **gh pr diff -- <file> not supported:** `gh pr diff` accepts at most 1 arg (the PR number). Cannot filter by file path. Read implementation files directly via the Read tool when diff is too large.
 - **SDS error message format:** SDS may describe error format intent rather than exact string — non-blocking if test assertions pass against actual implementation string.
 - **pipeline.yaml fix as necessary side-effect:** When engine adds a new validation rule that rejects a config pattern, pipeline.yaml must be fixed simultaneously. This is in-scope, not out-of-scope.
+- **Engine file touch in SDLC-scoped issue:** If decision explicitly lists `engine/hitl.ts` as a task file, touching it for generic template interpolation (no domain-specific logic) is in-scope — not a violation of engine domain-agnosticism.
