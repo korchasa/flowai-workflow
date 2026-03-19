@@ -22,3 +22,27 @@
 ### Check Status
 
 PASS — 509 tests, 0 failed.
+
+---
+
+## Iteration 2 (QA fix)
+
+**Root cause:** PM agent wrote FR-S34 to spec artifact (`01-spec.md`) but never
+persisted changes to `documents/requirements-sdlc.md` — same pattern as issues
+#147 iter2 and #148 iter2.
+
+### Files Changed (iter 2)
+
+- `documents/requirements-sdlc.md` — added §3.34 FR-S34 Dashboard Diagnostic
+  Enhancements (3 AC groups: inline log viewer, header status styling, phase
+  aggregate status); replaced duplicate stale FR-S32 row in Appendix C with
+  FR-S34 row.
+
+### Tests Added or Modified (iter 2)
+
+None — SRS documentation fix only; all implementation tests from iter 1 (509)
+continue to pass.
+
+### Check Status (iter 2)
+
+PASS — 509 tests, 0 failed.

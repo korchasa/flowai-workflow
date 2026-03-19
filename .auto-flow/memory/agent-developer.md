@@ -65,6 +65,7 @@ type: feedback
 - Run 20260319T192055 iter1: ~5 turns, scope sdlc, issue #148 (FR-S33), 7 files changed — PASS (delete-only + block removal; SDS already correct from tech-lead; SRS NOT updated → QA FAIL)
 - Run 20260319T192055 iter2: ~8 turns, scope sdlc, issue #148 (FR-S33) QA fix — PASS (SRS: added §3.33, NFR §4, Appendix B/C, stale FR-S13/FR-S15 ACs; same pattern as iter2 of issue #147)
 - Run 20260319T194808: ~7 turns, scope sdlc, issue #149 (FR-S34), 2 files changed — PASS (Write both files; deno-lint-ignore inside for-loop header not recognized → extract cast to separate variable before loop)
+- Run 20260319T194808 iter2: ~5 turns, scope sdlc, issue #149 (FR-S34) QA fix — PASS (SRS: added §3.34, Appendix C FR-S34 row; same PM persistence failure pattern as #147/#148)
 - Target: ≤35 turns. Key lesson: commit before deno task check; stash pattern for pre-existing fmt issues.
 
 ## QA-Fix Pattern
