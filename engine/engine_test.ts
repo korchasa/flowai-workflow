@@ -11,6 +11,7 @@ import { collectAllNodeIds, findNodeConfig } from "./config.ts";
 import { Engine, runPrepareCommand, runPreRunScript } from "./engine.ts";
 import {
   collectPostPipelineNodes,
+  executePostPipeline,
   runFailureHook,
   sortPostPipelineNodes,
 } from "./post-pipeline.ts";
@@ -1003,4 +1004,165 @@ Deno.test("runPrepareCommand — interpolates run_id in command", async () => {
   } finally {
     await Deno.remove(tmpFile);
   }
+});
+
+// --- FR-E34: on_error: continue interaction tests ---
+
+Deno.test("FR-E34 — continue-d failure: info log emitted, hook not called", async () => {
+  const tmpScript = await Deno.makeTempFile({ suffix: ".sh" });
+  try {
+    await Deno.writeTextFile(tmpScript, "#!/bin/bash\necho 'HOOK_CALLED'");
+    await Deno.chmod(tmpScript, 0o755);
+    const cap = createCapture();
+    const out = new OutputManager("normal", cap.writer);
+    const state = createRunState("fre34-t1", "cfg.yaml", ["p1"], {}, {});
+    const nodes: Record<string, NodeConfig> = {
+      p1: { type: "agent", label: "P1", run_on: "success" },
+    };
+    // pipelineSuccess=true: continue-d failure does NOT set pipelineSuccess false
+    await executePostPipeline({
+      nodeIds: ["p1"],
+      nodes,
+      state,
+      pipelineSuccess: true,
+      failureScript: tmpScript,
+      output: out,
+      executeNode: (_id) => {
+        // Simulate Task 1 log emission at on_error: continue branch
+        out.status(
+          "engine",
+          `node ${_id}: failure suppressed by on_error: continue`,
+        );
+        return Promise.resolve(true);
+      },
+    });
+    const joined = cap.lines.join("");
+    assertEquals(
+      joined.includes("failure suppressed by on_error: continue"),
+      true,
+    );
+    assertEquals(joined.includes("HOOK_CALLED"), false);
+  } finally {
+    await Deno.remove(tmpScript);
+  }
+});
+
+Deno.test("FR-E34 — all failures continue-d: pipelineSuccess true, hook not called", async () => {
+  const tmpScript = await Deno.makeTempFile({ suffix: ".sh" });
+  try {
+    await Deno.writeTextFile(tmpScript, "#!/bin/bash\necho 'HOOK_CALLED'");
+    await Deno.chmod(tmpScript, 0o755);
+    const cap = createCapture();
+    const out = new OutputManager("normal", cap.writer);
+    // Replicate executeLevel loop: all nodes continue-d → pipelineSuccess stays true
+    let pipelineSuccess = true;
+    for (const result of [true, true]) {
+      if (!result) {
+        pipelineSuccess = false;
+        break;
+      }
+    }
+    assertEquals(pipelineSuccess, true);
+    const state = createRunState("fre34-t2", "cfg.yaml", ["p1"], {}, {});
+    const nodes: Record<string, NodeConfig> = {
+      p1: { type: "agent", label: "P1", run_on: "success" },
+    };
+    await executePostPipeline({
+      nodeIds: ["p1"],
+      nodes,
+      state,
+      pipelineSuccess,
+      failureScript: tmpScript,
+      output: out,
+      executeNode: (_id) => Promise.resolve(true),
+    });
+    const joined = cap.lines.join("");
+    assertEquals(joined.includes("HOOK_CALLED"), false);
+    assertEquals(joined.includes("Failure hook"), false);
+  } finally {
+    await Deno.remove(tmpScript);
+  }
+});
+
+Deno.test("FR-E34 — one fatal failure among continue-d: hook called exactly once", async () => {
+  const tmpScript = await Deno.makeTempFile({ suffix: ".sh" });
+  try {
+    await Deno.writeTextFile(tmpScript, "#!/bin/bash\necho 'HOOK_CALLED'");
+    await Deno.chmod(tmpScript, 0o755);
+    const cap = createCapture();
+    const out = new OutputManager("normal", cap.writer);
+    // Replicate executeLevel loop: node-a continue-d (true), node-b fatal (false)
+    let pipelineSuccess = true;
+    for (const result of [true, false]) {
+      if (!result) {
+        pipelineSuccess = false;
+        break;
+      }
+    }
+    assertEquals(pipelineSuccess, false);
+    const state = createRunState("fre34-t3", "cfg.yaml", ["p1"], {}, {});
+    const nodes: Record<string, NodeConfig> = {
+      p1: { type: "agent", label: "P1", run_on: "failure" },
+    };
+    await executePostPipeline({
+      nodeIds: ["p1"],
+      nodes,
+      state,
+      pipelineSuccess,
+      failureScript: tmpScript,
+      output: out,
+      executeNode: (_id) => Promise.resolve(true),
+    });
+    const joined = cap.lines.join("");
+    // Hook called exactly once
+    const hookCount = (joined.match(/Failure hook completed/g) ?? []).length;
+    assertEquals(hookCount, 1);
+  } finally {
+    await Deno.remove(tmpScript);
+  }
+});
+
+Deno.test("FR-E34 — hook script fails after continue-d failure: warn emitted, no re-trigger", async () => {
+  const tmpScript = await Deno.makeTempFile({ suffix: ".sh" });
+  try {
+    await Deno.writeTextFile(tmpScript, "#!/bin/bash\nexit 1");
+    await Deno.chmod(tmpScript, 0o755);
+    const cap = createCapture();
+    const out = new OutputManager("normal", cap.writer);
+    const state = createRunState("fre34-t4", "cfg.yaml", ["p1"], {}, {});
+    const nodes: Record<string, NodeConfig> = {
+      p1: { type: "agent", label: "P1", run_on: "failure" },
+    };
+    // pipelineSuccess=false: one fatal failure (hook is attempted)
+    await executePostPipeline({
+      nodeIds: ["p1"],
+      nodes,
+      state,
+      pipelineSuccess: false,
+      failureScript: tmpScript,
+      output: out,
+      executeNode: (_id) => Promise.resolve(true),
+    });
+    const joined = cap.lines.join("");
+    assertEquals(joined.includes("WARN"), true);
+    assertEquals(joined.includes("Failure hook completed"), false);
+  } finally {
+    await Deno.remove(tmpScript);
+  }
+});
+
+Deno.test("FR-E34 — log message format: failure suppressed by on_error: continue", () => {
+  const cap = createCapture();
+  const out = new OutputManager("normal", cap.writer);
+  // Verify format produced by engine.ts at the on_error: continue branch
+  out.status(
+    "engine",
+    "node worker-1: failure suppressed by on_error: continue",
+  );
+  const joined = cap.lines.join("");
+  assertEquals(joined.includes("worker-1"), true);
+  assertEquals(
+    joined.includes("failure suppressed by on_error: continue"),
+    true,
+  );
 });

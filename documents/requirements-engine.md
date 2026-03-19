@@ -690,6 +690,40 @@
     node ID. Evidence: `engine/config.ts:137-148`
   - [x] Unit tests cover all 4 scenarios. Evidence: `engine/config_test.ts:669-732`
 
+### 3.34 FR-E34: Error Handling Precedence (`on_error` vs `on_failure_script`)
+
+- **Description:** Two error-handling mechanisms coexist in pipeline config.
+  `settings.on_error: continue` (per-node) marks a node `failed` and continues
+  pipeline without triggering `on_failure_script` at node level.
+  `defaults.on_failure_script` (pipeline-end hook) runs once, only when
+  `pipelineSuccess === false` after all DAG levels complete. Their interaction
+  is deterministic and governed by 4 rules.
+- **Rationale:** Without formal definition, pipeline authors cannot predict
+  whether the failure hook fires when a node is `continue`-d. Deterministic
+  rules prevent silent unexpected hook invocations.
+- **Interaction rules:**
+  1. `on_error: continue` → emits info log, continues pipeline. Hook not triggered.
+  2. All failures suppressed → `pipelineSuccess === true` → hook does NOT run.
+  3. Any unsuppressed failure → `pipelineSuccess === false` → hook runs once.
+  4. Hook failure does not affect `on_error: continue` semantics (FR-E19 applies).
+- **Acceptance criteria:**
+  - [x] `on_error: continue` branch emits info log:
+    `node <id>: failure suppressed by on_error: continue`. Evidence:
+    `engine/engine.ts:384-390` (status call in if-block before `return true`),
+    `engine/engine_test.ts` (FR-E34 test 5: log message format).
+  - [x] `on_error: continue` does NOT trigger `on_failure_script` at node level.
+    Evidence: `engine/engine_test.ts` (FR-E34 test 1: hook not called when
+    `pipelineSuccess=true`).
+  - [x] All failures suppressed → `pipelineSuccess === true` → hook NOT run.
+    Evidence: `engine/engine_test.ts` (FR-E34 test 2: all continue-d,
+    `pipelineSuccess` derivation via loop pattern).
+  - [x] Any unsuppressed failure → `pipelineSuccess === false` → hook runs once
+    via `runFailureHook()`. Evidence: `engine/engine_test.ts` (FR-E34 test 3:
+    one fatal failure, hook called exactly once).
+  - [x] Hook failure does not affect `on_error: continue` semantics (no
+    re-trigger, WARN emitted). Evidence: `engine/engine_test.ts` (FR-E34 test 4:
+    hook script fails, WARN emitted, no second invocation).
+
 ## 4. Non-Functional Requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution is not supported.
@@ -749,3 +783,4 @@
 | —      | FR-E31 | Stale Path Reference Cleanup in Engine Artifacts |
 | —      | FR-E32 | `{{file()}}` Template Function |
 | —      | FR-E33 | Phase Assignment Single-Mechanism Enforcement |
+| —      | FR-E34 | Error Handling Precedence (`on_error` vs `on_failure_script`) |

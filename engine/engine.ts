@@ -381,7 +381,13 @@ export class Engine {
 
         // Check on_error policy
         const onError = node.settings?.on_error ?? "fail";
-        if (onError === "continue") return true;
+        if (onError === "continue") {
+          this.output.status(
+            "engine",
+            `node ${nodeId}: failure suppressed by on_error: continue`,
+          );
+          return true;
+        }
       }
 
       await saveState(this.state);
