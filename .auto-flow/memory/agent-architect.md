@@ -18,6 +18,7 @@
 - Use `output_mode: files_with_matches` first, then targeted content checks
 - For cleanup tasks: inventory all occurrences before planning variants
 - For large SRS: use Grep with line numbers to find section offsets, then Read with offset/limit for targeted sections
+- For rename/renumber tasks: Grep `count` mode per old filename gives precise blast radius per variant
 
 ## Environment quirks
 
@@ -25,9 +26,11 @@
 - FR-E30 ID is reused: JSDoc/why-comments task in SDS AND prepare_command in SRS
 - `.claude/skills/agent-*` symlinks still exist (per FR-S26) — both old and new paths resolve
 - `config_test.ts` does `Deno.readTextFileSync` on prompt paths — replacement must use valid path
+- Engine test files reference `01-spec.md` in fixtures — touching those = cross-scope contamination
 
 ## Baseline metrics
 
+- Run 20260319T182156: ~8 tool calls, sdlc scope, artifact renumber task, 3 variants
 - Run 20260315T215901: ~9 tool calls, sdlc scope, QA check suite extension, 3 variants
 - Run 20260315T213641: 10 tool calls, engine scope, template file() function, 3 variants
 - Run 20260315T193605: 10 tool calls, engine+sdlc scope, path cleanup task, 3 variants
