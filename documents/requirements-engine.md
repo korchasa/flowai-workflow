@@ -177,9 +177,9 @@
 - **Acceptance criteria:**
   - [x] Node output directories are grouped by pipeline phase under
     `.auto-flow/runs/<run-id>/` (e.g., `plan/`, `impl/`, `report/`). Phase derived
-    from top-level `phases:` config declaration (authoritative) or per-node
-    `phase:` field (fallback). Evidence: `engine/state.ts:20-36`
-    (`setPhaseRegistry()` — builds nodeId→phase map from config),
+    from exactly one mechanism per FR-E33 (canonical: top-level `phases:` block;
+    alternate: per-node `phase:` field). Evidence: `engine/state.ts:28-45`
+    (`setPhaseRegistry()` — builds nodeId→phase map via exclusive if/else),
     `engine/state.ts:98-104` (`getNodeDir()` — phase-aware path resolution),
     `engine/engine.ts:135` (`setPhaseRegistry(config)` at engine init)
   - [x] `state.json` and `logs/` remain at the run root level
@@ -662,6 +662,34 @@
   - [ ] Unit tests: successful inclusion, missing file error, no re-interpolation of included content. Evidence: `engine/template_test.ts`
   - [ ] Config check tests: `deno task check` catches missing `{{file()}}` path in `task_template`. Evidence: `engine/config_test.ts`
 
+### 3.33 FR-E33: Phase Assignment Single-Mechanism Enforcement
+
+- **Description:** A pipeline config MUST use exactly one mechanism to assign
+  nodes to phases: either a top-level `phases:` block (maps phase names → node
+  ID lists) or per-node `phase:` fields on individual node definitions. Both
+  mechanisms simultaneously is forbidden. `phases:` block is canonical
+  (preferred). Engine rejects at parse time any config containing a `phases:`
+  block and at least one node with a `phase:` field.
+- **Motivation:** Two mechanisms encoding the same information cause silent
+  inconsistency when they diverge. Prior behavior silently preferred `phases:`
+  as "authoritative" over `phase:` as "fallback" — a misconfigured pipeline
+  misbehaved without diagnostic feedback. Parse-time rejection enforces the
+  fail-fast principle and eliminates the dual-mechanism merge path from
+  `setPhaseRegistry()`.
+- **Acceptance criteria:**
+  - [x] Config containing both `phases:` block and any node-level `phase:`
+    field is rejected at parse time with a diagnostic error. Evidence:
+    `engine/config.ts:133-149`
+  - [x] Config with `phases:` block only is accepted. Evidence:
+    `engine/config_test.ts:694-708`
+  - [x] Config with per-node `phase:` fields only is accepted. Evidence:
+    `engine/config_test.ts:710-726`
+  - [x] Config with neither mechanism is accepted. Evidence:
+    `engine/config_test.ts:728-732`
+  - [x] Diagnostic error names both mechanisms and lists at least one affected
+    node ID. Evidence: `engine/config.ts:137-148`
+  - [x] Unit tests cover all 4 scenarios. Evidence: `engine/config_test.ts:669-732`
+
 ## 4. Non-Functional Requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution is not supported.
@@ -720,3 +748,4 @@
 | —      | FR-E30 | Pipeline Prepare Command (`prepare_command`) |
 | —      | FR-E31 | Stale Path Reference Cleanup in Engine Artifacts |
 | —      | FR-E32 | `{{file()}}` Template Function |
+| —      | FR-E33 | Phase Assignment Single-Mechanism Enforcement |
