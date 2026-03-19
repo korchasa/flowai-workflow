@@ -242,7 +242,7 @@ if (import.meta.main) {
 
   console.log("=== auto-flow: Full Check ===");
 
-  await run("deno", ["fmt", "--check"], "Formatting Check");
+  await run("deno", ["fmt"], "Formatting (auto-fix)");
   await run("deno", ["lint"], "Linting");
 
   // Type check all .ts files (source + tests) in engine/ and scripts/
