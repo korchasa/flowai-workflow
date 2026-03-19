@@ -139,6 +139,18 @@
   - 524 tests (up from 519) confirms 5 new FR-E34 tests were added.
   - SRS persistence failure pattern broken for this issue — PM + Developer both delivered correctly.
 
+## 2026-03-19T31:XX — Issue #153 (iteration 2)
+
+- **Turns:** ~5
+- **Cost:** ~$0.14 (est)
+- **Verdict:** PASS
+- **Outcome:** All 5 acceptance criteria passed. 528 tests, 0 failures. FR-E35 present at line 727 (§3.35) and Appendix at line 816 — blocking issue from iteration 1 resolved. Implementation: `engine/config.ts:273-289` inline forwarding validation in `validateNode()` loop branch; 4 FR-E35 tests in `config_test.ts:171-291`; `design-engine.md:109-116` (§3.1) and `design-engine.md:569-581` (§5 Logic) document the algorithm. Self-approval failed → used `gh issue comment` fallback on issue #153.
+- **Key learnings:**
+  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-E35) confirmed PASS in one parallel turn — blocking issue from iter 1 resolved.
+  - `requirements-engine.md` IS in the diff this time, confirming PM-stage fix was applied.
+  - 528 tests (same as iteration 1) — no new tests needed since tests were already added in iter 1.
+  - Reading the existing (FAIL) QA report before overwriting is required by the Write tool — add Read step to plan.
+
 ## 2026-03-19T30:XX — Issue #153 (iteration 1)
 
 - **Turns:** ~5

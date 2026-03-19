@@ -1,53 +1,51 @@
 ---
-verdict: FAIL
+verdict: PASS
 ---
 
 ## Check Results
 
-- Format: PASS
-- Lint: PASS
+- Format: PASS (76 files checked)
+- Lint: PASS (53 files checked)
 - Type Check: PASS
 - CLI Smoke Test: PASS
 - Tests: PASS — 528 passed, 0 failed
 - Doc Lint: PASS
 - Pipeline Integrity: PASS
-- HITL Artifact Source: PASS
-- AGENTS.md Accuracy: PASS
+- HITL Artifact Source Validation: PASS
+- AGENTS.md Agent List Accuracy: PASS
 - Comment Scan: PASS
-
-**Overall: `deno task check` — ALL CHECKS PASSED**
 
 ## Spec vs Issue Alignment
 
-Issue #153 requirements:
-1. Engine MUST validate at parse time that every loop inner node input is either a sibling body node or listed in the loop's own `inputs` — **addressed by FR-E35 in spec**
-2. Engine MUST produce a clear error message identifying body node, loop node, and missing inputs — **addressed by FR-E35 AC #2**
-3. Engine documentation MUST describe the input forwarding mechanism — **addressed by FR-E35 AC #4**
+Issue #153 ("engine: Document implicit input forwarding for nodes inside loops") states 3 requirements:
 
-Spec creates FR-E35 with 5 ACs covering: parse-time rejection, error message format, sibling-body exclusion, documentation, and `deno task check` green. No spec drift from issue.
+1. Engine MUST validate at parse time that every input referenced by a loop's inner node is either another inner node or listed in the loop's own `inputs`.
+2. Engine MUST produce a clear error message when an inner node references an external input not forwarded by the loop.
+3. Engine documentation MUST describe the input forwarding mechanism for loop nodes.
+
+The spec (01-spec.md) creates FR-E35 covering all 3 requirements via 5 acceptance criteria. No spec drift detected.
 
 ## Acceptance Criteria
 
-FR-E35 acceptance criteria (as described in spec's "SRS Changes" §3.35):
+All 5 AC from FR-E35 (§3.35 `requirements-engine.md:740-754`):
 
-- [x] **AC1 — Parse-time rejection:** Body node referencing external input not in loop `inputs` → config error at parse time. Evidence: `engine/config.ts:273-289` (forwarding validation in `validateNode()` loop branch); `engine/config_test.ts:203-233` (test throws with expected message).
-- [x] **AC2 — Error message format:** Error includes body node ID, loop node ID, and missing external input IDs. Evidence: `engine/config.ts:284-288` — message: `"Loop '${id}' body node '${bodyId}' references external input(s) [${missing.join(", ")}] not listed in loop inputs"`.
-- [x] **AC3 — Sibling-body exclusion:** Body node referencing sibling body node → no error. Evidence: `engine/config.ts:279-280` (`!bodyNodeIds.includes(inp)` guard); `engine/config_test.ts:235-262` (sibling test passes).
-- [x] **AC4 — Documentation:** Forwarding mechanism described in SDS. Evidence: `documents/design-engine.md:109-116` (§3.1 `config.ts` description), `documents/design-engine.md:569-581` (§5 Logic algorithm).
-- [x] **AC5 — `deno task check` green:** 528 tests, 0 failures. All checks passed.
-- [ ] **AC6 — SRS FR-E35 section:** `documents/requirements-engine.md` must contain §3.35 with 5 ACs and Appendix cross-reference row. Evidence: file NOT in `git diff main...HEAD --name-only`; `grep -n "FR-E35" documents/requirements-engine.md` returned empty. **BLOCKING.**
+- [x] Body node referencing external input not listed in loop `inputs` rejected at parse time with a config error. Evidence: `engine/config.ts:273-289` — `validateNode()` loop branch throws after iterating body inputs against `loopInputs` set.
+- [x] Error message identifies body node ID, loop node ID, and all missing external input IDs. Evidence: `engine/config.ts:284-288` — message: `"Loop '${id}' body node '${bodyId}' references external input(s) [${missing.join(", ")}] not listed in loop inputs"`.
+- [x] Body node referencing a sibling body node generates no error. Evidence: `engine/config.ts:279-280` — `!bodyNodeIds.includes(inp)` guard excludes siblings; `engine/config_test.ts:235-262` test confirms.
+- [x] Forwarding mechanism and validation algorithm documented in SDS. Evidence: `documents/design-engine.md:109-116` (§3.1 `config.ts`), `documents/design-engine.md:569-581` (§5 Logic).
+- [x] `deno task check` green: 528 tests, 0 failures.
+
+Additionally verified:
+- [x] `documents/requirements-engine.md` is in `git diff main...HEAD --name-only`. FR-E35 present at line 727 (§3.35) with all 5 ACs marked [x] with evidence. Appendix cross-reference row at line 816.
 
 ## Issues Found
 
-1. **FR-E35 section absent from `documents/requirements-engine.md`**
-   - File: `documents/requirements-engine.md`
-   - Severity: **blocking**
-   - The spec ("SRS Changes" section) explicitly states: "Added FR-E35 (§ 3.35): Loop Input Forwarding Validation — 5 acceptance criteria…" and "File modified: `documents/requirements-engine.md`." However, `requirements-engine.md` is absent from `git diff main...HEAD --name-only` and `grep "FR-E35"` returns 0 matches. This is a recurring PM-stage SRS persistence failure (issues #147–#152). The SRS is the source of truth; the FR section must exist there with all 5 ACs and the Appendix cross-reference row.
+None.
 
 ## Verdict Details
 
-FAIL: 1 blocking issue. Implementation is correct across all 3 source files (`engine/config.ts`, `engine/config_test.ts`, `documents/design-engine.md`), `deno task check` is green (528 tests, 0 failures), and the issue requirements are fully addressed by the implementation. However, the SRS (`documents/requirements-engine.md`) was never updated — FR-E35 section §3.35 and Appendix row are missing. The PM agent specified this change in the spec but never persisted it to the file.
+PASS: All 5 acceptance criteria met. `requirements-engine.md` IS in the diff (blocking issue from iteration 1 resolved) — FR-E35 at §3.35 (line 727) with all 5 ACs marked [x] with evidence, and Appendix row at line 816. Implementation at `engine/config.ts:273-289` is a minimal inline check (~16 lines) in the existing `validateNode()` loop branch — aligned with Variant A decision (no new exported functions, no signature changes). Four FR-E35 test cases in `config_test.ts:171-291` cover all required scenarios. SDS updated at `design-engine.md:109-116` and `design-engine.md:569-581`. No blocking issues.
 
 ## Summary
 
-FAIL — 5/6 criteria passed, 1 blocking issue: FR-E35 absent from `documents/requirements-engine.md` (§3.35 + Appendix row required). Implementation in `config.ts`/`config_test.ts`/`design-engine.md` is correct and complete; only SRS persistence is missing.
+PASS — 5/5 criteria passed, 0 blocking issues. 528 tests, 0 failures. FR-E35 loop input forwarding validation implemented in `engine/config.ts`, documented in SRS (`requirements-engine.md:727`) and SDS (`design-engine.md:109-116,569-581`), and fully tested in `engine/config_test.ts:171-291`.
