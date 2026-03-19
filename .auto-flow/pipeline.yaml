@@ -35,8 +35,11 @@ nodes:
   specification:
     type: agent
     label: "Project Manager — Specification"
-    prompt: ".auto-flow/agents/agent-pm/SKILL.md"
     task_template: |
+      {{file(".auto-flow/agents/shared-rules.md")}}
+      ---
+      {{file(".auto-flow/agents/agent-pm/SKILL.md")}}
+      ---
       Read reflection memory at .auto-flow/memory/agent-pm.md and history at .auto-flow/memory/agent-pm-history.md before starting. Update both when done.
       Triage open GitHub issues: check health (no merged PRs, no needs-triage label), select best candidate by priority.
       Output:
@@ -70,8 +73,11 @@ nodes:
     label: "Architect — Design-Solution Plan"
     model: claude-opus-4-6
     inputs: [specification]
-    prompt: ".auto-flow/agents/agent-architect/SKILL.md"
     task_template: |
+      {{file(".auto-flow/agents/shared-rules.md")}}
+      ---
+      {{file(".auto-flow/agents/agent-architect/SKILL.md")}}
+      ---
       Read reflection memory at .auto-flow/memory/agent-architect.md and history at .auto-flow/memory/agent-architect-history.md before starting. Update both when done.
       Read the specification at {{input.specification}}/01-spec.md.
       Read ONLY scope-relevant SRS/SDS docs (derive scope from spec frontmatter `scope:` field).
@@ -92,8 +98,11 @@ nodes:
     label: "Tech Lead — Decision + Branch + PR"
     model: claude-opus-4-6
     inputs: [specification, design]
-    prompt: ".auto-flow/agents/agent-tech-lead/SKILL.md"
     task_template: |
+      {{file(".auto-flow/agents/shared-rules.md")}}
+      ---
+      {{file(".auto-flow/agents/agent-tech-lead/SKILL.md")}}
+      ---
       Read reflection memory at .auto-flow/memory/agent-tech-lead.md and history at .auto-flow/memory/agent-tech-lead-history.md before starting. Update both when done.
       Read the plan at {{input.design}}/02-plan.md.
       Read the spec at {{input.specification}}/01-spec.md.
@@ -125,8 +134,11 @@ nodes:
         type: agent
         label: "Developer — Implementation"
         inputs: [decision]
-        prompt: ".auto-flow/agents/agent-developer/SKILL.md"
         task_template: |
+          {{file(".auto-flow/agents/shared-rules.md")}}
+          ---
+          {{file(".auto-flow/agents/agent-developer/SKILL.md")}}
+          ---
           Read reflection memory at .auto-flow/memory/agent-developer.md and history at .auto-flow/memory/agent-developer-history.md before starting. Update both when done.
           Read the decision at {{input.decision}}/03-decision.md.
           Read ONLY scope-relevant SRS/SDS docs (derive scope from decision's spec reference or task context).
@@ -146,8 +158,11 @@ nodes:
         type: agent
         label: "QA — Verification"
         inputs: [specification, decision, build]
-        prompt: ".auto-flow/agents/agent-qa/SKILL.md"
         task_template: |
+          {{file(".auto-flow/agents/shared-rules.md")}}
+          ---
+          {{file(".auto-flow/agents/agent-qa/SKILL.md")}}
+          ---
           Read reflection memory at .auto-flow/memory/agent-qa.md and history at .auto-flow/memory/agent-qa-history.md before starting. Update both when done.
           Verify the implementation against the spec at {{input.specification}}/01-spec.md.
           Check the decision at {{input.decision}}/03-decision.md.
@@ -172,8 +187,11 @@ nodes:
     type: agent
     label: "Tech Lead Review — Final Review + CI + Merge"
     inputs: [specification, decision]
-    prompt: ".auto-flow/agents/agent-tech-lead-review/SKILL.md"
     task_template: |
+      {{file(".auto-flow/agents/shared-rules.md")}}
+      ---
+      {{file(".auto-flow/agents/agent-tech-lead-review/SKILL.md")}}
+      ---
       Read reflection memory at .auto-flow/memory/agent-tech-lead-review.md and history at .auto-flow/memory/agent-tech-lead-review-history.md before starting. Update both when done.
       Perform final code review of the PR.
       Read the spec at {{input.specification}}/01-spec.md for acceptance criteria.
