@@ -614,12 +614,28 @@ graph TD
     `getNodeDir()` resolves phase-aware paths: `${runDir}/${phase}/${nodeId}`
     when phase registered, `${runDir}/${nodeId}` otherwise. Evidence:
     `engine/state.ts:20-36`, `engine/engine.ts:135`.
-  - **Failure Hook Before Post-Pipeline Nodes (FR-34)**: When
-    `pipelineSuccess === false`, engine executes `config.defaults.on_failure_script`
-    (if configured) via `runFailureHook()` before post-pipeline nodes. Script
-    is pipeline-specific. Engine treats it as opaque
-    `Deno.Command` invocation — domain-agnostic. Failed node IDs available via
-    `state.json` (`nodes[*].status === "failed"`) — no engine-written artifacts.
+  - **Error Handling Precedence (FR-E34)**: Two mechanisms interact:
+    - `on_error: continue` (per-node): marks node `failed`, logs info message,
+      continues pipeline. Does NOT trigger `on_failure_script` at node level.
+    - `on_failure_script` (pipeline-end): evaluated once after all DAG levels
+      complete, only when `pipelineSuccess === false`.
+    - **Log message (AC #1):** At the `on_error: continue` branch in
+      `executeNode()` (~engine.ts:384), before `return true`:
+      `this.output.status()` emits
+      `[INFO] node <id>: failure suppressed by on_error: continue`.
+      Deterministic — identifies which mechanism took effect.
+    - **Interaction rules:**
+      1. `on_error: continue` → log suppression, continue. Hook not triggered.
+      2. All failures suppressed → `pipelineSuccess === true` → hook NOT run.
+      3. Any unsuppressed (fatal) failure → `pipelineSuccess === false` → hook
+         runs exactly once via `runFailureHook()`.
+      4. Hook failure does not affect `on_error: continue` semantics (FR-E19).
+    - **`runFailureHook()`:** private method in engine.ts. Executes
+      `config.defaults.on_failure_script` via `Deno.Command()`. Swallows errors
+      (hook must not crash engine). Called before post-pipeline nodes when
+      `pipelineSuccess === false`. Script is pipeline-specific — engine treats
+      as opaque invocation (domain-agnostic). Failed node IDs available via
+      `state.json` (`nodes[*].status === "failed"`).
   - **Semi-verbose filtering (FR-41):** `formatEventForOutput(event,
     verbosity?)` accepts optional `Verbosity` param. When
     `verbosity === "semi-verbose"`, skips `tool_use` content blocks in
@@ -635,8 +651,9 @@ graph TD
 
 - **Scale:** Single pipeline per run. Sequential stages (no parallel agents).
 - **Fault:** Node failure stops pipeline (unless `on_error: continue`). Failure
-  reported via state.json. Configurable `on_failure_script` hook runs before
-  post-pipeline nodes.
+  reported via state.json. `on_error: continue` emits info log per suppressed
+  node (FR-E34). Configurable `on_failure_script` hook runs before post-pipeline
+  nodes only when `pipelineSuccess === false` (not when all failures suppressed).
 - **Logs:** Full transcripts per node in `.auto-flow/runs/<run-id>/logs/`.
 
 ## 7. Constraints
