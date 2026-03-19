@@ -106,6 +106,14 @@ graph TD
     (>1 entry requires `inputs` declarations), validates `condition_node`
     references valid key in `nodes`. Skips top-level existence check for
     body node IDs referenced in `inputs`.
+    **Loop input forwarding validation (FR-E35):** After body node validation
+    loop (~line 261-271), iterates each body node's `inputs`. For each input
+    NOT in `bodyNodeIds` (external reference), checks presence in
+    `node.inputs ?? []` (loop node's declared inputs). Missing → throws:
+    `"Loop '<loopId>' body node '<bodyId>' references external input(s)
+    [<missing>] not listed in loop inputs"`. Runs inline in `validateNode()`
+    loop branch — no new function or signature change. `node.inputs` accessed
+    directly from the loop node object already in scope.
   - `dag.ts` — topological sort, cycle detection, level grouping.
     Excludes loop body nodes (from `nodes` sub-object) from top-level
     graph; loop node itself remains in DAG with its declared `inputs`.
@@ -558,6 +566,19 @@ graph TD
     Load-time validation: `validateFileReferences(config)` in `config.ts`
     scans `task_template`/`prompt` fields for `{{file("...")}}` regex, checks
     existence. Skips paths with `{{` (template vars unresolvable at load time).
+  - **Loop Input Forwarding Validation (FR-E35):** In `validateNode()` loop
+    branch, after existing body node validation loop: for each body node,
+    classify its `inputs` as internal (present in `bodyNodeIds`) or external.
+    External inputs must appear in the enclosing loop node's `inputs` array
+    (`node.inputs ?? []`). Algorithm:
+    1. Collect `bodyNodeIds = new Set(Object.keys(node.nodes))`.
+    2. Collect `loopInputs = new Set(node.inputs ?? [])`.
+    3. For each body node: filter its `inputs` to those NOT in `bodyNodeIds`.
+    4. For each such external input: if NOT in `loopInputs`, collect as missing.
+    5. If any missing: throw config error naming body node, loop node, and
+       missing input IDs. Single error per body node (all missing IDs listed).
+    Parse-time check — runs during `loadConfig()` → `validateNode()`. No
+    runtime overhead. Sibling body node references excluded from check.
   - **Post-Pipeline Node Collection & Ordering**: `collectPostPipelineNodes()`
     collects nodes where `run_on !== undefined` (replaces `run_always`-based
     collection). `sortPostPipelineNodes()` sorts them topologically using
