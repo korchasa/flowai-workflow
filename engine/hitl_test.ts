@@ -229,6 +229,53 @@ Deno.test("runHitlLoop — timeout returns failure", async () => {
   assertEquals(result.error!.includes("timeout"), true);
 });
 
+Deno.test("runHitlLoop — artifact_source template resolved via ctx", async () => {
+  const capturedAskArgs: string[] = [];
+
+  const opts = makeBaseOpts({
+    config: {
+      ...makeHitlConfig(),
+      artifact_source: "{{input.specification}}/01-spec.md",
+    },
+    ctx: {
+      node_dir: "/tmp/test",
+      run_dir: "/tmp/run",
+      run_id: "test-run",
+      args: {},
+      env: {},
+      input: { specification: "/runs/abc/specification" },
+    },
+    scriptRunner: (path: string, args: string[]) => {
+      if (path.includes("ask")) capturedAskArgs.push(...args);
+      if (path.includes("check")) {
+        return Promise.resolve({ exitCode: 0, stdout: "Go" });
+      }
+      return Promise.resolve({ exitCode: 0, stdout: "" });
+    },
+    claudeRunner: (_opts) =>
+      Promise.resolve({
+        output: {
+          result: "OK",
+          session_id: "sess-xyz",
+          total_cost_usd: 0.01,
+          duration_ms: 100,
+          duration_api_ms: 80,
+          num_turns: 1,
+          is_error: false,
+        },
+      }),
+  });
+
+  await runHitlLoop(opts);
+
+  const idx = capturedAskArgs.indexOf("--artifact-source");
+  assertEquals(idx !== -1, true);
+  assertEquals(
+    capturedAskArgs[idx + 1],
+    "/runs/abc/specification/01-spec.md",
+  );
+});
+
 Deno.test("runHitlLoop — skipAsk=true skips ask invocation", async () => {
   const calls: string[] = [];
 
