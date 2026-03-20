@@ -67,6 +67,15 @@ type: feedback
 - design-sdlc.md may already be updated by Tech Lead in the decide phase — check §8
   for existing FR-S<N> entry before writing.
 
+## Scope-Check Module Pattern (FR-E37)
+
+- `scope_check` is an internal-only `ValidationRule.type` — added to the union but never user-configured in YAML.
+- Synthetic `ValidationResult` uses `path: ""` (empty string) since scope_check has no file path concept.
+- While loop condition must be widened: `validationRules.length > 0 || node.allowed_paths !== undefined` — otherwise loop skips when no validate rules but scope check is active.
+- `allPassed([])` returns `true` (Array.every on empty), so loop exits correctly when no rules and no scope violations.
+- `beforeSnapshot` updated to `afterSnapshot` after each iteration — incremental detection, not cumulative.
+- `globMatch()` implemented inline: `**` → `.*`, `*` → `[^/]*`, `?` → `[^/]`, literals escaped.
+
 ## Baseline Metrics
 
 - Run 20260315T003418: ~14 turns, scope sdlc, issue #121 (FR-S29), 7 SKILL.md + 2 memory files — PASS
