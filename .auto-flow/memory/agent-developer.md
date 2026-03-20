@@ -96,6 +96,14 @@ type: feedback
   checks `!fieldMatch || !fieldMatch[1].trim()` to catch both absent and empty-valued fields.
 - No `assertRejects` needed — all sync config tests use `assertThrows`.
 
+## Large File Edit Tool Tracking
+
+- When `Read` output exceeds ~85KB, the system saves it to a temp file and the Edit tool
+  does NOT recognize the file as "read" (tracking fails). Re-reading with offset/limit also
+  fails in this case.
+- Fix: use Bash with Python inline script to apply changes to large files. This is a valid
+  fallback when the dedicated Edit tool is broken due to temp-file output routing.
+
 ## Binary Distribution Pattern (FR-E39)
 
 - `VERSION` constant uses `Deno.env.get("VERSION") ?? "dev"` — embedded at compile time via `deno compile --env-file <tmpfile>` where tmpfile contains `VERSION=<tag>`.

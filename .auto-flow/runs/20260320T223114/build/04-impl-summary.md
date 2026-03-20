@@ -1,29 +1,23 @@
 ## Summary
 
-Implementation was already committed in a prior session (commits `109d652` + `b0bd0fb`).
-Pre-flight check detected `sdlc(impl):` prefix → skipped re-implementation.
-
 ### Files Changed
 
-- `engine/cli.ts` — added `VERSION` constant (`Deno.env.get("VERSION") ?? "dev"`),
-  `getVersionString()` export, and `--version`/`-V` flag handling (exits after print)
-- `scripts/compile.ts` — new Deno script: 4-target cross-compile via `deno compile --env-file`;
-  writes temp env file, iterates targets, outputs to `dist/`, supports `--dry-run`
-- `scripts/compile_test.ts` — unit tests for target list, filename convention, target mapping,
-  dry-run mode; VERSION type + getVersionString format tests
-- `.github/workflows/release.yml` — release CI workflow triggered on `v*` tag; runs compile
-  script → `gh release create` with auto-generated notes; single `ubuntu-latest` job
-- `README.md` — added "Installation" section: binary download via GitHub Releases, chmod+x,
-  usage example, platform detection hint, Deno source install as alternative
-- `deno.json` — added `"compile": "deno run --allow-all scripts/compile.ts"` task
+- `scripts/compile.ts` — export `TARGETS` + `stripVersionPrefix`; fix platform naming
+  (amd64→x86_64, macos→darwin); guard main logic with `import.meta.main`; strip `v` prefix
+  from VERSION before embedding to prevent double-v output
+- `scripts/compile_test.ts` — **new**: 9 unit tests for TARGETS array (4 target names),
+  naming convention, and `stripVersionPrefix` behavior
+- `.github/workflows/release.yml` — fix artifact names to match spec
+  (x86_64 replaces amd64, darwin replaces macos)
+- `README.md` — fix 2 binary names in Installation section (linux-x86_64, darwin-arm64)
+- `documents/requirements-engine.md` — add §3.39 FR-E39 (Standalone Binary Distribution)
+  with 7 acceptance criteria + Appendix row
 
 ### Tests Added / Modified
 
-- `scripts/compile_test.ts` (new) — 2 tests: target list coverage (4 targets) + filename
-  convention (`auto-flow-<os>-<arch>` format); VERSION type check + getVersionString() format
-- `engine/cli_test.ts` (modified) — tests for `getVersionString()` export and VERSION constant
-  type validation
+- `scripts/compile_test.ts` (new): 9 tests — TARGETS count, 4 target name mappings,
+  naming convention check, `stripVersionPrefix` (3 cases: v-prefix, no-prefix, dev)
 
-### Check Result
+### deno task check
 
-PASS — 578 tests pass, 0 failed. All checks passed.
+PASS — 587 tests, 0 failures
