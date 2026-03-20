@@ -6,6 +6,19 @@ set -euo pipefail
 # Destructive by design: discards uncommitted changes, force-switches branch.
 # Called by self_runner.ts and cli.ts BEFORE engine starts.
 
+# Auto-stash uncommitted changes to preserve developer work before reset.
+if [ -n "$(git status --porcelain)" ]; then
+  branch="$(git branch --show-current)"
+  echo "Dirty working tree on branch: ${branch}"
+  git diff --stat HEAD
+  git diff --stat --cached
+  git status --porcelain | awk '/^\?\?/ { print "Untracked: " $2 }'
+  timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  git stash push --include-untracked -m "auto-flow pre_run: ${timestamp}"
+  echo "Stashed: $(git stash list -1)"
+  echo "To restore: git stash pop"
+fi
+
 git fetch origin main
 
 # Discard any local state: uncommitted changes, merge-in-progress, etc.

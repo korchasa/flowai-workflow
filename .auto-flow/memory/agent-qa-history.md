@@ -163,131 +163,25 @@
   - 528 tests unchanged from iteration 1 — no new tests needed for this sdlc-only change.
   - SDLC pipeline pattern (wrapper script replacing `|| true`) is correct approach for observable non-blocking after-script failures.
 
-## 2026-03-20T41:XX — Issue #158 (iteration 2)
+## 2026-03-20T42:XX — Issue #159 (iteration 1)
 
-- **Turns:** ~6
-- **Cost:** ~$0.15 (est)
-- **Verdict:** PASS
-- **Outcome:** All 9 acceptance criteria passed. 533 tests, 0 failures. FR-S40 present at line 904 (§3.40) and Appendix C at line 1064 — blocking issues from iteration 1 resolved. All 4 required files in diff. `requirements-sdlc.md`: 18 targeted edits confirmed (agent count 7→6, meta-agent removed, Appendix A/B fixed, Section 5 Interfaces updated). `design-sdlc.md` correct (Tech Lead pre-applied). `pipeline-report.md` canonical numbering. `spec-unified-task-template.md` Phase 1/2 → done. Self-approval failed → used `gh issue comment` fallback on issue #158.
-- **Key learnings:**
-  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S40) confirmed PASS in one parallel turn — optimal fix-iteration pattern.
-  - `requirements-sdlc.md` IS in diff and FR-S40 found at lines 904 and 1064 — PM-stage persistence failure from iter 1 resolved.
-  - 533 tests unchanged — no new tests for documentation-only issues.
-  - For documentation-only issues, implementation is correct when all targeted doc edits are applied; SRS FR section is the only recurring failure point.
-
-## 2026-03-19T40:XX — Issue #158 (iteration 1)
-
-- **Turns:** ~7
-- **Cost:** ~$0.18 (est)
+- **Turns:** ~5
+- **Cost:** ~$0.12 (est)
 - **Verdict:** FAIL
-- **Outcome:** 7/9 criteria passed (inferred; FR-S40 section absent). 533 tests, 0 failures. All 4 required files in diff. Implementation correct: 18 targeted edits to `requirements-sdlc.md` (agent count 7→6, meta-agent active refs removed, Appendix A Stage 7 + artifact name fix, Appendix B agent-meta-agent removed, Section 5 Interfaces updated, Section 6 AC#7 removed); `pipeline-report.md` numbering fixed to FR-S32 canonical; `spec-unified-task-template.md` Phase 1/2 → done; `design-sdlc.md` already correct (Tech Lead pre-applied FR-S40 §8 entry). Blocking: FR-S40 section 3.40 and Appendix C row missing from `requirements-sdlc.md` — PM-stage persistence failure (13th consecutive: #147–#158). Self-request-changes failed (author = reviewer) → used `gh issue comment` fallback on issue #158.
+- **Outcome:** 4/5 implementation criteria passed (all behavioral ACs met). 533 tests, 0 failures. Implementation correct: `reset-to-main.sh:10-20` adds dirty-check guard, branch display, `git diff --stat HEAD` + cached + untracked, `git stash push --include-untracked -m "auto-flow pre_run: <timestamp>"`, stash ref + restore cmd. `reset-to-main_test.sh` covers all 3 test scenarios (clean-tree, dirty-tree, post-reset). Blocking: `documents/requirements-sdlc.md` not in diff, 0 matches for FR-S41 — PM-stage SRS persistence failure (14th consecutive: #147–#159). Self-request-changes failed (author = reviewer) → used `gh issue comment` fallback on issue #159.
 - **Key learnings:**
-  - `requirements-sdlc.md` being in the diff does NOT guarantee PM-stage FR section is present — developer doc edits can be in the same file without the PM-added FR section. Always grep for FR number.
-  - For documentation-only issues (no code changes), grep-first strategy is still mandatory.
-  - `design-sdlc.md` may already be correct before developer touches it (Tech Lead updated it during design phase) — check impl-summary for "no changes" claim.
-  - 533 tests unchanged — no new tests for documentation-only issues.
+  - Shell test file (`reset-to-main_test.sh`) is NOT part of Deno test suite — `deno task check` count stays at 533 (same as #158). Behavioral ACs still verified by reading the script directly.
+  - PM-stage SRS persistence failure continues (14th consecutive). Grep for FR-S41 in requirements-sdlc.md returns 0 matches — same pattern as all prior issues.
+  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S41) confirmed FAIL in one parallel turn — optimal pattern.
 
-## 2026-03-19T39:XX — Issue #157 (iteration 2)
+## 2026-03-20T43:XX — Issue #159 (iteration 2)
 
 - **Turns:** ~5
 - **Cost:** ~$0.12 (est)
 - **Verdict:** PASS
-- **Outcome:** All 4 acceptance criteria passed. 533 tests, 0 failures. FR-S39 present at line 881 (§3.39) and Appendix C at line 1028 — blocking issue from iteration 1 resolved. `requirements-sdlc.md` IS in diff. All 6 SKILL.md files: `# BEFORE YOU DO ANYTHING` block absent, first-tool-call guidance preserved in 5 agents, agent-tech-lead-review starts directly at `# Role:`. Cross-references preserved (agent-pm:98, agent-architect:23,48, agent-tech-lead:58,102, agent-developer:63). Frontmatter intact. Self-approval failed → used `gh issue comment` fallback on issue #157.
+- **Outcome:** All 5 acceptance criteria passed. 533 tests, 0 failures. FR-S41 present at line 945 (§3.41, all ACs marked [x]) and Appendix C at line 1092 — blocking issue from iteration 1 resolved. `requirements-sdlc.md` IS in diff. Implementation: `reset-to-main.sh:10-20` auto-stash block (dirty-check, branch display, diff stat, stash push with --include-untracked, confirmation with restore cmd). `reset-to-main_test.sh`: 3 test scenarios (clean-tree no-op, dirty-tree stash creation, post-reset HEAD at origin/main). Self-approval failed → used `gh issue comment` fallback on issue #159.
 - **Key learnings:**
-  - Write tool requires prior Read of existing file even when overwriting QA report on iteration > 1 — always Read first.
-  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S39) confirmed PASS in one parallel turn — optimal fix-iteration pattern.
-  - 533 tests unchanged from iteration 1 — no new tests needed for SKILL.md content-only removal.
-  - PM-stage SRS persistence failure for issue #157 resolved in iter 2 — `requirements-sdlc.md` in diff with FR-S39 at all promised locations.
-
-## 2026-03-19T38:XX — Issue #157 (iteration 1)
-
-- **Turns:** ~5
-- **Cost:** ~$0.12 (est)
-- **Verdict:** FAIL
-- **Outcome:** 3/4 acceptance criteria passed. 533 tests, 0 failures. SKILL.md changes correct: all 6 files have `# BEFORE YOU DO ANYTHING` block removed, cross-references preserved (`per shared-rules.md §...`), frontmatter intact. Blocking: `documents/requirements-sdlc.md` not in diff, 0 matches for FR-S39 — PM agent never added section 3.39 or Appendix C row (12th consecutive PM-stage SRS persistence failure: #147–#157). Self-request-changes failed (author = reviewer) → used `gh issue comment` fallback on issue #157.
-- **Key learnings:**
-  - PM-stage SRS persistence failure confirmed again (12th consecutive). Grep-first strategy mandatory.
-  - For SKILL.md-only changes (no source code), SKILL.md files are the entire implementation — verify each one individually by reading in parallel.
-  - `design-sdlc.md` was in diff (Tech Lead SDS update) even though spec did not require it — non-blocking, out-of-spec addition by Tech Lead is acceptable.
-  - 533 tests unchanged — no new tests needed for SKILL.md content-only removal.
-
-## 2026-03-19T37:XX — Issue #156 (iteration 2)
-
-- **Turns:** ~5
-- **Cost:** ~$0.12 (est)
-- **Verdict:** PASS
-- **Outcome:** All 4 acceptance criteria passed. 533 tests, 0 failures. FR-S38 present at line 864 (§3.38) and Appendix C at line 1001 — blocking issue from iteration 1 resolved. Implementation: all 6 pipeline.yaml nodes (`specification`, `design`, `decision`, `build`, `verify`, `tech-lead-review`) migrated from `prompt:` to `{{file(...)}}` injection for both shared-rules.md and SKILL.md with `---` separators. `pipeline_integrity_test.ts` enforces AC#3 (no `prompt:` field). Self-approval failed → used `gh issue comment` fallback on issue #156.
-- **Key learnings:**
-  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S38) confirmed PASS in one parallel turn — optimal fix-iteration pattern.
-  - `requirements-sdlc.md` IS in diff and FR-S38 found at lines 864 and 1001 — PM-stage persistence failure from iter 1 resolved.
-  - 533 tests unchanged from iteration 1 — implementation tests were already added (pipeline_integrity_test.ts), only SRS doc updated.
-  - PM-stage SRS persistence failure: 11th consecutive issue (#147–#156 all failed on iter 1 due to missing SRS).
-
-## 2026-03-19T36:XX — Issue #156 (iteration 1)
-
-- **Turns:** ~5
-- **Cost:** ~$0.12 (est)
-- **Verdict:** FAIL
-- **Outcome:** 4/5 criteria passed. 533 tests, 0 failures. Implementation correct: all 6 nodes in `pipeline.yaml` migrated from `prompt:` to `{{file(...)}}` injection (`specification`/`design`/`decision`/`build`/`verify`/`tech-lead-review`), no `prompt:` field in any node, `pipeline_integrity_test.ts` added with FR-S38 AC#3 test + `collectPromptPaths` unit test. Blocking: `documents/requirements-sdlc.md` not in diff, 0 matches for FR-S38 — PM agent never added section 3.38 or Appendix C row. Self-approval failed → used `gh issue comment` fallback on issue #156.
-- **Key learnings:**
-  - PM-stage SRS persistence failure continues (issue #156, now 10th consecutive failure: #147, #148, #149, #150, #151, #153, #154, #155, #156). Grep for FR number immediately after getting git diff is mandatory.
-  - Developer added a `pipeline_integrity_test.ts` with `collectPromptPaths` function test — good pattern for enforcing structural constraints in pipeline.yaml.
-  - 533 tests (unchanged from #155) — no new tests needed for the SRS fix.
-  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S38) confirmed FAIL in one parallel turn.
-
-## 2026-03-19T35:XX — Issue #155 (iteration 2)
-
-- **Turns:** ~5
-- **Cost:** ~$0.12 (est)
-- **Verdict:** PASS
-- **Outcome:** All 10 acceptance criteria passed. 533 tests, 0 failures. FR-E36 present at line 756 (§3.36) and Appendix at line 854 in requirements-engine.md. FR-S37 present at line 850 (§3.37) and Appendix at line 983 in requirements-sdlc.md. Both SRS files confirmed in diff — PM-stage persistence failure from iteration 1 resolved. Implementation: `config.ts` lines 291-312 (parse-time validation), `loop.ts` lines 224-226 (runtime throw with descriptive message), `pipeline.yaml` lines 162-165 (frontmatter_field: verdict + allowed: [PASS, FAIL]), 5 new tests (2 parse-time + 3 runtime). Self-approval failed → used `gh issue comment` fallback on issue #155.
-- **Key learnings:**
-  - First engine+sdlc scope issue to PASS on iteration 2 — both SRS files were in diff and both FRs found at all promised locations.
-  - 533 tests unchanged from iteration 1 — tests were already added in iter 1, no new ones needed.
-  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-E36|FR-S37) confirmed PASS in one parallel turn — optimal pattern for fix iterations.
-
-## 2026-03-19T34:XX — Issue #155 (iteration 1)
-
-- **Turns:** ~5
-- **Cost:** ~$0.12 (est)
-- **Verdict:** FAIL
-- **Outcome:** 8/10 acceptance criteria passed. 533 tests, 0 failures. Implementation correct: parse-time FR-E36 check in `config.ts` (lines 291-312), runtime FR-E36 throw in `loop.ts` (lines 224-226) with updated `extractConditionValue()` signature (5 params: +loopId +condNodeId), 2 parse-time tests in `config_test.ts` (lines 1137-1206), 3 runtime tests in `loop_test.ts` (lines 279-378), `pipeline.yaml` verify node frontmatter_field: verdict + allowed: [PASS, FAIL] (lines 162-165). Blocking: both `requirements-engine.md` and `requirements-sdlc.md` absent from diff; FR-E36 and FR-S37 have 0 grep matches — PM agent failed to persist either SRS file (engine+sdlc scope). Self-approval failed → used `gh issue comment` fallback on issue #155.
-- **Key learnings:**
-  - First engine+sdlc scope issue — both SRS files can be absent simultaneously when two FRs span both scopes.
-  - 533 tests (up from 528) confirms 5 new tests added (2 config + 3 loop).
-  - `extractConditionValue()` signature extended from 3 to 5 params to include loopId + condNodeId for descriptive error messages.
-  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-E36|FR-S37) confirmed FAIL in one parallel turn.
-
-## 2026-03-19T32:XX — Issue #154 (iteration 1)
-
-- **Turns:** ~5
-- **Cost:** ~$0.14 (est)
-- **Verdict:** FAIL
-- **Outcome:** 6/7 criteria passed. 528 tests, 0 failures. Implementation correct: `run-dashboard.sh` wrapper created (warns on failure, exits 0), `pipeline.yaml` `after:` updated to `.auto-flow/scripts/run-dashboard.sh {{run_dir}}`, `design-sdlc.md` updated. Blocking: `documents/requirements-sdlc.md` not in diff, 0 grep matches for FR-S36 — PM agent never added section 3.36 or Appendix C row. Self-approval failed → used `gh issue comment` fallback on issue #154.
-- **Key learnings:**
-  - PM-stage SRS persistence failure continues (issue #154). Pattern now: #147, #148, #149, #151, #153, #154 all fail on missing SRS; #150, #152 pass. Grep-first strategy is mandatory.
-  - `design-sdlc.md` was in diff (SDS update correct) but `requirements-sdlc.md` was not — confirms PM-stage, not Developer-stage failure.
-  - 528 tests (unchanged from #153) — no new tests needed for this sdlc-only change (wrapper script, pipeline config).
-
-## 2026-03-19T30:XX — Issue #153 (iteration 1)
-
-- **Turns:** ~5
-- **Cost:** ~$0.14 (est)
-- **Verdict:** FAIL
-- **Outcome:** 5/6 criteria passed. 528 tests, 0 failures. Implementation correct: `engine/config.ts:273-289` inline forwarding validation in `validateNode()` loop branch; 4 FR-E35 tests in `config_test.ts` (lines 171–291) covering all required cases; `documents/design-engine.md` §3.1 (lines 109–116) and §5 Logic (lines 569–581) document the algorithm. Blocking: `documents/requirements-engine.md` not in diff, 0 grep matches for FR-E35 — PM agent never added §3.35 or Appendix row. Self-approval failed → used `gh issue comment` fallback on issue #153.
-- **Key learnings:**
-  - PM-stage SRS persistence failure confirmed again (7th issue: #147, #148, #149, #150, #151, #152 passed, #153 fails again). Grep-first strategy is the mandatory first verification step.
-  - 528 tests (up from 524) confirms 4 new FR-E35 tests were added.
-  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-E35) confirmed FAIL in one parallel turn — blocking identified immediately.
-  - Issue #152 broke the streak (PASS on iter 1), but #153 reverts to missing SRS pattern.
-
-## 2026-03-19T28:XX — Issue #151 (iteration 2)
-
-- **Turns:** ~6
-- **Cost:** ~$0.16 (est)
-- **Verdict:** PASS
-- **Outcome:** All 9 acceptance criteria passed. 519 tests, 0 failures. FR-S35 present at line 788 (section 3.35) and Appendix C at line 938. Implementation: pipeline.yaml `{{input.specification}}/01-spec.md` (line 23), `interpolate()` in `hitl.ts:buildScriptArgs()` (line 264), `validateHitlArtifactSource()` + `hitlArtifactSource()` in `check.ts` (lines 110–146), tests in `hitl_test.ts` + `check_test.ts`. Self-approval failed → used `gh issue comment` fallback on issue #151.
-- **Key learnings:**
-  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S35) confirmed PASS in one parallel turn — blocking issue from iter 1 resolved.
-  - When SRS file IS in diff and grep confirms FR at all promised locations, source file reads confirm the rest — optimal pattern for fix iterations.
-  - 6 consecutive PM-stage SRS persistence failures (#147–151); the grep-first strategy is now the mandatory first verification step.
+  - Shell tests (.sh) are not in Deno count (533 unchanged) — non-blocking; behavioral coverage confirmed by reading script + test file directly.
+  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S41) confirmed PASS in one parallel turn — optimal fix-iteration pattern.
+  - PM-stage SRS persistence failure for issue #159 resolved in iteration 2 — `requirements-sdlc.md` in diff with FR-S41 at all promised locations.
+  - 15th consecutive pattern: PM stage fails on iter 1, dev restores on iter 2. Pattern continues unchanged.

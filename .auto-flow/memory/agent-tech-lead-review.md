@@ -32,3 +32,4 @@ type: feedback
 - **Large diff (run artifacts):** When `gh pr diff` output is very large (>900KB), the agent memory files and run artifacts dominate. The SKILL.md hunks appear near the top — verify them first, then confirm memory/artifacts are expected pipeline output.
 - **Doc-only PR review:** For documentation-only PRs (no TS logic), review focuses on: correct stale refs removed, scope-correct files only, no engine files touched. QA PASS with all ACs marked [x] is sufficient evidence.
 - **QA report dirty on entry:** QA agent may leave the run's `05-qa-report.md` modified without committing. Always check `git status` and commit with `git add -f` before merge.
+- **Shell-only PR (no TS):** When implementation is entirely bash scripts, Deno test count stays unchanged. QA verifies by reading the script + test file directly; bash test count (e.g., 7 assertions) is non-blocking and separate from Deno suite.
