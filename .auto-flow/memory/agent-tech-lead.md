@@ -43,4 +43,5 @@
 - Run 20260319T224519: ~7 turns, scope sdlc, issue #156 (FR-S38).
 - Run 20260319T230952: ~7 turns, scope sdlc, issue #157 (FR-S39).
 - Run 20260319T233247: ~7 turns, scope sdlc, issue #158 (FR-S40).
+- Run 20260320T000829: ~7 turns, scope sdlc, issue #159 (FR-S41).
 - Target: ≤10 turns. Achieved all runs.
