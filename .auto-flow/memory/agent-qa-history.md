@@ -174,6 +174,17 @@
   - PM-stage SRS persistence failure continues (14th consecutive). Grep for FR-S41 in requirements-sdlc.md returns 0 matches — same pattern as all prior issues.
   - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S41) confirmed FAIL in one parallel turn — optimal pattern.
 
+## 2026-03-20T44:XX — Issue #174 (iteration 1)
+
+- **Turns:** ~5
+- **Cost:** ~$0.12 (est)
+- **Verdict:** FAIL
+- **Outcome:** 8/9 criteria passed. 533 tests, 0 failures. Pipeline.yaml implementation fully correct: all 6 nodes use `type: artifact` with correct sections; `frontmatter_field` rules for specification (issue, scope) and verify (verdict) preserved; `custom_script` in build preserved; deno task check passes. Blocking: `documents/requirements-sdlc.md` not in diff, 0 matches for FR-S42 — PM-stage SRS persistence failure (16th consecutive: #147–#174). Self-request-changes failed (author = reviewer) → used `gh issue comment` fallback on issue #174.
+- **Key learnings:**
+  - PM-stage SRS persistence failure continues (16th consecutive). Pipeline config-only changes are no exception to the SRS verification step.
+  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S42) confirmed FAIL in one parallel turn — optimal pattern.
+  - `design-sdlc.md` IS in diff (Tech Lead SDS update) but spec doesn't promise it — not a blocking issue.
+
 ## 2026-03-20T43:XX — Issue #159 (iteration 2)
 
 - **Turns:** ~5

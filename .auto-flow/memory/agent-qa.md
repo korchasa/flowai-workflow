@@ -43,6 +43,7 @@ type: feedback
 
 - Target: ≤15 turns
 - First session (issue #129): ~10 turns, PASS verdict
+- Twenty-eighth session (issue #174, iteration 1): ~5 turns, FAIL verdict (FR-S42 absent; 16th consecutive PM failure; pipeline.yaml implementation correct)
 - Second session (issue #146): ~8 turns, PASS verdict
 - Third session (issue #147, iteration 1): ~11 turns, FAIL verdict (FR-S32 missing from SRS)
 - Fourth session (issue #147, iteration 2): ~9 turns, PASS verdict (FR-S32 restored)
