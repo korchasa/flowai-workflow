@@ -1204,3 +1204,175 @@ nodes:
     assertEquals(config.nodes["my-loop"].condition_field, "verdict");
   },
 );
+
+// --- FR-E7: Hook template variable validation ---
+
+Deno.test("parseConfig — before hook with valid template vars passes", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  a:
+    type: agent
+    label: A
+    task_template: "do something"
+    before: "echo {{node_dir}} {{run_id}}"
+`;
+  const config = parseConfig(yaml);
+  assertEquals(config.nodes.a.before, "echo {{node_dir}} {{run_id}}");
+});
+
+Deno.test("parseConfig — after hook with valid template vars passes", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  a:
+    type: agent
+    label: A
+    task_template: "do something"
+    after: "deno task check {{env.SOME_VAR}}"
+`;
+  const config = parseConfig(yaml);
+  assertEquals(config.nodes.a.after, "deno task check {{env.SOME_VAR}}");
+});
+
+Deno.test(
+  "parseConfig — before hook with unknown prefix throws with node ID",
+  () => {
+    const yaml = `
+name: test
+version: "1"
+nodes:
+  my-node:
+    type: agent
+    label: A
+    task_template: "do something"
+    before: "echo {{bad.var}}"
+`;
+    assertThrows(
+      () => parseConfig(yaml),
+      Error,
+      "my-node",
+    );
+  },
+);
+
+Deno.test(
+  "parseConfig — after hook with unknown prefix throws mentioning 'after hook'",
+  () => {
+    const yaml = `
+name: test
+version: "1"
+nodes:
+  my-node:
+    type: agent
+    label: A
+    task_template: "do something"
+    after: "echo {{bad.var}}"
+`;
+    assertThrows(
+      () => parseConfig(yaml),
+      Error,
+      "after hook",
+    );
+  },
+);
+
+Deno.test(
+  "parseConfig — before hook with unknown direct key throws mentioning 'before hook'",
+  () => {
+    const yaml = `
+name: test
+version: "1"
+nodes:
+  my-node:
+    type: agent
+    label: A
+    task_template: "do something"
+    before: "echo {{unknown_key}}"
+`;
+    assertThrows(
+      () => parseConfig(yaml),
+      Error,
+      "before hook",
+    );
+  },
+);
+
+Deno.test(
+  "parseConfig — hook with valid input.<node-id> from same pipeline passes",
+  () => {
+    const yaml = `
+name: test
+version: "1"
+nodes:
+  a:
+    type: agent
+    label: A
+    task_template: "do A"
+  b:
+    type: agent
+    label: B
+    task_template: "do B"
+    inputs: [a]
+    after: "cat {{input.a}}/output.md"
+`;
+    const config = parseConfig(yaml);
+    assertEquals(config.nodes.b.after, "cat {{input.a}}/output.md");
+  },
+);
+
+Deno.test(
+  "parseConfig — hook with input.<unknown-node> throws",
+  () => {
+    const yaml = `
+name: test
+version: "1"
+nodes:
+  a:
+    type: agent
+    label: A
+    task_template: "do A"
+    after: "cat {{input.nonexistent}}/output.md"
+`;
+    assertThrows(
+      () => parseConfig(yaml),
+      Error,
+      "after hook",
+    );
+  },
+);
+
+Deno.test(
+  "parseConfig — loop body node hook uses combined IDs (body node ref valid)",
+  () => {
+    const yaml = `
+name: test
+version: "1"
+nodes:
+  my-loop:
+    type: loop
+    label: Loop
+    condition_node: qa
+    condition_field: verdict
+    exit_value: PASS
+    nodes:
+      developer:
+        type: agent
+        label: Developer
+        task_template: implement
+      qa:
+        type: agent
+        label: QA
+        task_template: verify
+        inputs: [developer]
+        after: "echo {{input.developer}}"
+`;
+    const config = parseConfig(yaml);
+    assertEquals(
+      config.nodes["my-loop"].nodes!.qa.after,
+      "echo {{input.developer}}",
+    );
+  },
+);

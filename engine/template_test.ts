@@ -1,5 +1,9 @@
 import { assertEquals, assertThrows } from "@std/assert";
-import { FILE_INCLUSION_SIZE_WARN_BYTES, interpolate } from "./template.ts";
+import {
+  FILE_INCLUSION_SIZE_WARN_BYTES,
+  interpolate,
+  validateTemplateVars,
+} from "./template.ts";
 import type { TemplateContext } from "./types.ts";
 
 function makeCtx(overrides?: Partial<TemplateContext>): TemplateContext {
@@ -204,4 +208,72 @@ Deno.test("interpolate — file() emits console.warn for large file", () => {
   }
   assertEquals(warns.length, 1);
   assertEquals(warns[0].includes("large file"), true);
+});
+
+// --- validateTemplateVars tests (FR-E7) ---
+
+Deno.test("validateTemplateVars — empty string returns no errors", () => {
+  assertEquals(validateTemplateVars("", []), []);
+});
+
+Deno.test("validateTemplateVars — no placeholders returns no errors", () => {
+  assertEquals(validateTemplateVars("git pull", []), []);
+});
+
+Deno.test("validateTemplateVars — valid direct keys return no errors", () => {
+  assertEquals(
+    validateTemplateVars("{{node_dir}} {{run_dir}} {{run_id}}", []),
+    [],
+  );
+});
+
+Deno.test("validateTemplateVars — valid input with known node returns no errors", () => {
+  assertEquals(validateTemplateVars("{{input.pm}}", ["pm"]), []);
+});
+
+Deno.test("validateTemplateVars — input with unknown node returns error", () => {
+  const errors = validateTemplateVars("{{input.nonexistent}}", ["pm"]);
+  assertEquals(errors.length, 1);
+  assertEquals(errors[0].includes("Unknown input node"), true);
+});
+
+Deno.test("validateTemplateVars — env and args are always valid", () => {
+  assertEquals(
+    validateTemplateVars("{{env.KEY}} {{args.issue}}", []),
+    [],
+  );
+});
+
+Deno.test("validateTemplateVars — loop.iteration is valid", () => {
+  assertEquals(validateTemplateVars("{{loop.iteration}}", []), []);
+});
+
+Deno.test("validateTemplateVars — unknown loop property returns error", () => {
+  const errors = validateTemplateVars("{{loop.count}}", []);
+  assertEquals(errors.length, 1);
+  assertEquals(errors[0].includes("Unknown loop property"), true);
+});
+
+Deno.test("validateTemplateVars — file() pattern is valid", () => {
+  assertEquals(
+    validateTemplateVars('{{file("/path/to/file.md")}}', []),
+    [],
+  );
+});
+
+Deno.test("validateTemplateVars — unknown prefix returns error", () => {
+  const errors = validateTemplateVars("{{foo.bar}}", []);
+  assertEquals(errors.length, 1);
+  assertEquals(errors[0].includes("Unknown template variable prefix"), true);
+});
+
+Deno.test("validateTemplateVars — unknown direct key returns error", () => {
+  const errors = validateTemplateVars("{{unknown_key}}", []);
+  assertEquals(errors.length, 1);
+  assertEquals(errors[0].includes("Unknown template variable"), true);
+});
+
+Deno.test("validateTemplateVars — multiple errors accumulated", () => {
+  const errors = validateTemplateVars("{{foo.bar}} {{baz}}", []);
+  assertEquals(errors.length, 2);
 });

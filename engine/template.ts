@@ -109,3 +109,73 @@ function resolve(key: string, ctx: TemplateContext): string {
       throw new Error(`Unknown template variable prefix: {{${key}}}`);
   }
 }
+
+/**
+ * Validate all `{{...}}` template variables in a string against known inputs.
+ *
+ * Pure function — no I/O. Returns an array of error descriptions; empty = valid.
+ * Known prefixes: `input` (suffix must be in knownInputs), `env`, `args`,
+ * `loop` (only `loop.iteration`). Known direct keys: `run_dir`, `run_id`,
+ * `node_dir`. `file("...")` pattern is always accepted.
+ */
+export function validateTemplateVars(
+  template: string,
+  knownInputs: string[],
+): string[] {
+  const errors: string[] = [];
+
+  for (const match of template.matchAll(/\{\{([^}]+)\}\}/g)) {
+    const key = match[1].trim();
+
+    // Direct fields
+    if (key === "node_dir" || key === "run_dir" || key === "run_id") continue;
+
+    // file() function: {{file("path")}}
+    if (/^file\(".*"\)$/.test(key)) continue;
+
+    // Dotted paths
+    const dotIdx = key.indexOf(".");
+    if (dotIdx === -1) {
+      errors.push(`Unknown template variable: {{${key}}}`);
+      continue;
+    }
+
+    const prefix = key.substring(0, dotIdx);
+    const suffix = key.substring(dotIdx + 1);
+
+    if (!suffix) {
+      errors.push(`Empty key after prefix in template variable: {{${key}}}`);
+      continue;
+    }
+
+    switch (prefix) {
+      case "input":
+        if (!knownInputs.includes(suffix)) {
+          errors.push(
+            `Unknown input node in template variable: {{${key}}}. Available: ${
+              knownInputs.join(", ") || "(none)"
+            }`,
+          );
+        }
+        break;
+
+      case "args":
+      case "env":
+        // Any suffix is valid — resolved at runtime from CLI args / environment
+        break;
+
+      case "loop":
+        if (suffix !== "iteration") {
+          errors.push(
+            `Unknown loop property in template variable: {{${key}}}. Only 'loop.iteration' is supported.`,
+          );
+        }
+        break;
+
+      default:
+        errors.push(`Unknown template variable prefix: {{${key}}}`);
+    }
+  }
+
+  return errors;
+}

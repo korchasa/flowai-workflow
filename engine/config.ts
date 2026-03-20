@@ -7,6 +7,7 @@
  */
 
 import { parse as parseYaml } from "@std/yaml";
+import { validateTemplateVars } from "./template.ts";
 import type {
   NodeConfig,
   NodeSettings,
@@ -316,6 +317,28 @@ function validateNode(
     if (typeof node.question !== "string" || !node.question) {
       throw new Error(
         `Human node '${id}' requires a non-empty 'question' field`,
+      );
+    }
+  }
+
+  // Validate hook template variables (FR-E7)
+  if (typeof node.before === "string" && node.before) {
+    const errors = validateTemplateVars(node.before, allNodeIds);
+    if (errors.length > 0) {
+      throw new Error(
+        `Node '${id}' before hook has invalid template variables: ${
+          errors.join("; ")
+        }`,
+      );
+    }
+  }
+  if (typeof node.after === "string" && node.after) {
+    const errors = validateTemplateVars(node.after, allNodeIds);
+    if (errors.length > 0) {
+      throw new Error(
+        `Node '${id}' after hook has invalid template variables: ${
+          errors.join("; ")
+        }`,
       );
     }
   }
