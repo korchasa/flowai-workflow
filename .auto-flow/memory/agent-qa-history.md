@@ -209,6 +209,18 @@
   - Continuation loop condition `while (validationRules.length > 0 || node.allowed_paths !== undefined)` ensures scope-check nodes enter loop even without artifact rules — important subtlety for AC #7 verification.
   - 18th consecutive pattern: PM stage fails on iter 1, dev restores on iter 2. Pattern continues.
 
+## 2026-03-20T51:XX — Issue #178 (iteration 2)
+
+- **Turns:** ~10
+- **Cost:** ~$0.25 (est)
+- **Verdict:** PASS
+- **Outcome:** All 15 acceptance criteria passed. 569 tests, 0 failures. FR-S43 (§3.43, line 1007), FR-S44 (§3.44, line 1027), FR-S45 (§3.45, line 1045) + Appendix C rows (lines 1185–1187) all present — blocking issue from iteration 1 resolved. SKILL.md implementations confirmed correct. 6 non-blocking findings (documentation quality gaps). Self-approval failed → used `gh issue comment` fallback on issue #178.
+- **Key learnings:**
+  - 22nd consecutive PM-stage SRS persistence failure resolved in iteration 2 — `requirements-sdlc.md` in diff with all 3 FR sections at correct lines.
+  - Three FRs simultaneously (FR-S43/S44/S45): grepping for all 3 in one command confirms all 3 in one operation.
+  - Multi-focus review sub-agents add thoroughness but produce mostly non-blocking documentation quality findings for prompt-level-only changes.
+  - SKILL.md internal tensions (responsibility #4 vs #7 for SKILL.md file reviews) are non-blocking spec-compliance gaps.
+
 ## 2026-03-20T50:XX — Issue #178 (iteration 1)
 
 - **Turns:** ~9
