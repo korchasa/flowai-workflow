@@ -80,7 +80,14 @@ graph TD
     `Deno.readTextFileSync()` relative to `Deno.cwd()`, returns content
     as-is (no re-interpolation — single-pass). Missing file → throw with
     diagnostic. Size > `FILE_INCLUSION_SIZE_WARN_BYTES` (100KB) →
-    `console.warn()` (non-fatal)
+    `console.warn()` (non-fatal).
+    `validateTemplateVars(template: string, knownInputs: string[]): string[]`
+    (FR-E7): extracts all `{{...}}` patterns, validates each against known
+    prefixes (`input` — suffix ∈ `knownInputs`, `env`, `args`, `loop` —
+    only `loop.iteration`) and direct keys (`run_dir`, `run_id`, `node_dir`).
+    `file("...")` accepted. Unknown prefix/key → error string. Returns error
+    array (empty = valid). Pure function, no I/O. Co-located with `resolve()`
+    to maintain single source of truth for valid template variables
   - `config.ts` — YAML parsing, schema validation, defaults merge,
     `run_on` normalization. `extractPreRun()`: lightweight pre-parse
     extracting only `pre_run` field for two-phase loading (FR-E24). `validateNode()`: if `run_on` present, must be
@@ -91,6 +98,14 @@ graph TD
     checks file existence via `Deno.statSync()`. Skips paths containing `{{`
     (unresolvable at load time). Called from `mergeDefaults()` alongside
     `validatePromptPaths()`.
+    **Hook template variable validation (FR-E7):** In `validateNode()`, after
+    existing type-specific checks: calls `validateTemplateVars()` (imported
+    from `template.ts`) on `node.before` and `node.after` strings. Passes
+    `allNodeIds` as `knownInputs` (for top-level nodes) or
+    `[...allNodeIds, ...bodyNodeIds]` (for loop body nodes — can reference
+    both external and sibling nodes). Errors formatted with hook type
+    (`before`/`after`) and node ID. Non-empty errors → config validation
+    error at load time (fail-fast).
     `validateAllowedPaths()` (FR-E37): when `allowed_paths` present on node,
     validates array of non-empty strings. Invalid → config error at parse time.
     Called from `validateNode()`.
@@ -609,6 +624,20 @@ graph TD
     Load-time validation: `validateFileReferences(config)` in `config.ts`
     scans `task_template`/`prompt` fields for `{{file("...")}}` regex, checks
     existence. Skips paths with `{{` (template vars unresolvable at load time).
+  - **Hook Template Variable Validation (FR-E7):** In `validateNode()`,
+    for each hook command (`before`/`after`): call
+    `validateTemplateVars(hookCmd, knownInputs)` from `template.ts`.
+    `knownInputs` = `allNodeIds` for top-level nodes;
+    `[...allNodeIds, ...bodyNodeIds]` for loop body nodes. Algorithm:
+    1. Extract all `{{...}}` patterns via regex (same pattern as `resolve()`).
+    2. For each match: parse prefix. Validate against allowed set:
+       `input.<id>` (id ∈ knownInputs), `env.<KEY>`, `args.<name>`,
+       `loop.iteration`, `run_dir`, `run_id`, `node_dir`, `file("...")`.
+    3. Unknown prefix or invalid `input.*` suffix → collect error string.
+    4. Return all errors (batch, not fail-on-first).
+    In `config.ts`: format each error with hook type + node ID, throw single
+    config error. Runs at parse time via `loadConfig()` → `validateNode()`.
+    Ensures `deno task check` catches misconfigured hooks before execution.
   - **Loop Input Forwarding Validation (FR-E35):** In `validateNode()` loop
     branch, after existing body node validation loop: for each body node,
     classify its `inputs` as internal (present in `bodyNodeIds`) or external.
