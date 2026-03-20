@@ -13,13 +13,13 @@ jobs:
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
-            artifact: auto-flow-linux-amd64
+            artifact: auto-flow-linux-x86_64
           - target: aarch64-unknown-linux-gnu
             artifact: auto-flow-linux-arm64
           - target: x86_64-apple-darwin
-            artifact: auto-flow-macos-amd64
+            artifact: auto-flow-darwin-x86_64
           - target: aarch64-apple-darwin
-            artifact: auto-flow-macos-arm64
+            artifact: auto-flow-darwin-arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +59,7 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --title "auto-flow ${{ github.ref_name }}" \
             --generate-notes \
-            dist/auto-flow-linux-amd64 \
+            dist/auto-flow-linux-x86_64 \
             dist/auto-flow-linux-arm64 \
-            dist/auto-flow-macos-amd64 \
-            dist/auto-flow-macos-arm64
+            dist/auto-flow-darwin-x86_64 \
+            dist/auto-flow-darwin-arm64

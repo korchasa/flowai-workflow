@@ -175,12 +175,12 @@ Download a pre-built binary from the [latest release](../../releases/latest) —
 
 ```bash
 # Linux x86_64
-gh release download --repo <owner>/auto-flow --pattern auto-flow-linux-amd64
-chmod +x auto-flow-linux-amd64 && mv auto-flow-linux-amd64 auto-flow
+gh release download --repo <owner>/auto-flow --pattern auto-flow-linux-x86_64
+chmod +x auto-flow-linux-x86_64 && mv auto-flow-linux-x86_64 auto-flow
 
 # macOS Apple Silicon
-gh release download --repo <owner>/auto-flow --pattern auto-flow-macos-arm64
-chmod +x auto-flow-macos-arm64 && mv auto-flow-macos-arm64 auto-flow
+gh release download --repo <owner>/auto-flow --pattern auto-flow-darwin-arm64
+chmod +x auto-flow-darwin-arm64 && mv auto-flow-darwin-arm64 auto-flow
 
 # Verify
 ./auto-flow --version
