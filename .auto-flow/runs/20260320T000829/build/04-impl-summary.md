@@ -17,6 +17,10 @@
 - `.auto-flow/scripts/reset-to-main_test.sh` (new): 7 tests, all PASS.
   Uses temp bare + working repos for full isolation. No network required.
 
+- `documents/requirements-sdlc.md` — added §3.41 FR-S41 with 5 acceptance
+  criteria (all `[x]` with evidence); added Appendix C row for FR-S41.
+  (QA fix, iteration 2.)
+
 ### deno task check
 
-PASS — 533 tests, 0 failed. All checks passed.
+PASS — 533 tests, 0 failed. All checks passed (iter 1 + iter 2).

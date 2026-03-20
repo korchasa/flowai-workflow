@@ -98,6 +98,7 @@ type: feedback
 - Run 20260319T224519 iter2: ~4 turns, scope sdlc, issue #156 QA fix — PASS (SRS: added §3.38 + Appendix C row; tenth consecutive PM persistence failure #147–#156).
 - Run 20260319T230952 iter2: ~5 turns, scope sdlc, issue #157 (FR-S39) QA fix — PASS (SRS: added §3.39 + Appendix C row; eleventh consecutive PM persistence failure #147–#157).
 - Run 20260320T000829: ~5 turns, scope sdlc, issue #159 (FR-S41), 2 files changed — PASS (shell script + new bash test file; 7 shell tests all green; deno task check unaffected since no TS changes).
+- Run 20260320T000829 iter2: ~4 turns, scope sdlc, issue #159 (FR-S41) QA fix — PASS (SRS: added §3.41 + Appendix C row; fourteenth consecutive PM persistence failure #147–#159).
 - Target: ≤35 turns. Key lesson: commit before deno task check; stash pattern for pre-existing fmt issues.
 
 ## Pipeline.yaml Coexistence Pattern
