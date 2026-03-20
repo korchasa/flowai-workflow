@@ -16,3 +16,19 @@
 ### `deno task check` Result
 
 PASS
+
+---
+
+## Iteration 2 (QA Fix)
+
+### Files Changed
+
+- `documents/requirements-engine.md` — FR-E7 §3.7: replaced old single vague `[ ]` criterion with 4 detailed `[x]` criteria with evidence links (PM-stage SRS persistence failure #19, #147–#176)
+
+### Tests Added or Modified
+
+- No new tests (behavioral implementation was correct in iter 1)
+
+### `deno task check` Result
+
+PASS — 569 passed, 0 failed. All checks passed.
