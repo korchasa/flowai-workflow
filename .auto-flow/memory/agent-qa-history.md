@@ -209,6 +209,42 @@
   - Continuation loop condition `while (validationRules.length > 0 || node.allowed_paths !== undefined)` ensures scope-check nodes enter loop even without artifact rules — important subtlety for AC #7 verification.
   - 18th consecutive pattern: PM stage fails on iter 1, dev restores on iter 2. Pattern continues.
 
+## 2026-03-20T57:XX — Issue #183 (iteration 3)
+
+- **Turns:** ~10
+- **Cost:** ~$0.22 (est)
+- **Verdict:** PASS
+- **Outcome:** All 7 FR-E39 acceptance criteria passed. 587 tests, 0 failures. All 4 blocking issues from iteration 2 resolved: (1) FR-E39 at line 861 §3.39 + Appendix row at line 954 — requirements-engine.md in diff; (2) `scripts/compile_test.ts` exists with 9 tests (4 target mappings, 1 naming convention, 3 stripVersionPrefix); (3) platform names correct (x86_64/darwin, not amd64/macos); (4) double-v bug fixed via `stripVersionPrefix()` in `compile.ts:33–35`. Self-approval failed → used `gh issue comment` fallback on issue #183.
+- **Key learnings:**
+  - Issue #183 required 3 iterations — only issue in history to need iter 3 (iter 2 had 4 blocking issues: SRS + 3 implementation bugs).
+  - Multi-focus review sub-agents found only non-blocking observations in iter 3: decision's --dry-run flag absent (not an AC), README covers 2/4 platforms, output dir deviation from decision.
+  - `--env-file` in `deno compile` embeds vars into the binary for runtime use; CI env var `VERSION` is what compile.ts reads and strips before embedding — not a conflict.
+  - 25th consecutive PM-stage SRS persistence failure resolved in iteration 3 for issue #183.
+
+## 2026-03-20T56:XX — Issue #183 (iteration 2)
+
+- **Turns:** ~8
+- **Cost:** ~$0.22 (est)
+- **Verdict:** FAIL
+- **Outcome:** 5/9 acceptance criteria passed. 578 tests, 0 failures. 4 blocking issues: (1) FR-E39 absent from `requirements-engine.md` (25th consecutive PM-stage SRS persistence failure); (2) `scripts/compile_test.ts` missing — Decision Task 2 not delivered, file does not exist; (3) platform naming deviation: `amd64`/`macos` instead of spec-required `x86_64`/`darwin` (3 of 4 binary names wrong); (4) double-v version string bug: `release.yml` passes `VERSION=${{ github.ref_name }}` = "v1.2.3", `getVersionString()` prepends another `v` → "auto-flow vv1.2.3". `deno.json` compile task registered, CI workflow structure correct, README install docs present, `design-engine.md` has FR-E39 section (with duplicate 3.5 numbering). Self-request-changes failed → used `gh issue comment` fallback on issue #183.
+- **Key learnings:**
+  - Decision deliverables can be entirely missing even on iter 2: compile_test.ts was listed as Task 2 but never created. Always verify ALL decision tasks present in diff.
+  - Double-v bug: always check if VERSION env var in CI already carries `v` prefix from git tag. `github.ref_name` for tag "v1.2.3" = "v1.2.3" (includes v). If getVersionString() also prepends v → double-v. Fix: strip leading `v` in compile.ts before embedding.
+  - Platform naming: spec/issue explicitly state `x86_64`/`darwin` — always verify implementation uses exact strings, not aliases (`amd64`/`macos`).
+  - 25th consecutive PM-stage SRS persistence failure. Pattern unchanged.
+
+## 2026-03-20T55:XX — Issue #183 (iteration 1)
+
+- **Turns:** ~8
+- **Cost:** ~$0.20 (est)
+- **Verdict:** FAIL
+- **Outcome:** 4/7 spec ACs passed. 578 tests, 0 failures. All 4 implementation tasks correct: `VERSION = Deno.env.get("VERSION") ?? "dev"` + `getVersionString()` + `--version`/`-V` in `engine/cli.ts`; `scripts/compile.ts` with 4 targets; `.github/workflows/release.yml` matrix CI; README Installation section. Blocking: `documents/requirements-engine.md` not in diff, 0 matches for FR-E39 — PM-stage SRS persistence failure (24th consecutive: #147–#183). Non-blocking: double-v version string bug (`github.ref_name="v1.2.3"` + `getVersionString()` prepends `v` → `auto-flow vv1.2.3`) [confidence: 96]; platform naming deviation (`amd64`/`macos` vs `x86_64`/`darwin` in spec) [confidence: 85]. Self-request-changes failed → used `gh issue comment` fallback on issue #183.
+- **Key learnings:**
+  - Double-v version string bug: always check if `VERSION` env var in CI already contains the `v` prefix (GitHub tag names do); `getVersionString()` prepends another `v`. Fix: strip leading `v` in compile.ts before embedding.
+  - Platform naming deviation (`amd64` vs `x86_64`, `macos` vs `darwin`): spec explicitly states platform strings; implementation uses more user-friendly but non-conformant names.
+  - `deno compile --env-file <tmpfile>` is a valid alternative to `--env` for embedding env vars — different from what the decision specified but functionally correct.
+  - 24th consecutive PM-stage SRS persistence failure. Pattern unchanged: grep for FR-E39 returns 0 immediately.
+
 ## 2026-03-20T54:XX — Issue #182 (iteration 2)
 
 - **Turns:** ~9

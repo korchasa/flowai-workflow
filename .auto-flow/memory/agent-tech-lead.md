@@ -49,4 +49,6 @@
 - Run 20260320T101834: ~7 turns, scope engine, issue #176 (FR-E7).
 - Run 20260320T104440: ~7 turns, scope sdlc, issue #178 (FR-S43+FR-S44+FR-S45).
 - Run 20260320T213059: ~7 turns, scope engine, issue #182 (FR-E38).
+- Run 20260320T220824: ~7 turns, scope engine, issue #183 (FR-E39).
+- Run 20260320T223114: ~7 turns, scope engine, issue #183 (FR-E39) re-run.
 - Target: ≤10 turns. Achieved all runs.

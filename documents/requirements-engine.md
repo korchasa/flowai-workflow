@@ -858,6 +858,35 @@
     `engine/config_test.ts:1137,1148`; 576 tests pass, 0 failed.
   - [x] `deno task check` green: 576 tests, 0 failures. Evidence: run `20260320T213059`.
 
+### 3.39 FR-E39: Standalone Binary Distribution
+
+- **Description:** The engine compiles to standalone platform binaries via `deno compile`,
+  bundling all dependencies (including `npm:yaml`). A CI/CD release workflow triggers on
+  version tags (`v*`), cross-compiles binaries for 4 targets using a single `ubuntu-latest`
+  runner, and publishes them as GitHub Release assets. The `VERSION` env var is embedded at
+  compile time; leading `v` prefix is stripped before embedding (e.g., tag `v1.2.3` embeds
+  as `1.2.3`).
+- **Motivation:** Lowers adoption barrier — users run `auto-flow --config <path>` without
+  installing Deno, eliminating runtime dependency friction.
+- **Acceptance criteria:**
+  - [x] AC1: Standalone binary produced by `deno compile --allow-all engine/cli.ts` with
+    all deps bundled. Evidence: `scripts/compile.ts`.
+  - [x] AC2: Cross-platform builds for linux-x86_64, linux-arm64, darwin-x86_64,
+    darwin-arm64. Evidence: `scripts/compile.ts:TARGETS` (4 entries);
+    `scripts/compile_test.ts` (4 target name tests).
+  - [x] AC3: Version-tag-triggered CI release pipeline.
+    Evidence: `.github/workflows/release.yml:4-6` (on push tags `v*`).
+  - [x] AC4: Binary naming convention `auto-flow-<os>-<arch>`
+    (e.g., `auto-flow-linux-x86_64`). Evidence: `scripts/compile.ts:TARGETS`;
+    `scripts/compile_test.ts` (naming convention test).
+  - [x] AC5: README installation docs with binary download instructions.
+    Evidence: `README.md` §Installation.
+  - [x] AC6: Config-only CLI entry: `auto-flow --config <path>`. No Deno runtime required.
+    Evidence: `engine/cli.ts:parseArgs` (`--config` flag); `deno compile` bundles all deps.
+  - [x] AC7: VERSION embedded at compile time; `v` prefix stripped to avoid double-v output.
+    Evidence: `scripts/compile.ts:stripVersionPrefix`; `engine/cli.ts:getVersionString`.
+  - [x] `deno task check` green: 587 tests, 0 failures. Evidence: run `20260320T223114` iter 2.
+
 ## 4. Non-Functional Requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution is not supported.
@@ -922,3 +951,4 @@
 | —      | FR-E36 | Loop Condition Field Validation |
 | —      | FR-E37 | Scope-Based File Modification Detection |
 | —      | FR-E38 | Artifact Rule Frontmatter Field Presence Checks |
+| —      | FR-E39 | Standalone Binary Distribution |

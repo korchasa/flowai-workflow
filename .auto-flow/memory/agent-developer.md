@@ -96,6 +96,22 @@ type: feedback
   checks `!fieldMatch || !fieldMatch[1].trim()` to catch both absent and empty-valued fields.
 - No `assertRejects` needed — all sync config tests use `assertThrows`.
 
+## Large File Edit Tool Tracking
+
+- When `Read` output exceeds ~85KB, the system saves it to a temp file and the Edit tool
+  does NOT recognize the file as "read" (tracking fails). Re-reading with offset/limit also
+  fails in this case.
+- Fix: use Bash with Python inline script to apply changes to large files. This is a valid
+  fallback when the dedicated Edit tool is broken due to temp-file output routing.
+
+## Binary Distribution Pattern (FR-E39)
+
+- `VERSION` constant uses `Deno.env.get("VERSION") ?? "dev"` — embedded at compile time via `deno compile --env-file <tmpfile>` where tmpfile contains `VERSION=<tag>`.
+- `getVersionString()` exported for testability; `--version`/`-V` case in parseArgs calls it + `Deno.exit(0)` (same as `--help`).
+- `scripts/compile.ts` writes a temp env file, iterates targets, runs `deno compile --allow-all --target <t> --env-file <f> --output <name> engine/cli.ts`, removes temp file in `finally` block.
+- Release workflow: `ubuntu-latest` for all 4 targets (cross-compilation handled by deno compile's built-in cross-target support); `actions/upload-artifact` per job; final job uses `actions/download-artifact` with `merge-multiple: true` then `gh release create`.
+- No test needed for `--version` flag itself (calls Deno.exit; same untested pattern as `--help`). Test VERSION type + getVersionString format instead.
+
 ## Baseline Metrics
 
 - Run 20260315T003418: ~14 turns, scope sdlc, issue #121 (FR-S29), 7 SKILL.md + 2 memory files — PASS
