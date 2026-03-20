@@ -14,6 +14,7 @@ import type {
   NodeSettings,
   PermissionDenial,
   TemplateContext,
+  ValidationRule,
   Verbosity,
 } from "./types.ts";
 import { interpolate } from "./template.ts";
@@ -25,6 +26,7 @@ import {
 } from "./validate.ts";
 import type { OutputManager, VerboseInput } from "./output.ts";
 import { invokeClaudeCli } from "./claude-process.ts";
+import { findViolations, snapshotModifiedFiles } from "./scope-check.ts";
 
 /**
  * Resolve input artifact file paths and sizes from input directories.
@@ -98,10 +100,11 @@ export interface AgentRunOptions {
  *
  * Flow:
  * 1. Run `before` hook if configured
- * 2. Invoke `claude` CLI with prompt + task template
- * 3. Validate output artifacts
- * 4. If validation fails and continuations remain, resume with `--resume`
- * 5. Run `after` hook if configured
+ * 2. Snapshot modified files if `allowed_paths` set (FR-E37)
+ * 3. Invoke `claude` CLI with prompt + task template
+ * 4. Validate output artifacts; inject scope_check result if out-of-scope mods detected
+ * 5. If validation fails and continuations remain, resume with `--resume`
+ * 6. Run `after` hook if configured
  *
  * Why reuse the same session_id across continuations: `claude --resume <id>`
  * re-enters the existing conversation so the agent retains full context of
@@ -149,6 +152,12 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
     output.verbosePrompt(nodeId, taskPrompt);
   }
 
+  // Scope check: snapshot before first invocation (FR-E37)
+  let beforeSnapshot: Set<string> | undefined;
+  if (node.allowed_paths !== undefined) {
+    beforeSnapshot = await snapshotModifiedFiles();
+  }
+
   // Initial invocation
   let result = await invokeClaudeCli({
     promptFile: node.prompt ? interpolate(node.prompt, ctx) : undefined,
@@ -177,9 +186,29 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
     };
   }
 
-  // Continuation loop
-  while (validationRules.length > 0) {
+  // Continuation loop: runs when validate rules exist OR scope check is active
+  while (validationRules.length > 0 || node.allowed_paths !== undefined) {
     const validationResults = await runValidations(validationRules, ctx);
+
+    // Inject scope_check result if out-of-scope modifications detected (FR-E37)
+    if (node.allowed_paths !== undefined && beforeSnapshot !== undefined) {
+      const afterSnapshot = await snapshotModifiedFiles();
+      const violations = findViolations(
+        beforeSnapshot,
+        afterSnapshot,
+        node.allowed_paths,
+      );
+      if (violations.length > 0) {
+        const scopeRule: ValidationRule = { type: "scope_check", path: "" };
+        validationResults.push({
+          rule: scopeRule,
+          passed: false,
+          message: `Out-of-scope modifications: ${violations.join(", ")}`,
+        });
+      }
+      // Update snapshot for next iteration (incremental detection)
+      beforeSnapshot = afterSnapshot;
+    }
 
     // Verbose: show validation results
     if (output && nodeId) {

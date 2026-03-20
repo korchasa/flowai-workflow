@@ -13,7 +13,13 @@ import {
   tsPrefix,
 } from "./stream.ts";
 import type { StreamProcessorState } from "./stream.ts";
-import type { NodeConfig, NodeSettings, TemplateContext } from "./types.ts";
+import type {
+  NodeConfig,
+  NodeSettings,
+  TemplateContext,
+  ValidationRule,
+} from "./types.ts";
+import type { ValidationResult } from "./validate.ts";
 
 // Note: Full integration tests for runAgent require a real claude CLI.
 // These tests verify the module's helpers and data structures.
@@ -1068,4 +1074,45 @@ Deno.test("processStreamEvent — footer written to log after result event", asy
   } finally {
     await Deno.remove(tmpPath);
   }
+});
+
+// --- Scope-check integration tests (FR-E37) ---
+
+Deno.test("NodeConfig — allowed_paths field accepted by type system", () => {
+  const node: NodeConfig = {
+    type: "agent",
+    label: "Scoped agent",
+    task_template: "Do task",
+    allowed_paths: ["engine/**", "engine/*_test.ts"],
+  };
+  assertEquals(Array.isArray(node.allowed_paths), true);
+  assertEquals(node.allowed_paths![0], "engine/**");
+  assertEquals(node.allowed_paths!.length, 2);
+});
+
+Deno.test("NodeConfig — allowed_paths absent by default", () => {
+  const node: NodeConfig = {
+    type: "agent",
+    label: "No scope restriction",
+    task_template: "Do task",
+  };
+  assertEquals(node.allowed_paths, undefined);
+});
+
+Deno.test("ValidationRule — scope_check type accepted by type system", () => {
+  const rule: ValidationRule = { type: "scope_check", path: "" };
+  assertEquals(rule.type, "scope_check");
+  assertEquals(rule.path, "");
+});
+
+Deno.test("ValidationResult — scope_check failure structure", () => {
+  const rule: ValidationRule = { type: "scope_check", path: "" };
+  const result: ValidationResult = {
+    rule,
+    passed: false,
+    message: "Out-of-scope modifications: .github/workflow.yaml",
+  };
+  assertEquals(result.rule.type, "scope_check");
+  assertEquals(result.passed, false);
+  assertEquals(result.message.includes(".github/workflow.yaml"), true);
 });

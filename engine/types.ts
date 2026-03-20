@@ -116,6 +116,12 @@ export interface NodeConfig {
    * Merged with global env (node-level overrides global defaults).
    * Accessible in template context via `{{env.<key>}}`. */
   env?: Record<string, string>;
+
+  /** Glob patterns for file paths permitted to be modified during agent invocation.
+   * When set, the engine snapshots modified files before/after each invocation
+   * and injects a scope_check validation failure if out-of-scope modifications
+   * are detected. Pre-existing uncommitted changes are excluded (FR-E37). */
+  allowed_paths?: string[];
 }
 
 /** Per-node settings (merged with defaults). */
@@ -141,8 +147,10 @@ export interface ValidationRule {
     | "contains_section"
     | "custom_script"
     | "frontmatter_field"
-    | "artifact";
-  /** Relative path to the artifact file being validated. */
+    | "artifact"
+    | "scope_check";
+  /** Relative path to the artifact file being validated.
+   * Empty string for engine-injected scope_check rules. */
   path: string;
   /** Expected content (section header for contains_section, script path for custom_script). */
   value?: string;

@@ -344,6 +344,11 @@ function validateNode(
       validateValidationRule(id, rule as Record<string, unknown>);
     }
   }
+
+  // Validate allowed_paths if present (FR-E37)
+  if (node.allowed_paths !== undefined) {
+    validateAllowedPaths(id, node.allowed_paths);
+  }
 }
 
 function validateSettings(
@@ -408,6 +413,29 @@ function validateValidationRule(
     ) {
       throw new Error(
         `Node '${nodeId}' artifact rule 'sections' must be an array of strings`,
+      );
+    }
+  }
+}
+
+/**
+ * Validate the allowed_paths field on a node.
+ * Must be an array of non-empty strings (glob patterns).
+ * Called from validateNode() when allowed_paths is present (FR-E37).
+ */
+function validateAllowedPaths(
+  nodeId: string,
+  allowedPaths: unknown,
+): void {
+  if (!Array.isArray(allowedPaths)) {
+    throw new Error(
+      `Node '${nodeId}' allowed_paths must be an array of strings`,
+    );
+  }
+  for (const entry of allowedPaths) {
+    if (typeof entry !== "string" || !entry) {
+      throw new Error(
+        `Node '${nodeId}' allowed_paths entries must be non-empty strings`,
       );
     }
   }
