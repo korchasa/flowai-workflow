@@ -76,6 +76,10 @@ type: feedback
 - `beforeSnapshot` updated to `afterSnapshot` after each iteration — incremental detection, not cumulative.
 - `globMatch()` implemented inline: `**` → `.*`, `*` → `[^/]*`, `?` → `[^/]`, literals escaped.
 
+- **FR-E36 appendix gap**: When adding FR-E37 appendix row, also check that FR-E36 is in
+  the appendix — it was missing (section existed in main but row was never added). Safe to
+  fix both in the same QA-fix commit.
+
 ## Baseline Metrics
 
 - Run 20260315T003418: ~14 turns, scope sdlc, issue #121 (FR-S29), 7 SKILL.md + 2 memory files — PASS
@@ -110,6 +114,7 @@ type: feedback
 - Run 20260320T000829 iter2: ~4 turns, scope sdlc, issue #159 (FR-S41) QA fix — PASS (SRS: added §3.41 + Appendix C row; fourteenth consecutive PM persistence failure #147–#159).
 - Run 20260320T092158: ~5 turns, scope sdlc, issue #174 (FR-S42), 1 file changed — PASS (config-only: 19 validate rules → 6 artifact rules in pipeline.yaml; pipeline integrity check is acceptance gate; no tests needed).
 - Run 20260320T092158 iter2: ~4 turns, scope sdlc, issue #174 (FR-S42) QA fix — PASS (SRS: added §3.42 + Appendix C row; sixteenth consecutive PM persistence failure #147–#174).
+- Run 20260320T094502 iter2: ~5 turns, scope engine, issue #175 (FR-E37) QA fix — PASS (SRS: added §3.37, updated FR-E1 §3.1 Future→[x], Appendix FR-E36+FR-E37 rows; seventeenth consecutive PM persistence failure #147–#175).
 - Target: ≤35 turns. Key lesson: commit before deno task check; stash pattern for pre-existing fmt issues.
 
 ## Pipeline.yaml Coexistence Pattern
