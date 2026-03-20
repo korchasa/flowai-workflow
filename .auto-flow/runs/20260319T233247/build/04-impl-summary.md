@@ -17,4 +17,10 @@
   - `documents/adrs/001-agent-context-setup-method/spec-unified-task-template.md` — Phase 1
     and Phase 2 status changed from `not-started` to `done`.
 - **Tests added or modified:** none (documentation-only changes; no TS logic)
-- **`deno task check` result:** PASS (533 tests, 0 failures, all checks passed)
+- **`deno task check` result (iter 2):** PASS (533 tests, 0 failures, all checks passed)
+
+### Iteration 2 Fix (QA-flagged)
+
+- `documents/requirements-sdlc.md` — added section 3.40 (FR-S40: Pipeline
+  Format Change Documentation Sync) with 7 ACs; added FR-S40 row to Appendix
+  C. PM persistence failure (13th consecutive, #147–#158).

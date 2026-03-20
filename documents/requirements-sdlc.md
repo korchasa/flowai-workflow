@@ -901,6 +901,47 @@
   - [x] `deno task check` passes. Evidence: PASS (533 tests, run
     `20260319T230952`).
 
+### 3.40 FR-S40: Pipeline Format Change Documentation Sync
+
+- **Description:** After PRs #147–#157 implemented FR-S26–FR-S39, multiple
+  documentation artifacts were out of sync with the actual pipeline structure:
+  SRS referenced 7 agents including removed meta-agent; Appendix A showed Stage
+  7 Meta-Agent and old artifact filename `05-qa-report-N.md`; Appendix B listed
+  `agent-meta-agent/SKILL.md` and old `prompt:` field pattern; SDS described
+  `phases:` block and `prompt:` fields; `pipeline-report.md` had outdated
+  artifact numbering; `spec-unified-task-template.md` marked Phase 1/2 as
+  not-started. FR-S40 formalizes the full documentation sync across SRS, SDS,
+  and supporting docs.
+- **Dep:** FR-S9 (meta-agent removal), FR-S32 (artifact naming), FR-S38
+  (file() injection), FR-S39 (SKILL.md cleanup).
+- **Acceptance criteria:**
+  - [x] `documents/requirements-sdlc.md`: active agent count updated 7→6 in
+    all descriptions; meta-agent removed from all active sections. Evidence:
+    `documents/requirements-sdlc.md`, run `20260319T233247` (18 targeted edits,
+    impl-summary confirmed).
+  - [x] `documents/requirements-sdlc.md` Appendix A: Stage 7 Meta-Agent row
+    removed; `05-qa-report-N.md` → `05-qa-report.md`. Evidence:
+    `documents/requirements-sdlc.md`, run `20260319T233247`.
+  - [x] `documents/requirements-sdlc.md` Appendix B: `agent-meta-agent/SKILL.md`
+    entry removed; `prompt:` field references replaced with `task_template`/
+    `{{file(...)}}` pattern. Evidence: `documents/requirements-sdlc.md`, run
+    `20260319T233247`.
+  - [x] `documents/requirements-sdlc.md` Section 5 Interfaces:
+    `--append-system-prompt` description replaced with `-p`/`task_template`/
+    `{{file(...)}}` mechanism (FR-S38). Evidence:
+    `documents/requirements-sdlc.md:916–917`.
+  - [x] `documents/design-sdlc.md`: §3.4 marks `prompt:` field as removed with
+    `{{file(...)}}` replacement; §8 FR-S40 evidence entry present. Evidence:
+    `documents/design-sdlc.md` (Tech Lead pre-applied), run `20260319T233247`.
+  - [x] `documents/rnd/pipeline-report.md`: artifact numbering updated to
+    `01-spec → 02-plan → 03-decision → 04-impl-summary → 05-qa-report →
+    06-review`. Evidence: `documents/rnd/pipeline-report.md:5`, run
+    `20260319T233247`.
+  - [x] `documents/adrs/001-agent-context-setup-method/spec-unified-task-template.md`:
+    Phase 1 status → "done"; Phase 2 status → "done". Evidence:
+    `documents/adrs/001-agent-context-setup-method/spec-unified-task-template.md:83,126`,
+    run `20260319T233247`.
+
 ## 4. Non-functional requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution is not supported.
@@ -1020,3 +1061,4 @@ engine/                                # Deno/TypeScript pipeline engine
 | —      | FR-S37 | Verify Node Verdict Frontmatter Validation |
 | —      | FR-S38 | Pipeline Agent Context via file() Injection in task_template |
 | —      | FR-S39 | Remove Redundant shared-rules.md Read Instruction from SKILL.md Files |
+| —      | FR-S40 | Pipeline Format Change Documentation Sync |
