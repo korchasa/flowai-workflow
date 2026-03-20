@@ -31,6 +31,7 @@ type: feedback
 ## Environment quirks
 
 - `requirements-engine.md` is ~720+ lines (~68KB+) as of run 20260315T213641. Last FR: FR-E32.
+- `requirements-engine.md` is ~880+ lines as of run 20260320T223114. Last FR: FR-E39.
 - `requirements-sdlc.md` is ~835+ lines (~73KB) as of run 20260319T182156. Last FR: FR-S32 (just added).
 - Read of requirements-engine.md redirects to tool-results file (68KB). That file ALSO redirects (73KB). Both are too large. Use Bash tail.
 - `gh issue view` without `comments` flag is fast (~1KB). Always omit `comments`.
@@ -52,3 +53,4 @@ type: feedback
 - Run 20260315T215901: ~8 turns, main branch, issue #129 (sdlc scope), FR-S31 added. python3 str.replace() pattern.
 - Run 20260319T182156: ~8 turns, main branch, issue #147 (sdlc scope), FR-S32 added. python3 str.replace(). Efficient.
 - Run 20260320T213059: ~7 turns, main branch, issue #182 (engine scope), FR-E38 added. python3 str.replace() for insertion + appendix fix. Removed stale duplicate FR-E36 appendix entry.
+- Run 20260320T223114: ~7 turns, main branch, issue #183 (engine scope), FR-E39 added. python3 str.replace() — clean single-call insertion + appendix row. Memory FR count was correct (FR-E38). Only 1 candidate issue; health check passed.
