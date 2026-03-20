@@ -163,6 +163,18 @@
   - 528 tests unchanged from iteration 1 — no new tests needed for this sdlc-only change.
   - SDLC pipeline pattern (wrapper script replacing `|| true`) is correct approach for observable non-blocking after-script failures.
 
+## 2026-03-20T41:XX — Issue #158 (iteration 2)
+
+- **Turns:** ~6
+- **Cost:** ~$0.15 (est)
+- **Verdict:** PASS
+- **Outcome:** All 9 acceptance criteria passed. 533 tests, 0 failures. FR-S40 present at line 904 (§3.40) and Appendix C at line 1064 — blocking issues from iteration 1 resolved. All 4 required files in diff. `requirements-sdlc.md`: 18 targeted edits confirmed (agent count 7→6, meta-agent removed, Appendix A/B fixed, Section 5 Interfaces updated). `design-sdlc.md` correct (Tech Lead pre-applied). `pipeline-report.md` canonical numbering. `spec-unified-task-template.md` Phase 1/2 → done. Self-approval failed → used `gh issue comment` fallback on issue #158.
+- **Key learnings:**
+  - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S40) confirmed PASS in one parallel turn — optimal fix-iteration pattern.
+  - `requirements-sdlc.md` IS in diff and FR-S40 found at lines 904 and 1064 — PM-stage persistence failure from iter 1 resolved.
+  - 533 tests unchanged — no new tests for documentation-only issues.
+  - For documentation-only issues, implementation is correct when all targeted doc edits are applied; SRS FR section is the only recurring failure point.
+
 ## 2026-03-19T40:XX — Issue #158 (iteration 1)
 
 - **Turns:** ~7
