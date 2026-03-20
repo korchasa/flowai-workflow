@@ -163,6 +163,18 @@
   - 528 tests unchanged from iteration 1 — no new tests needed for this sdlc-only change.
   - SDLC pipeline pattern (wrapper script replacing `|| true`) is correct approach for observable non-blocking after-script failures.
 
+## 2026-03-19T40:XX — Issue #158 (iteration 1)
+
+- **Turns:** ~7
+- **Cost:** ~$0.18 (est)
+- **Verdict:** FAIL
+- **Outcome:** 7/9 criteria passed (inferred; FR-S40 section absent). 533 tests, 0 failures. All 4 required files in diff. Implementation correct: 18 targeted edits to `requirements-sdlc.md` (agent count 7→6, meta-agent active refs removed, Appendix A Stage 7 + artifact name fix, Appendix B agent-meta-agent removed, Section 5 Interfaces updated, Section 6 AC#7 removed); `pipeline-report.md` numbering fixed to FR-S32 canonical; `spec-unified-task-template.md` Phase 1/2 → done; `design-sdlc.md` already correct (Tech Lead pre-applied FR-S40 §8 entry). Blocking: FR-S40 section 3.40 and Appendix C row missing from `requirements-sdlc.md` — PM-stage persistence failure (13th consecutive: #147–#158). Self-request-changes failed (author = reviewer) → used `gh issue comment` fallback on issue #158.
+- **Key learnings:**
+  - `requirements-sdlc.md` being in the diff does NOT guarantee PM-stage FR section is present — developer doc edits can be in the same file without the PM-added FR section. Always grep for FR number.
+  - For documentation-only issues (no code changes), grep-first strategy is still mandatory.
+  - `design-sdlc.md` may already be correct before developer touches it (Tech Lead updated it during design phase) — check impl-summary for "no changes" claim.
+  - 533 tests unchanged — no new tests for documentation-only issues.
+
 ## 2026-03-19T39:XX — Issue #157 (iteration 2)
 
 - **Turns:** ~5
