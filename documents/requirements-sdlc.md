@@ -937,10 +937,9 @@
     `01-spec → 02-plan → 03-decision → 04-impl-summary → 05-qa-report →
     06-review`. Evidence: `documents/rnd/workflow-report.md:5`, run
     `20260319T233247`.
-  - [x] `documents/adrs/001-agent-context-setup-method/spec-unified-task-template.md`:
-    Phase 1 status → "done"; Phase 2 status → "done". Evidence:
-    `documents/adrs/001-agent-context-setup-method/spec-unified-task-template.md:83,126`,
-    run `20260319T233247`.
+  - [x] ADR-001 spec-unified-task-template.md: Phase 1/2 status → "done".
+    Evidence: run `20260319T233247`. (ADR-001 deleted — superseded, content
+    covered by FR-S38/FR-S39.)
 
 ### 3.41 FR-S41: pre_run Auto-Stash of Uncommitted Changes
 

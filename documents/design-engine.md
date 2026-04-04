@@ -175,9 +175,9 @@ graph TD
     `markNodeCompleted()` also accepts optional `result?: string` param
     (FR-E22) — persists excerpt to `NodeState.result` in `state.json`
   - `agent.ts` — Claude CLI invocation, continuation loop, retry.
-    ADR-001: `--system-prompt-file` replaces base system prompt (~5-7K dead
-    tokens eliminated). Useful base prompt sections replicated in workflow
-    shared-rules.md.
+    Agent context injected via `--agent` + `--append-system-prompt` (native
+    Claude Code subagents in `.claude/agents/*.md`). Pipeline-specific context
+    via `task_template` `{{file(...)}}` (FR-S38). Base system prompt preserved.
     `AgentRunOptions.model` and `InvokeOptions.model`: optional string for
     per-node model selection. `buildClaudeArgs()` emits `--model <value>` when
     `opts.model` is set AND `opts.resumeSessionId` is NOT set (resume inherits
@@ -872,3 +872,10 @@ graph TD
   Auto-update mechanism. Windows
   binary target (FR-E39). Package manager distribution (brew, npm). Auto-update
   mechanism. SHA256 checksums for release assets.
+- **Deferred CLI flags per node (ex ADR-001 C5):** Candidates for
+  `-p --output-format stream-json` validation: `--effort` (thinking depth),
+  `--max-budget-usd` (spend cap), `--allowedTools`/`--disallowedTools` (tool
+  restrictions), `--json-schema` (structured output), `--fallback-model`
+  (overload resilience), `--permission-mode` (granular permissions). Also:
+  `--name`, `--no-session-persistence`, `--settings`, `--mcp-config`,
+  `--worktree`. Create FR per validated candidate.

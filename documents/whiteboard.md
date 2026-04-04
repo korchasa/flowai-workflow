@@ -23,7 +23,7 @@ native primitives: `.claude/agents/*.md` (subagents with YAML frontmatter),
 `.claude/rules/*.md` (modular rules). Moving to these makes agents usable both
 inside workflow AND interactively.
 
-**ADR-001 revision:** ADR-001 (2026-03-17) rejected `--agent` in favor of
+**ADR-001 (deleted):** ADR-001 (2026-03-17) rejected `--agent` in favor of
 `--system-prompt-file`. This migration revisits that decision:
 - `model` overridable via `--model` CLI flag (workflow.yaml already does this)
 - `tools` frontmatter ignored under `--dangerously-skip-permissions`
@@ -88,7 +88,7 @@ compile.ts, generate-dashboard.ts, etc.). Workflow (SDLC) scripts are in
 - [ ] SDLC: memory files moved to `.claude/flowai-workflow-memory/`
 - [ ] SDLC: workflow.yaml updated to use `agent`/`prompt` fields
 - [ ] SDLC: `.claude/settings.json` cleaned up (stale paths removed)
-- [ ] Docs: ADR-001 updated with superseding decision
+- [x] Docs: ADR-001 deleted (superseded; content preserved in SDS Future Work)
 - [ ] All tests pass (`deno task check`)
 
 ## Solution
@@ -256,10 +256,9 @@ Remove stale entries:
 - `.flowai-workflow/agents/` — all content migrated to `.claude/agents/`
 - `.flowai-workflow/memory/` — all content migrated to `.claude/flowai-workflow-memory/`
 
-**Step 5.2: Update ADR-001**
-- Status: "Superseded (2026-04)"
-- Add note: coupling concerns mitigated; experiment confirmed `--agent` +
-  `--resume` + `--model` work correctly
+**Step 5.2: ADR-001 — DONE (deleted)**
+- ADR-001 deleted. Superseded content preserved in Design-Engine §7 (C5) and
+  Design-SDLC §7 (C4) as "Future Work" notes.
 
 **Step 5.3: Update documentation**
 - `CLAUDE.md`: update architecture section paths

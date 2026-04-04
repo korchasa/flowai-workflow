@@ -618,6 +618,18 @@ graph LR
 - **Deferred:** Multi-repo support. Parallel workflows for multiple issues.
   Issue size/complexity limits. Cost budget limits and alerts (per-node cost
   aggregation implemented in FR-32; budget enforcement deferred).
+- **Deferred prompt deduplication (ex ADR-001 C4):** Analysis of 6 SKILL.md
+  files (~1700 lines) found ~600 lines (35%) duplicated across agents in 13
+  rule groups. Automation tiers:
+  - Tier 1 (~120 lines): `--disallowedTools` per node for tool restrictions
+    (Bash, Agent, ToolSearch). `pipeline.yaml` `disallowed_tools` field.
+  - Tier 2 (~200 lines): shared prompt fragments via `{{include "rules/..."}}`.
+    Rules: no-grep-after-read, one-read-per-file, no-offset-limit,
+    first-person-voice, git-add-force.
+  - Tier 3 (~110 lines): pipeline config injection — scope-aware doc reads
+    (`{{scope_docs}}`), comment prefix, reflection memory protocol.
+  - Tier 4 (~100 lines): engine enforcement hooks — bash command whitelist,
+    allowed file modification paths (partially covered by FR-E37).
 
 ## 8. SRS Evidence Status
 
