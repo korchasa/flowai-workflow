@@ -8,7 +8,7 @@ Project has two documentation scopes:
 
 - **Engine** — domain-agnostic DAG executor (`engine/`). Core features: node
   types, validation, continuation, resume, HITL, CLI, template interpolation.
-- **SDLC Pipeline** — example pipeline using the engine. SDLC-specific agents,
+- **SDLC Workflow** — example workflow using the engine. SDLC-specific agents,
   prompts, GitHub workflow, dashboard, devcontainer.
 
 Each scope has its own SRS and SDS files.
@@ -31,9 +31,9 @@ Each scope has its own SRS and SDS files.
 2. **SRS Engine** (`documents/requirements-engine.md`): "What" & "Why" for
    engine. Source of truth. FR-E numbering.
 3. **SRS SDLC** (`documents/requirements-sdlc.md`): "What" & "Why" for SDLC
-   pipeline. Source of truth. FR-S numbering.
+   workflow. Source of truth. FR-S numbering.
 4. **SDS Engine** (`documents/design-engine.md`): "How" for engine.
-5. **SDS SDLC** (`documents/design-sdlc.md`): "How" for SDLC pipeline.
+5. **SDS SDLC** (`documents/design-sdlc.md`): "How" for SDLC workflow.
 6. **Whiteboard** (`documents/whiteboard.md`): Temporary notes.
 
 ## Rules
@@ -51,7 +51,7 @@ Each scope has its own SRS and SDS files.
 Separate files per scope. Same structure in each:
 
 ```markdown
-# SRS: Engine (or SDLC Pipeline)
+# SRS: Engine (or SDLC Workflow)
 
 ## 0. Resolved Design Decisions
 
@@ -74,7 +74,7 @@ Separate files per scope. Same structure in each:
 ## Appendix: FR Cross-Reference
 ```
 
-FR numbering: `FR-E<N>` for engine, `FR-S<N>` for SDLC pipeline. Existing
+FR numbering: `FR-E<N>` for engine, `FR-S<N>` for SDLC workflow. Existing
 `FR-<N>` numbers preserved as aliases (e.g., `FR-E1 (ex FR-8)`).
 
 ## SDS Format
@@ -82,7 +82,7 @@ FR numbering: `FR-E<N>` for engine, `FR-S<N>` for SDLC pipeline. Existing
 Separate files per scope. Same structure in each:
 
 ```markdown
-# SDS: Engine (or SDLC Pipeline)
+# SDS: Engine (or SDLC Workflow)
 
 ## 1. Intro
 - **Purpose:**

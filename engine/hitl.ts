@@ -39,7 +39,7 @@ export interface HitlRunOptions {
   config: HitlConfig;
   /** ID of the node awaiting human input. */
   nodeId: string;
-  /** Current pipeline run identifier. */
+  /** Current workflow run identifier. */
   runId: string;
   /** Filesystem path to the run's root directory. */
   runDir: string;

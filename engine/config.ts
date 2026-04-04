@@ -1,9 +1,9 @@
 /**
  * @module
- * Pipeline config loading, schema validation, and default merging.
- * Entry points: {@link loadConfig} (file → PipelineConfig) and
- * {@link parseConfig} (YAML string → PipelineConfig).
- * Defaults are applied in a 3-tier cascade: hardcoded → pipeline-level → node-level.
+ * Workflow config loading, schema validation, and default merging.
+ * Entry points: {@link loadConfig} (file → WorkflowConfig) and
+ * {@link parseConfig} (YAML string → WorkflowConfig).
+ * Defaults are applied in a 3-tier cascade: hardcoded → workflow-level → node-level.
  */
 
 import { parse as parseYaml } from "@std/yaml";
@@ -11,8 +11,8 @@ import { validateTemplateVars } from "./template.ts";
 import type {
   NodeConfig,
   NodeSettings,
-  PipelineConfig,
-  PipelineDefaults,
+  WorkflowConfig,
+  WorkflowDefaults,
 } from "./types.ts";
 
 /** Default node settings applied when not specified. */
@@ -24,8 +24,8 @@ export const DEFAULT_SETTINGS: Required<NodeSettings> = {
   retry_delay_seconds: 5,
 };
 
-/** Default pipeline-level settings. */
-export const DEFAULT_PIPELINE_DEFAULTS: Required<PipelineDefaults> = {
+/** Default workflow-level settings. */
+export const DEFAULT_WORKFLOW_DEFAULTS: Required<WorkflowDefaults> = {
   ...DEFAULT_SETTINGS,
   max_parallel: 0,
   claude_args: [],
@@ -52,19 +52,19 @@ export function extractPreRun(yaml: string): string | undefined {
   return typeof preRun === "string" ? preRun : undefined;
 }
 
-/** Parse YAML string into PipelineConfig, validate schema, merge defaults. */
-export function parseConfig(yaml: string): PipelineConfig {
+/** Parse YAML string into WorkflowConfig, validate schema, merge defaults. */
+export function parseConfig(yaml: string): WorkflowConfig {
   const raw = parseYaml(yaml);
   if (!raw || typeof raw !== "object") {
-    throw new Error("Pipeline config must be a YAML object");
+    throw new Error("Workflow config must be a YAML object");
   }
   const config = raw as Record<string, unknown>;
   validateSchema(config);
-  return mergeDefaults(config as unknown as PipelineConfig);
+  return mergeDefaults(config as unknown as WorkflowConfig);
 }
 
-/** Load and parse pipeline config from a file path. */
-export async function loadConfig(path: string): Promise<PipelineConfig> {
+/** Load and parse workflow config from a file path. */
+export async function loadConfig(path: string): Promise<WorkflowConfig> {
   const yaml = await Deno.readTextFile(path);
   return parseConfig(yaml);
 }
@@ -72,25 +72,25 @@ export async function loadConfig(path: string): Promise<PipelineConfig> {
 /** Validate required fields and node type constraints. */
 function validateSchema(config: Record<string, unknown>): void {
   if (typeof config.name !== "string" || !config.name) {
-    throw new Error("Pipeline config requires a non-empty 'name' field");
+    throw new Error("Workflow config requires a non-empty 'name' field");
   }
   if (config.version !== "1") {
     throw new Error(
-      `Unsupported pipeline config version: ${config.version}. Expected "1"`,
+      `Unsupported workflow config version: ${config.version}. Expected "1"`,
     );
   }
   if (
     !config.nodes || typeof config.nodes !== "object" ||
     Array.isArray(config.nodes)
   ) {
-    throw new Error("Pipeline config requires a 'nodes' object");
+    throw new Error("Workflow config requires a 'nodes' object");
   }
 
   const nodes = config.nodes as Record<string, unknown>;
   const nodeIds = Object.keys(nodes);
 
   if (nodeIds.length === 0) {
-    throw new Error("Pipeline config must have at least one node");
+    throw new Error("Workflow config must have at least one node");
   }
 
   for (const [id, rawNode] of Object.entries(nodes)) {
@@ -291,7 +291,7 @@ function validateNode(
 
     // Validate condition_field vs frontmatter_field in condition node (FR-E36):
     // If condition node declares a validate block, it must include a frontmatter_field
-    // rule whose 'field' matches condition_field — fail fast on misconfigured pipelines.
+    // rule whose 'field' matches condition_field — fail fast on misconfigured workflows.
     // Skip if condition node has no validate block (no contract to enforce).
     const condNodeRaw = bodyNodes[node.condition_node as string] as Record<
       string,
@@ -485,25 +485,25 @@ function validateAllowedPaths(
 }
 
 /**
- * Merge pipeline defaults into each node's settings.
+ * Merge workflow defaults into each node's settings.
  *
  * Why 3-tier cascade: `DEFAULT_SETTINGS` (hardcoded engine fallbacks) →
- * `config.defaults` (pipeline-level overrides) → `node.settings` (per-node
+ * `config.defaults` (workflow-level overrides) → `node.settings` (per-node
  * overrides). Each tier wins over the one before it, so operators can set
- * pipeline-wide timeouts without touching every node, and nodes can still
+ * workflow-wide timeouts without touching every node, and nodes can still
  * override individually.
  *
  * Why `run_always` normalisation: `run_always: true` is a legacy shorthand
  * that predates the `run_on` enum. We canonicalise it to `run_on: "always"`
  * here so all downstream code only needs to handle `run_on`.
  */
-function mergeDefaults(config: PipelineConfig): PipelineConfig {
-  const pipelineDefaults: PipelineDefaults = {
-    ...DEFAULT_PIPELINE_DEFAULTS,
+function mergeDefaults(config: WorkflowConfig): WorkflowConfig {
+  const workflowDefaults: WorkflowDefaults = {
+    ...DEFAULT_WORKFLOW_DEFAULTS,
     ...config.defaults,
   };
 
-  const nodeDefaults = extractNodeSettings(pipelineDefaults);
+  const nodeDefaults = extractNodeSettings(workflowDefaults);
 
   const mergedNodes: Record<string, NodeConfig> = {};
   for (const [id, node] of Object.entries(config.nodes)) {
@@ -544,9 +544,9 @@ function mergeDefaults(config: PipelineConfig): PipelineConfig {
     mergedNodes[id] = merged;
   }
 
-  const result: PipelineConfig = {
+  const result: WorkflowConfig = {
     ...config,
-    defaults: pipelineDefaults,
+    defaults: workflowDefaults,
     nodes: mergedNodes,
   };
   validateFileReferences(result);
@@ -560,7 +560,7 @@ function mergeDefaults(config: PipelineConfig): PipelineConfig {
  * (unresolvable template variables at load time). Throws immediately on the
  * first missing file, including the node ID for context.
  */
-export function validateFileReferences(config: PipelineConfig): void {
+export function validateFileReferences(config: WorkflowConfig): void {
   const FILE_REF_RE = /\{\{file\("([^"]+)"\)\}\}/g;
 
   function scanNode(nodeId: string, node: NodeConfig): void {
@@ -599,7 +599,7 @@ export function validateFileReferences(config: PipelineConfig): void {
  * Returns undefined if not found.
  */
 export function findNodeConfig(
-  config: PipelineConfig,
+  config: WorkflowConfig,
   nodeId: string,
 ): NodeConfig | undefined {
   if (config.nodes[nodeId]) return config.nodes[nodeId];
@@ -615,7 +615,7 @@ export function findNodeConfig(
  * Collect all node IDs including nested body nodes from loop `nodes` sub-objects.
  * Returns a flat list suitable for `createRunState()`.
  */
-export function collectAllNodeIds(config: PipelineConfig): string[] {
+export function collectAllNodeIds(config: WorkflowConfig): string[] {
   const ids: string[] = [];
   for (const [id, node] of Object.entries(config.nodes)) {
     ids.push(id);
@@ -628,8 +628,8 @@ export function collectAllNodeIds(config: PipelineConfig): string[] {
   return ids;
 }
 
-/** Extract NodeSettings fields from PipelineDefaults (exclude pipeline-only fields). */
-function extractNodeSettings(defaults: PipelineDefaults): NodeSettings {
+/** Extract NodeSettings fields from WorkflowDefaults (exclude workflow-only fields). */
+function extractNodeSettings(defaults: WorkflowDefaults): NodeSettings {
   const { max_parallel: _, claude_args: _ca, hitl: _hitl, ...settings } =
     defaults;
   return settings;

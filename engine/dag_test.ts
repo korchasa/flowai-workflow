@@ -1,9 +1,9 @@
 import { assertEquals, assertThrows } from "@std/assert";
 import { buildLevels, buildLoopBodyOrder } from "./dag.ts";
-import type { PipelineConfig } from "./types.ts";
+import type { WorkflowConfig } from "./types.ts";
 import { parseConfig } from "./config.ts";
 
-function cfg(yaml: string): PipelineConfig {
+function cfg(yaml: string): WorkflowConfig {
   return parseConfig(yaml);
 }
 
@@ -174,7 +174,7 @@ nodes:
 Deno.test("buildLevels — cycle detection throws", () => {
   // Can't use parseConfig because it doesn't detect cycles.
   // Build config manually with circular inputs.
-  const config: PipelineConfig = {
+  const config: WorkflowConfig = {
     name: "test",
     version: "1",
     nodes: {
@@ -190,7 +190,7 @@ Deno.test("buildLevels — cycle detection throws", () => {
 });
 
 Deno.test("buildLevels — 3-node cycle detection", () => {
-  const config: PipelineConfig = {
+  const config: WorkflowConfig = {
     name: "test",
     version: "1",
     nodes: {

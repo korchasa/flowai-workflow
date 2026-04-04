@@ -18,7 +18,7 @@
 
 - `deno task check` - Full project verification (format, lint, test)
 - `deno task test` - Run all tests
-- `deno task loop-in-claude` - Autonomous loop: check issues → run pipeline via claude CLI → repeat
+- `deno task loop-in-claude` - Autonomous loop: check issues → run workflow via claude CLI → repeat
 - `deno fmt` - Format code
 - `deno lint` - Lint code
 - `deno test` - Run tests
@@ -27,7 +27,7 @@
 
 - `scripts/check.ts` - Comprehensive check: fmt --check, lint, test,
   comment-scan
-- `scripts/loop_in_claude.ts` - Autonomous loop: check issues → run pipeline via claude CLI (backoff 30s→4h)
+- `scripts/loop_in_claude.ts` - Autonomous loop: check issues → run workflow via claude CLI (backoff 30s→4h)
 - `scripts/test.ts` - Run single test file or all tests
 - `scripts/dev.ts` - Start dev mode (watch)
 - `scripts/prod.ts` - Start production mode

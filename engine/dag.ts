@@ -1,7 +1,7 @@
-import type { PipelineConfig } from "./types.ts";
+import type { WorkflowConfig } from "./types.ts";
 
 /**
- * Build a DAG from pipeline config and produce execution levels.
+ * Build a DAG from workflow config and produce execution levels.
  * Each level is a set of node IDs that can run in parallel.
  * Nodes in level N depend only on nodes in levels < N.
  *
@@ -12,8 +12,8 @@ import type { PipelineConfig } from "./types.ts";
 /** Nodes grouped into parallel execution levels. */
 export type ExecutionLevels = string[][];
 
-/** Build execution levels from pipeline config via topological sort. */
-export function buildLevels(config: PipelineConfig): ExecutionLevels {
+/** Build execution levels from workflow config via topological sort. */
+export function buildLevels(config: WorkflowConfig): ExecutionLevels {
   const loopBodyNodes = collectLoopBodyNodes(config);
   const nodeIds = Object.keys(config.nodes).filter(
     (id) => !loopBodyNodes.has(id),
@@ -32,7 +32,7 @@ export function buildLevels(config: PipelineConfig): ExecutionLevels {
 }
 
 /** Collect all node IDs defined inline in any loop's `nodes` sub-object. */
-function collectLoopBodyNodes(config: PipelineConfig): Set<string> {
+function collectLoopBodyNodes(config: WorkflowConfig): Set<string> {
   const bodyNodes = new Set<string>();
   for (const node of Object.values(config.nodes)) {
     if (node.type === "loop" && node.nodes) {
@@ -67,7 +67,7 @@ function detectCycles(deps: Map<string, Set<string>>): void {
         const cycleStart = path.indexOf(dep);
         const cycle = path.slice(cycleStart).concat(dep);
         throw new Error(
-          `Cycle detected in pipeline DAG: ${cycle.join(" → ")}`,
+          `Cycle detected in workflow DAG: ${cycle.join(" → ")}`,
         );
       }
       if (s === UNVISITED) {
@@ -139,7 +139,7 @@ export function topoSort(deps: Map<string, Set<string>>): ExecutionLevels {
 /** Get the order of body nodes for a loop, resolving internal dependencies.
  * Reads from the loop's inline `nodes` sub-object, topo-sorts by `inputs`. */
 export function buildLoopBodyOrder(
-  config: PipelineConfig,
+  config: WorkflowConfig,
   loopNodeId: string,
 ): string[] {
   const loopNode = config.nodes[loopNodeId];

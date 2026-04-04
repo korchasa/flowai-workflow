@@ -22,14 +22,14 @@ import type {
   EngineOptions,
   NodeConfig,
   NodeSettings,
-  PipelineConfig,
   RunState,
   TemplateContext,
+  WorkflowConfig,
 } from "./types.ts";
 
 /** Parameter bag passed to every node executor function. */
 export interface EngineContext {
-  config: PipelineConfig;
+  config: WorkflowConfig;
   state: RunState;
   output: OutputManager;
   options: EngineOptions;
@@ -58,7 +58,7 @@ export async function executeAgentNode(
       markNodeFailed(
         eng.state,
         nodeId,
-        "HITL detected but defaults.hitl not configured in pipeline.yaml",
+        "HITL detected but defaults.hitl not configured in workflow.yaml",
         "unknown",
       );
       return null;
@@ -115,7 +115,7 @@ export async function executeAgentNode(
         markNodeFailed(
           eng.state,
           nodeId,
-          "Agent requested HITL (AskUserQuestion) but defaults.hitl not configured in pipeline.yaml",
+          "Agent requested HITL (AskUserQuestion) but defaults.hitl not configured in workflow.yaml",
           "unknown",
         );
         return null;

@@ -75,7 +75,7 @@ export interface AgentResult {
 
 /** Options for running an agent. */
 export interface AgentRunOptions {
-  /** Pipeline node configuration (prompt, hooks, validation rules). */
+  /** Workflow node configuration (prompt, hooks, validation rules). */
   node: NodeConfig;
   /** Template context for interpolating prompt/hook variables. */
   ctx: TemplateContext;

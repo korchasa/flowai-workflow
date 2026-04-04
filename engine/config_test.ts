@@ -2,7 +2,7 @@ import { assertEquals, assertThrows } from "@std/assert";
 import { DEFAULT_SETTINGS, extractPreRun, parseConfig } from "./config.ts";
 
 const MINIMAL_AGENT = `
-name: test-pipeline
+name: test-workflow
 version: "1"
 nodes:
   spec:
@@ -13,7 +13,7 @@ nodes:
 `;
 
 const MINIMAL_HUMAN = `
-name: test-pipeline
+name: test-workflow
 version: "1"
 nodes:
   review:
@@ -25,7 +25,7 @@ nodes:
 
 Deno.test("parseConfig — minimal agent node", () => {
   const config = parseConfig(MINIMAL_AGENT);
-  assertEquals(config.name, "test-pipeline");
+  assertEquals(config.name, "test-workflow");
   assertEquals(config.version, "1");
   assertEquals(Object.keys(config.nodes).length, 1);
   assertEquals(config.nodes.spec.type, "agent");
@@ -45,7 +45,7 @@ Deno.test("parseConfig — defaults are merged into node settings", () => {
   );
 });
 
-Deno.test("parseConfig — pipeline defaults override global defaults", () => {
+Deno.test("parseConfig — workflow defaults override global defaults", () => {
   const yaml = `
 name: test
 version: "1"
@@ -63,7 +63,7 @@ nodes:
   assertEquals(config.defaults!.max_parallel, 3);
 });
 
-Deno.test("parseConfig — node settings override pipeline defaults", () => {
+Deno.test("parseConfig — node settings override workflow defaults", () => {
   const yaml = `
 name: test
 version: "1"
@@ -434,7 +434,7 @@ Deno.test("parseConfig — wrong version throws", () => {
         `name: test\nversion: "2"\nnodes:\n  a:\n    type: agent\n    label: A\n    prompt: x`,
       ),
     Error,
-    "Unsupported pipeline config version",
+    "Unsupported workflow config version",
   );
 });
 
@@ -1233,7 +1233,7 @@ nodes:
 );
 
 Deno.test(
-  "parseConfig — hook with valid input.<node-id> from same pipeline passes",
+  "parseConfig — hook with valid input.<node-id> from same workflow passes",
   () => {
     const yaml = `
 name: test

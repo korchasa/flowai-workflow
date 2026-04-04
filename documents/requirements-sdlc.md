@@ -1,9 +1,9 @@
-# SRS: SDLC Pipeline
+# SRS: SDLC Workflow
 
 ## 0. Resolved Design Decisions
 
 - **Target project:** This repo (flowai-workflow). Project-agnostic reuse deferred.
-- **Concurrent pipelines:** One pipeline per branch. Single local execution assumed. No concurrent locking.
+- **Concurrent workflows:** One workflow per branch. Single local execution assumed. No concurrent locking.
 - **Cost limits:** Not tracked. No budget constraints.
 - **Agent prompts:** Written incrementally alongside implementation.
 - **CLAUDE.md interaction:** Target project's CLAUDE.md and agent system prompts complement each other (additive, not conflicting).
@@ -15,12 +15,12 @@
 
 ## 1. Introduction
 
-- **Document purpose:** Define the specification for the automated multi-agent SDLC pipeline — a chain of specialized AI agents orchestrated by the DAG engine, automating the full development lifecycle from GitHub issue triage to merged PR.
-- **Scope:** A locally-run pipeline where a GitHub Issue triggers a chain of specialized AI agents (via `deno task run [--prompt "..."]`), each performing a distinct role in the software development lifecycle — from issue triage to QA verification. PM agent autonomously selects and triages open GitHub issues. This document covers pipeline-specific concerns: agent roles, prompts, GitHub workflow, devcontainer, dashboard. Engine-level concerns (DAG executor, node types, validation, continuation, resume, HITL, CLI) are in the engine SRS.
+- **Document purpose:** Define the specification for the automated multi-agent SDLC workflow — a chain of specialized AI agents orchestrated by the DAG engine, automating the full development lifecycle from GitHub issue triage to merged PR.
+- **Scope:** A locally-run workflow where a GitHub Issue triggers a chain of specialized AI agents (via `deno task run [--prompt "..."]`), each performing a distinct role in the software development lifecycle — from issue triage to QA verification. PM agent autonomously selects and triages open GitHub issues. This document covers workflow-specific concerns: agent roles, prompts, GitHub workflow, devcontainer, dashboard. Engine-level concerns (DAG executor, node types, validation, continuation, resume, HITL, CLI) are in the engine SRS.
 - **Audience:** Project maintainer (korchasa), contributors.
 - **Definitions and abbreviations:**
   - **Agent:** An isolated Claude Code CLI invocation with a dedicated system prompt (role).
-  - **Stage:** A single step in the pipeline, executed by one agent.
+  - **Stage:** A single step in the workflow, executed by one agent.
   - **Handoff Artifact:** A structured Markdown file produced by one agent and consumed by the next.
   - **Agent Log:** A full transcript of an agent's session (input, reasoning, output, tool calls).
   - **Meta-Agent:** A separate agent that analyzes logs of other agents and refines their prompts.
@@ -28,20 +28,20 @@
 
 ## 2. General description
 
-- **System context:** Operates as a local Deno engine process triggered by CLI command (`deno task run [--prompt "..."]`). The engine reads pipeline DAG config (`.flowai-workflow/pipeline.yaml`), executes nodes sequentially via `claude` CLI, validates outputs, and commits artifacts. PM agent autonomously triages open GitHub issues; `--prompt` passes optional additional context. Agents communicate through files in the repository.
+- **System context:** Operates as a local Deno engine process triggered by CLI command (`deno task run [--prompt "..."]`). The engine reads workflow DAG config (`.flowai-workflow/workflow.yaml`), executes nodes sequentially via `claude` CLI, validates outputs, and commits artifacts. PM agent autonomously triages open GitHub issues; `--prompt` passes optional additional context. Agents communicate through files in the repository.
 - **Assumptions and constraints:**
   - A devcontainer provides the runtime environment with all required tools (see FR-S10).
   - Each agent is stateless between runs — all context comes from input artifacts and its system prompt.
-  - The target project is this repository (flowai-workflow). Pipeline design should be project-agnostic for future reuse in other repos.
-- **Goal:** Automate the full development cycle for feature requests: from issue triage to a ready-to-merge PR — fully autonomous, no human gates between stages. PR merge is the only human checkpoint (post-pipeline, not between stages).
+  - The target project is this repository (flowai-workflow). Workflow design should be project-agnostic for future reuse in other repos.
+- **Goal:** Automate the full development cycle for feature requests: from issue triage to a ready-to-merge PR — fully autonomous, no human gates between stages. PR merge is the only human checkpoint (post-workflow, not between stages).
 
 ## 3. Functional Requirements
 
-### 3.1 FR-S1 (ex FR-1): Pipeline Trigger
+### 3.1 FR-S1 (ex FR-1): Workflow Trigger
 
 - **Description:** Single entry point `deno task run [--prompt "..."]`. PM agent autonomously triages open GitHub issues — selects highest-priority open issue, fetches its title and body, and writes `issue: <N>` in `01-spec.md` YAML frontmatter. `--prompt` provides optional additional context passed to the PM agent.
 - **Acceptance criteria:**
-  - [x] `deno task run` starts pipeline; PM selects highest-priority open issue autonomously. Evidence: `engine/cli.ts:36-76` (CLI argument parsing + pipeline entry point), `.flowai-workflow/agents/agent-pm/SKILL.md` (PM triage logic via `gh issue list`)
+  - [x] `deno task run` starts workflow; PM selects highest-priority open issue autonomously. Evidence: `engine/cli.ts:36-76` (CLI argument parsing + workflow entry point), `.flowai-workflow/agents/agent-pm/SKILL.md` (PM triage logic via `gh issue list`)
   - [x] `deno task run --prompt "..."` passes additional context string to PM agent. Evidence: `engine/cli.ts:40-42` (`--prompt` arg parsed into `cliArgs.prompt`)
   - [x] PM writes `issue: <N>` in `01-spec.md` YAML frontmatter after issue selection. Evidence: `.flowai-workflow/agents/agent-pm/SKILL.md` (Output Format section mandates YAML frontmatter with `issue: N`)
   - [x] Common engine flags (`--resume`, `--dry-run`, `-v`, `-q`, `--config`) work with the single entry point. Evidence: `engine/cli.ts:36-76` (`--resume` :43-45, `--dry-run` :47-49, `-v` :50-53, `-q` :58-61, `--config` :37-39)
@@ -50,7 +50,7 @@
 
 - **Description:** The PM agent reads the issue, analyzes existing documentation, and produces a specification. PM updates only the SRS (what needs to be done), not the SDS (how to do it — that's the Tech Lead's job).
 - **Input:** Issue title + body, `documents/requirements-sdlc.md`, `documents/design-sdlc.md`, `AGENTS.md`.
-- **Output:** `.flowai-workflow/pipeline/<issue-number>/01-spec.md`, updated `documents/requirements-sdlc.md`.
+- **Output:** `.flowai-workflow/workflow/<issue-number>/01-spec.md`, updated `documents/requirements-sdlc.md`.
 - **Acceptance criteria:**
   - Agent updates `documents/requirements-sdlc.md` with new/modified requirements (marked with status markers per CLAUDE.md conventions).
   - Agent produces `01-spec.md` containing:
@@ -87,7 +87,7 @@
 - **Previous input/output:** `02-plan.md` → `03-revised-plan.md` (no longer produced as separate artifact).
 - **Acceptance criteria:**
   - Critique is embedded in Tech Lead's `03-decision.md` body (at least one issue per variant).
-  - No separate reviewer node in `pipeline.yaml`.
+  - No separate reviewer node in `workflow.yaml`.
 
 ### 3.5 FR-S5 (ex FR-5): Stage 3 — Tech Lead (Decision + Branch + PR)
 
@@ -134,7 +134,7 @@
 - **Previous input/output:** `03-decision.md` → updated `documents/design-sdlc.md` (now done by Tech Lead).
 - **Acceptance criteria:**
   - Tech Lead updates `documents/design-sdlc.md` with selected variant's design details.
-  - No separate sds-update node in `pipeline.yaml`.
+  - No separate sds-update node in `workflow.yaml`.
 
 ### 3.7 FR-S7 (ex FR-7): Stage 6-7 — Developer + QA (Iterative Implementation Loop)
 
@@ -174,12 +174,12 @@
     - If `PASS`: loop ends, proceeds to next stage.
     - If `FAIL`: loop repeats with the next Developer iteration.
   - **Loop config structure:**
-    - [ ] Loop body nodes (`developer`, `qa`) MUST be defined inline within the loop node config, not as top-level pipeline nodes. Body node IDs are loop-scoped.
+    - [ ] Loop body nodes (`developer`, `qa`) MUST be defined inline within the loop node config, not as top-level workflow nodes. Body node IDs are loop-scoped.
     - [ ] Body nodes can declare `inputs` referencing both sibling body nodes (within the same loop) and external top-level nodes.
     - [ ] `{{loop.iteration}}` template variable is only available in loop body node contexts.
   - **Loop constraints:**
     - Maximum iterations: configurable (default 3).
-    - If limit reached without `PASS`: pipeline stops and reports failure on the issue. Meta-Agent is triggered (see FR-S8).
+    - If limit reached without `PASS`: workflow stops and reports failure on the issue. Meta-Agent is triggered (see FR-S8).
 - **Quality metrics:**
   - `deno task check` passes on every Developer commit (enforced by stage script, see engine SRS FR-8).
   - QA report covers 100% of acceptance criteria from `01-spec.md`.
@@ -199,11 +199,11 @@
 
 ### 3.9 FR-S9 (ex FR-11): Meta-Agent (Prompt Optimization)
 
-- **Description:** A dedicated agent that runs after every pipeline execution (both success and failure). It analyzes the logs of the current run, identifies errors, friction points, and inefficiencies, and produces actionable prompt improvement suggestions.
+- **Description:** A dedicated agent that runs after every workflow execution (both success and failure). It analyzes the logs of the current run, identifies errors, friction points, and inefficiencies, and produces actionable prompt improvement suggestions.
 - **Trigger conditions:**
-  - **On pipeline success:** runs as the final stage after Presenter (Stage 9).
-  - **On pipeline failure:** runs automatically when any stage fails after exhausting its continuation limit.
-- **Trigger mechanism:** Engine executes meta-agent node as a post-pipeline node. In `pipeline.yaml`, the meta-agent node is configured with `run_on: always` (engine SRS FR-25) to run regardless of upstream success/failure. Failed node ID identified via `state.json` (nodes with `status: "failed"`). Engine does NOT write a separate `failed-node.txt` — that violates engine SRS FR-29.
+  - **On workflow success:** runs as the final stage after Presenter (Stage 9).
+  - **On workflow failure:** runs automatically when any stage fails after exhausting its continuation limit.
+- **Trigger mechanism:** Engine executes meta-agent node as a post-workflow node. In `workflow.yaml`, the meta-agent node is configured with `run_on: always` (engine SRS FR-25) to run regardless of upstream success/failure. Failed node ID identified via `state.json` (nodes with `status: "failed"`). Engine does NOT write a separate `failed-node.txt` — that violates engine SRS FR-29.
 - **Input:**
   - `.flowai-workflow/memory/agent-meta-agent.md` — own reflection memory (read first; FR-S28).
   - Run logs from `<run-dir>/logs/` and `state.json` (failed node context from `nodes[*].status` field; no `failed-node.txt`).
@@ -224,10 +224,10 @@
 
 ### 3.10 FR-S10 (ex FR-12): Runtime Infrastructure
 
-- **Description:** Pipeline runs locally inside a devcontainer. The Deno engine orchestrates agent invocations. Legacy shell scripts preserved for backward compatibility.
+- **Description:** Workflow runs locally inside a devcontainer. The Deno engine orchestrates agent invocations. Legacy shell scripts preserved for backward compatibility.
 - **Devcontainer contents** (`.devcontainer/Dockerfile`):
   - `claude` CLI (Claude Code) — installed via `npm install -g @anthropic-ai/claude-code`.
-  - `deno` runtime — for running project checks, tests, and the pipeline engine.
+  - `deno` runtime — for running project checks, tests, and the workflow engine.
   - `git` — for branch management, commits, and diff-based safety checks.
   - `gh` CLI — for creating PRs and posting issue comments.
   - `gitleaks` — for secret detection in diff-based safety checks (see engine SRS FR-8).
@@ -250,10 +250,10 @@
 
 ### 3.11 FR-S11 (ex FR-14): Inter-Stage Data Flow & Commit Strategy
 
-- **Description:** Defines how data flows between pipeline stages and when commits happen on the feature branch.
+- **Description:** Defines how data flows between workflow stages and when commits happen on the feature branch.
 - **Data flow:**
-  - Engine path: artifacts stored in `.flowai-workflow/runs/<run-id>/[<phase>/]<node-id>/` (phase subdir present when node's `phase` field is set in `pipeline.yaml`; flat `<node-id>/` otherwise). Linked via `{{input.<node-id>}}` templates. Phase-aware directory creation depends on engine FR-E9 implementation. Evidence: `documents/design-sdlc.md` §2.2 (Artifact Store subsystem description).
-  - Legacy path: artifacts in `.flowai-workflow/pipeline/<issue-number>/`.
+  - Engine path: artifacts stored in `.flowai-workflow/runs/<run-id>/[<phase>/]<node-id>/` (phase subdir present when node's `phase` field is set in `workflow.yaml`; flat `<node-id>/` otherwise). Linked via `{{input.<node-id>}}` templates. Phase-aware directory creation depends on engine FR-E9 implementation. Evidence: `documents/design-sdlc.md` §2.2 (Artifact Store subsystem description).
+  - Legacy path: artifacts in `.flowai-workflow/workflow/<issue-number>/`.
   - The file system is the single source of truth for inter-stage communication. No manifest or registry.
   - Claude CLI's built-in context auto-compression handles large input sets; no manual context management is required.
 - **Commit strategy (FR-S15):**
@@ -266,7 +266,7 @@
 - **Branch lifecycle:**
   - Branch created by Tech Lead agent after variant selection.
   - On re-run, existing branch is reused — new commits overwrite previous artifacts (previous versions preserved in git history per FR-13).
-  - Branch is merged via tech-lead-review post-pipeline agent.
+  - Branch is merged via tech-lead-review post-workflow agent.
 - **Acceptance criteria:**
   - [x] Engine does NOT auto-commit after any node. Evidence: `engine.ts` — no `commitIfNeeded()` calls
   - Developer commits/pushes own code during implementation.
@@ -275,7 +275,7 @@
 
 ### 3.12 FR-S12 (ex FR-16): Secrets
 
-- **Description:** Defines the required secrets for pipeline operation.
+- **Description:** Defines the required secrets for workflow operation.
 - **Authentication:**
   - **Claude Code CLI:** OAuth session (`claude login`) or `ANTHROPIC_API_KEY` env var. OAuth is the default method in devcontainer; API key is an optional alternative.
   - `GITHUB_TOKEN` — used by `gh` CLI for PR creation and issue comments. Must have `issues:write`, `pull-requests:write`, `contents:write` permissions. Can be obtained via `gh auth token`.
@@ -286,51 +286,51 @@
 
 ### 3.13 FR-S13 (ex FR-19): Agents as Skills
 
-- **Description:** Each pipeline agent is a Claude Code project skill stored canonically in `.flowai-workflow/agents/agent-<name>/SKILL.md` per the agentskills.io specification. Each skill directory may include a `scripts/` subdirectory with co-located stage scripts. No symlinks. Each agent can be invoked standalone via `/agent-<name>` or used by the pipeline engine.
+- **Description:** Each workflow agent is a Claude Code project skill stored canonically in `.flowai-workflow/agents/agent-<name>/SKILL.md` per the agentskills.io specification. Each skill directory may include a `scripts/` subdirectory with co-located stage scripts. No symlinks. Each agent can be invoked standalone via `/agent-<name>` or used by the workflow engine.
 - **Agents (6):** pm, architect, tech-lead, tech-lead-review, developer, qa. (FR-S15: reduced from 10-agent set; removed committer, tech-lead-reviewer, tech-lead-sds; presenter has no agent directory. FR-S9: meta-agent removed. FR-S18: executor renamed to developer.)
 - **Supersedes:** Original layout `agents/<name>/SKILL.md` with `.claude/skills/` symlinks (superseded by FR-S17).
 - **Acceptance criteria:**
   - [x] Each of 7 agents has a canonical directory `.flowai-workflow/agents/agent-<name>/` containing `SKILL.md` with spec-compliant YAML frontmatter (`name`, `description`, `compatibility`, `allowed-tools`; no `disable-model-invocation`). Expected: `.flowai-workflow/agents/agent-pm/SKILL.md`, `.flowai-workflow/agents/agent-architect/SKILL.md`, `.flowai-workflow/agents/agent-tech-lead/SKILL.md`, `.flowai-workflow/agents/agent-tech-lead-review/SKILL.md`, `.flowai-workflow/agents/agent-developer/SKILL.md`, `.flowai-workflow/agents/agent-qa/SKILL.md`, `.flowai-workflow/agents/agent-meta-agent/SKILL.md`. Evidence: commits `6176e91`, `985e3e5`, `f0085df`; QA PASS runs `20260313T230627`, `20260314T000902`
   - [x] No symlinks in `.claude/skills/` pointing to `agents/`. Evidence: `agents/` directory removed; `.flowai-workflow/agents/agent-*/` are real directories (commits `6176e91`, `985e3e5`)
   - [x] `agents/` top-level directory removed after migration. Evidence: commit `985e3e5 sdlc(impl): remove agents/ directory and fix stale path references`
-  - [x] Pipeline engine `prompt:` fields in `pipeline.yaml` reference `.flowai-workflow/agents/agent-<name>/SKILL.md`. Evidence: `.flowai-workflow/pipeline.yaml` (commit `6176e91`)
-  - [x] Each agent skill is accessible to the pipeline engine via `.flowai-workflow/agents/agent-<name>/SKILL.md`. Interactive standalone invocation via `/agent-<name>` relied on `.claude/skills/` symlinks superseded by FR-S33. Evidence: `.flowai-workflow/pipeline.yaml` `prompt:` fields; `.flowai-workflow/agents/agent-*/SKILL.md` (7 files present)
+  - [x] Workflow engine `prompt:` fields in `workflow.yaml` reference `.flowai-workflow/agents/agent-<name>/SKILL.md`. Evidence: `.flowai-workflow/workflow.yaml` (commit `6176e91`)
+  - [x] Each agent skill is accessible to the workflow engine via `.flowai-workflow/agents/agent-<name>/SKILL.md`. Interactive standalone invocation via `/agent-<name>` relied on `.claude/skills/` symlinks superseded by FR-S33. Evidence: `.flowai-workflow/workflow.yaml` `prompt:` fields; `.flowai-workflow/agents/agent-*/SKILL.md` (7 files present)
   - [x] `deno task check` passes after migration. Evidence: QA PASS — 436 tests pass (run `20260313T230627`)
 
 ### 3.14 FR-S14 (ex FR-22): Project Documentation (README)
 
-- **Description:** README.md must accurately reflect current project state: vision, architecture (DAG-based engine), usage (`deno task run` with flags), prerequisites (Deno, Docker/devcontainer, Claude CLI, `gh`), available `deno task` commands, configuration mechanism (YAML `pipeline.yaml`), project directory structure, and agents-as-skills.
-- **Scenario:** A new contributor reads README.md and gets correct, up-to-date information about how to set up, configure, and run the pipeline.
+- **Description:** README.md must accurately reflect current project state: vision, architecture (DAG-based engine), usage (`deno task run` with flags), prerequisites (Deno, Docker/devcontainer, Claude CLI, `gh`), available `deno task` commands, configuration mechanism (YAML `workflow.yaml`), project directory structure, and agents-as-skills.
+- **Scenario:** A new contributor reads README.md and gets correct, up-to-date information about how to set up, configure, and run the workflow.
 - **Acceptance criteria:**
   - [ ] README.md reflects DAG-based engine architecture (not shell script orchestration).
   - [ ] Usage section documents `deno task run` with current flags (`--prompt`, `--resume`, `--dry-run`, `-v`, `-q`, `--config`, `--skip`, `--only`, `--env`).
   - [ ] Prerequisites list: Deno, Docker/devcontainer, Claude Code CLI, `gh` CLI, Git.
   - [ ] Available `deno task` commands documented (run, check, test).
-  - [ ] Configuration section references `pipeline.yaml` (not env vars).
+  - [ ] Configuration section references `workflow.yaml` (not env vars).
   - [ ] Project directory structure matches actual layout (`engine/`, `.flowai-workflow/runs/`, `.claude/skills/`).
   - [ ] Agents-as-skills mentioned with `/agent-<name>` slash command examples.
   - [ ] Installation/setup instructions are accurate for devcontainer workflow.
 
-### 3.15 FR-S15 (ex FR-26): Align Pipeline Git Workflow with Standard GitHub Practices
+### 3.15 FR-S15 (ex FR-26): Align Workflow Git Workflow with Standard GitHub Practices
 
-- **Description:** Restructure pipeline agent roles and git workflow to match
+- **Description:** Restructure workflow agent roles and git workflow to match
   standard GitHub development practices. Rename/merge agents to reflect
   real-world roles, eliminate artificial agents (committer, reviewer), move git
   operations (branch, commit, push, PR) to the agents that own the work, and
   use PRs (not issues) as the primary communication channel for code review.
-- **Motivation:** Current pipeline diverges from standard practices: roles are
+- **Motivation:** Current workflow diverges from standard practices: roles are
   misnamed (tech-lead does architecture, architect does tech-lead work),
   artificial roles exist (committer, reviewer), git operations are deferred to
   separate committer nodes, and QA/review communication happens in issues
   instead of PRs.
-- **Target pipeline flow:**
+- **Target workflow flow:**
   ```
   pm → architect → tech-lead → impl-loop(developer, qa) → tech-lead-review
                                                            ↑
                                                     meta-agent (run_always)
   ```
   5 agent invocations in happy path (was 8): pm, architect, tech-lead,
-  developer, qa — plus tech-lead-review and meta-agent as post-pipeline.
+  developer, qa — plus tech-lead-review and meta-agent as post-workflow.
 - **Role changes:**
   - `tech-lead` node (current) → renamed to **`architect`** (designs solution
     with variants). Prompt: `.flowai-workflow/agents/agent-architect/SKILL.md`.
@@ -358,7 +358,7 @@
   - Update `.flowai-workflow/agents/agent-developer/SKILL.md` — add commit/push, PR comments. (FR-S18: formerly `agent-executor`)
   - Update `.flowai-workflow/agents/agent-qa/SKILL.md` — PR review instead of issue comments.
   - New `.flowai-workflow/agents/agent-tech-lead-review/SKILL.md` — code review + CI gate + merge.
-  - Update `pipeline.yaml` — new DAG with fewer nodes.
+  - Update `workflow.yaml` — new DAG with fewer nodes.
 - **Invariants (no changes):**
   - `engine/` — engine remains domain-agnostic, no code changes.
   - `.flowai-workflow/agents/agent-pm/` — no changes.
@@ -370,20 +370,20 @@
   - [x] `.flowai-workflow/agents/agent-tech-lead-review/SKILL.md` created with code review + CI gate + merge logic. Evidence: `.flowai-workflow/agents/agent-tech-lead-review/SKILL.md:21-24`
   - [x] `.flowai-workflow/agents/agent-developer/SKILL.md` exists: commits/pushes own code, posts PR comments, "do not commit" rule removed. Evidence: commit `f0085df sdlc(impl): rename Executor agent role to Developer (FR-37)`, `.flowai-workflow/agents/agent-developer/SKILL.md`
   - [x] `.flowai-workflow/agents/agent-qa/SKILL.md` updated: posts PR reviews via `gh pr review` ONLY (no issue comments). Evidence: `.flowai-workflow/agents/agent-qa/SKILL.md`
-  - [x] `pipeline.yaml` updated: `finalize` (committer) node removed; `review` node renamed to `tech-lead-review` using `.flowai-workflow/agents/agent-tech-lead-review/SKILL.md` with `run_on: always` + merge capability. Evidence: `.flowai-workflow/pipeline.yaml:163-184`
+  - [x] `workflow.yaml` updated: `finalize` (committer) node removed; `review` node renamed to `tech-lead-review` using `.flowai-workflow/agents/agent-tech-lead-review/SKILL.md` with `run_on: always` + merge capability. Evidence: `.flowai-workflow/workflow.yaml:163-184`
   - [x] Agent skill directories present as `.flowai-workflow/agents/agent-*/` (no `.claude/skills/` symlinks). Evidence: commit `6176e91`, `985e3e5`; FR-S33 removes remaining `.claude/skills/ agent-*` symlinks
-  - [x] Pipeline produces 5 agent invocations in happy path (pm, architect, tech-lead, developer, qa) plus 1 post-pipeline (tech-lead-review). Evidence: commit `f0085df`, `.flowai-workflow/pipeline.yaml` (developer node in impl-loop)
+  - [x] Workflow produces 5 agent invocations in happy path (pm, architect, tech-lead, developer, qa) plus 1 post-workflow (tech-lead-review). Evidence: commit `f0085df`, `.flowai-workflow/workflow.yaml` (developer node in impl-loop)
   - [x] Developer creates commits on feature branch during implementation. Evidence: commit `f0085df`, `.flowai-workflow/agents/agent-developer/SKILL.md`
   - [x] QA posts review on PR only (not issue comment). Evidence: `.flowai-workflow/agents/agent-qa/SKILL.md`
   - [x] Tech-lead-review merges PR if CI green, or leaves open with comments. Evidence: `.flowai-workflow/agents/agent-tech-lead-review/SKILL.md`
   - [x] `--prompt` mode (no GitHub issue) uses fallback branch name `sdlc/<run-id>`. Evidence: `.flowai-workflow/agents/agent-tech-lead/SKILL.md`
   - [x] All existing engine tests pass (no engine code changes). Evidence: engine/ unchanged.
   - [x] `deno task check` passes after all changes. Evidence: validated post-implementation.
-  - [x] SRS, SDS updated to reflect final pipeline structure. Evidence: `documents/requirements-sdlc.md`, `documents/design-sdlc.md`
+  - [x] SRS, SDS updated to reflect final workflow structure. Evidence: `documents/requirements-sdlc.md`, `documents/design-sdlc.md`
 
 ### 3.16 FR-S16 (ex FR-35): Dashboard Result Summary Display
 
-- **Description:** HTML dashboard cards for pipeline nodes must display at least the first 3 lines of the agent result text. Long results must be collapsible (expand on click). Single-line results display inline without unnecessary whitespace. Prior implementation used `white-space: nowrap; text-overflow: ellipsis` truncating multi-line results to ~40 chars.
+- **Description:** HTML dashboard cards for workflow nodes must display at least the first 3 lines of the agent result text. Long results must be collapsible (expand on click). Single-line results display inline without unnecessary whitespace. Prior implementation used `white-space: nowrap; text-overflow: ellipsis` truncating multi-line results to ~40 chars.
 - **Acceptance criteria:**
   - [x] `renderCard()` in `scripts/generate-dashboard.ts` uses `<details>/<summary>` for multi-line results (>1 line): first 3 lines in `<summary>`, full text in `<details>` body. Evidence: `scripts/generate-dashboard.ts:73-77`
   - [x] Single-line results render as `<p class="result">` without `<details>` wrapper. Evidence: `scripts/generate-dashboard.ts:72`
@@ -394,24 +394,24 @@
 
 ### 3.17 FR-S17 (ex FR-36): Agentskills.io-Compliant Skill Layout
 
-- **Description:** All pipeline agent skills must conform to the [agentskills.io specification](https://agentskills.io/specification). Canonical skill directories live in `.flowai-workflow/agents/agent-<name>/`. Associated stage scripts co-located under `scripts/` subdirectory of each skill. Frontmatter uses only spec-defined fields.
+- **Description:** All workflow agent skills must conform to the [agentskills.io specification](https://agentskills.io/specification). Canonical skill directories live in `.flowai-workflow/agents/agent-<name>/`. Associated stage scripts co-located under `scripts/` subdirectory of each skill. Frontmatter uses only spec-defined fields.
 - **Motivation:** Spec compliance enables standard skill tooling and discovery. Co-location reduces cognitive overhead. Removing the `agents/` → `.claude/skills/` symlink indirection eliminates broken-symlink failure mode.
 - **Acceptance criteria:**
   - [x] Each skill directory `.flowai-workflow/agents/agent-<name>/` contains `SKILL.md` with frontmatter fields: `name` (matches directory name), `description`, `compatibility`, `allowed-tools`. No `disable-model-invocation` field. Expected: `.flowai-workflow/agents/agent-pm/SKILL.md`, `.flowai-workflow/agents/agent-architect/SKILL.md`, `.flowai-workflow/agents/agent-tech-lead/SKILL.md`, `.flowai-workflow/agents/agent-tech-lead-review/SKILL.md`, `.flowai-workflow/agents/agent-developer/SKILL.md`, `.flowai-workflow/agents/agent-qa/SKILL.md`, `.flowai-workflow/agents/agent-meta-agent/SKILL.md`. Evidence: commit `f0085df sdlc(impl): rename Executor agent role to Developer (FR-37)`; QA PASS run `20260314T000902` (436 tests)
   - [x] Stage scripts formally deprecated (superseded by engine); co-location N/A for deprecated scripts. Evidence: deprecation headers added to all `.flowai-workflow/scripts/stage-*.sh`; `AGENT_PROMPT` paths updated to `.flowai-workflow/agents/agent-<name>/SKILL.md` (this commit).
   - [x] `hitl-ask.sh`, `hitl-check.sh`, `lib.sh`, and shared utilities remain in `.flowai-workflow/scripts/` (engine infrastructure, not agent skills). Evidence: `.flowai-workflow/scripts/hitl-ask.sh`, `.flowai-workflow/scripts/hitl-check.sh`, `.flowai-workflow/scripts/lib.sh`
   - [x] `agents/` top-level directory removed; no broken symlinks in `.claude/skills/`. Evidence: commit `985e3e5 sdlc(impl): remove agents/ directory and fix stale path references`
-  - [x] `pipeline.yaml` `prompt:` fields updated to `.flowai-workflow/agents/agent-<name>/SKILL.md`. Evidence: `.flowai-workflow/pipeline.yaml` (commit `6176e91`)
+  - [x] `workflow.yaml` `prompt:` fields updated to `.flowai-workflow/agents/agent-<name>/SKILL.md`. Evidence: `.flowai-workflow/workflow.yaml` (commit `6176e91`)
   - [x] `documents/requirements-sdlc.md` path references updated to reflect new `.claude/skills/` layout and FR-S18 rename. Evidence: this update (run `20260314T010515`); commit `f0085df`
   - [x] `deno task check` passes after migration. Evidence: QA PASS — 436 tests pass (run `20260313T230627`)
 
 ### 3.18 FR-S18 (ex FR-37): Rename Executor Agent to Developer
 
-- **Description:** Rename the `executor` agent to `developer` across all project files. The executor agent's actual role — writing code, committing, pushing, posting PR comments — matches the industry term "developer", not the generic "executor". All other pipeline agents use role-based names; this rename completes the alignment.
-- **Scope:** Pure rename — no behavioral changes. Affected artifacts: agent skill directory, pipeline config node IDs, all SKILL.md cross-references, legacy shell scripts, engine test fixtures, and documentation.
+- **Description:** Rename the `executor` agent to `developer` across all project files. The executor agent's actual role — writing code, committing, pushing, posting PR comments — matches the industry term "developer", not the generic "executor". All other workflow agents use role-based names; this rename completes the alignment.
+- **Scope:** Pure rename — no behavioral changes. Affected artifacts: agent skill directory, workflow config node IDs, all SKILL.md cross-references, legacy shell scripts, engine test fixtures, and documentation.
 - **Acceptance criteria:**
   - [x] `.flowai-workflow/agents/agent-executor/` directory renamed to `.flowai-workflow/agents/agent-developer/`. `SKILL.md` frontmatter `name` field updated to `agent-developer`. Evidence: commit `f0085df sdlc(impl): rename Executor agent role to Developer (FR-37)`
-  - [x] `.flowai-workflow/pipeline.yaml`: loop body node id `executor` → `developer`; all `{{input.executor}}` → `{{input.developer}}` template references updated. Evidence: commit `f0085df`
+  - [x] `.flowai-workflow/workflow.yaml`: loop body node id `executor` → `developer`; all `{{input.executor}}` → `{{input.developer}}` template references updated. Evidence: commit `f0085df`
   - [x] All agent `SKILL.md` files: `{{input.executor}}` → `{{input.developer}}` in cross-agent references. Evidence: commit `f0085df`
   - [x] Legacy scripts renamed: `stage-6-executor.sh` → `stage-6-developer.sh`; internal refs and `AGENT_PROMPT` path updated. `stage-7-qa.sh` executor output references updated. Evidence: commit `f0085df`
   - [x] Engine test fixtures: node IDs using `executor` as example updated to `developer`. Evidence: commit `f0085df`
@@ -421,7 +421,7 @@
 ### 3.19 FR-S19 (ex FR-38): Timeline Visualization in Dashboard
 
 - **Description:** HTML dashboard must include a Gantt-style timeline section
-  showing each pipeline node as a horizontal bar. Bar position reflects
+  showing each workflow node as a horizontal bar. Bar position reflects
   `started_at` offset from run start; bar width reflects `duration_ms`.
   Parallel nodes appear stacked vertically at the same horizontal offset. The
   longest-duration node (bottleneck) is visually highlighted.
@@ -456,7 +456,7 @@
   "execution log" or styled differently). Enables direct navigation from a
   failing node card to its detailed execution log without manual filesystem
   navigation.
-- **Motivation:** Stream logs are the primary debugging tool for pipeline
+- **Motivation:** Stream logs are the primary debugging tool for workflow
   failures. The dashboard currently lists only `.md` output artifacts;
   execution logs (`stream.log`) are not linked, making them hard to discover.
   `scanArtifacts` already surfaces `stream.log` in node directories but
@@ -488,8 +488,8 @@
 
 ### 3.21 FR-S21 (ex FR-42): Agent Output Summary Section
 
-- **Description:** Every agent in the pipeline must produce a `## Summary`
-  section in its primary output artifact. The pipeline validation must enforce
+- **Description:** Every agent in the workflow must produce a `## Summary`
+  section in its primary output artifact. The workflow validation must enforce
   its presence via `contains_section: Summary` rule. Ensures traceability:
   any operator or downstream agent can read a single section to understand
   what the stage accomplished.
@@ -508,18 +508,18 @@
     `.flowai-workflow/agents/agent-developer/SKILL.md:92`,
     `.flowai-workflow/agents/agent-qa/SKILL.md:113`,
     `.flowai-workflow/agents/agent-tech-lead-review/SKILL.md:55`.
-  - [x] `pipeline.yaml` validation rules include `contains_section: Summary`
+  - [x] `workflow.yaml` validation rules include `contains_section: Summary`
     for all 6 agent nodes (`specification`, `design`, `decision`, `build`,
     `verify`, `tech-lead-review`).
-    Evidence: `.flowai-workflow/pipeline.yaml:61` (specification), `:83` (design),
+    Evidence: `.flowai-workflow/workflow.yaml:61` (specification), `:83` (design),
     `:108` (decision), `:140` (build), `:159` (verify), `:210` (tech-lead-review).
   - [x] Continuation mechanism is triggered when `## Summary` is absent
     (same `contains_section` rule behavior as other section validations).
     Evidence: Inherent behavior of `contains_section` validation in engine;
-    `.flowai-workflow/pipeline.yaml` `contains_section` rules trigger continuation on
+    `.flowai-workflow/workflow.yaml` `contains_section` rules trigger continuation on
     missing section (same mechanism as all other section validations).
   - [x] `deno task check` passes after changes.
-    Evidence: Run 20260314T073009 — 490 tests pass, pipeline integrity valid.
+    Evidence: Run 20260314T073009 — 490 tests pass, workflow integrity valid.
 
 ### 3.22 FR-S22 (ex FR-43): Agent First-Person Voice in GitHub Interactions
 
@@ -553,31 +553,31 @@
 
 ### 3.23 FR-S23: SDLC Documentation Accuracy
 
-- **Description:** SDLC SDS (`documents/design-sdlc.md`) must accurately reflect the current pipeline architecture. Deprecated components must be explicitly labeled with deprecation reason and superseding FR, or removed entirely. References in SDS must match current `deno.json` task state.
-- **Rationale:** Legacy diagrams and stubs for removed pipeline stages (removed per FR-S15) create architectural confusion for new contributors. `deno.json` task references in SDS 3.2 that no longer match actual state undermine doc trustworthiness.
+- **Description:** SDLC SDS (`documents/design-sdlc.md`) must accurately reflect the current workflow architecture. Deprecated components must be explicitly labeled with deprecation reason and superseding FR, or removed entirely. References in SDS must match current `deno.json` task state.
+- **Rationale:** Legacy diagrams and stubs for removed workflow stages (removed per FR-S15) create architectural confusion for new contributors. `deno.json` task references in SDS 3.2 that no longer match actual state undermine doc trustworthiness.
 - **Acceptance criteria:**
-  - [x] SDS section 2.1 legacy shell pipeline diagram marked "(DEPRECATED — pre-FR-S15)" or removed. Affected nodes: Stage 3 (Reviewer), Stage 4 (Architect), Stage 5 (SDS Update), Stage 8 (Presenter) — all absorbed/removed after FR-S15 pipeline restructure. Evidence: `documents/design-sdlc.md` §2.1 heading "Legacy: Shell Script Pipeline (REMOVED — superseded by FR-S15)".
+  - [x] SDS section 2.1 legacy shell workflow diagram marked "(DEPRECATED — pre-FR-S15)" or removed. Affected nodes: Stage 3 (Reviewer), Stage 4 (Architect), Stage 5 (SDS Update), Stage 8 (Presenter) — all absorbed/removed after FR-S15 workflow restructure. Evidence: `documents/design-sdlc.md` §2.1 heading "Legacy: Shell Script Workflow (REMOVED — superseded by FR-S15)".
   - [x] SDS section 3.2 (Stage Scripts) `deno.json` task references aligned with current state: 9 `test:*` legacy tasks accurately documented with DEPRECATED status. Evidence: `documents/design-sdlc.md` §3.2 heading "Stage Scripts — DELETED (FR-S26)".
   - [x] `deno task check` passes. Evidence: `deno task check` PASS (this commit).
 
-### 3.24 FR-S24: Pipeline Config Validation
+### 3.24 FR-S24: Workflow Config Validation
 
-- **Description:** SDLC pipeline config (`.flowai-workflow/pipeline.yaml`) must be validated for schema correctness as part of `deno task check`. Detects drift between pipeline config and engine schema requirements before runtime failures occur.
+- **Description:** SDLC workflow config (`.flowai-workflow/workflow.yaml`) must be validated for schema correctness as part of `deno task check`. Detects drift between workflow config and engine schema requirements before runtime failures occur.
 - **Rationale:** Unvalidated config changes cause hard-to-diagnose runtime failures. Static validation catches invalid node types, missing required fields, and bad `inputs` references at development time. Maps to SDLC-scope aspect of engine FR-E7 (config drift detection).
 - **Acceptance criteria:**
-  - [x] `scripts/check.ts` validates `.flowai-workflow/pipeline.yaml` schema: node types, required fields, `inputs` references, `run_on` values. Evidence: `scripts/check.ts:84-96` (`pipelineIntegrity()` calls `loadConfig()`), `engine/config.ts:43-103` (schema validation), `engine/config.ts:105-249` (node validation — types, inputs, `run_on`).
-  - [x] `deno task check` exits non-zero with descriptive error on invalid config. Evidence: `scripts/check.ts:84-96` (`pipelineIntegrity()` catches `loadConfig()` exceptions and reports descriptive error messages).
-  - [x] `deno task check` passes on valid config with no false positives. Evidence: `deno task check` passes on current `.flowai-workflow/pipeline.yaml` with no errors.
+  - [x] `scripts/check.ts` validates `.flowai-workflow/workflow.yaml` schema: node types, required fields, `inputs` references, `run_on` values. Evidence: `scripts/check.ts:84-96` (`workflowIntegrity()` calls `loadConfig()`), `engine/config.ts:43-103` (schema validation), `engine/config.ts:105-249` (node validation — types, inputs, `run_on`).
+  - [x] `deno task check` exits non-zero with descriptive error on invalid config. Evidence: `scripts/check.ts:84-96` (`workflowIntegrity()` catches `loadConfig()` exceptions and reports descriptive error messages).
+  - [x] `deno task check` passes on valid config with no false positives. Evidence: `deno task check` passes on current `.flowai-workflow/workflow.yaml` with no errors.
 
 ### 3.25 FR-S25: Phase-Organized SDLC Artifact Directories
 
-- **Description:** SDLC pipeline nodes with a `phase` config field must store output artifacts in phase-organized subdirectories (`.flowai-workflow/runs/<run-id>/<phase>/<node-id>/`). Nodes without `phase` use flat layout (`.flowai-workflow/runs/<run-id>/<node-id>/`). Depends on engine FR-E9 implementation.
-- **Rationale:** SDLC pipeline nodes are grouped into `plan`, `impl`, `report` phases in `pipeline.yaml`. Phase-organized storage improves navigability and aligns artifact structure with declared execution flow. Without engine FR-E9 (phase registry + phase-aware `getNodeDir()`), the `phase` field in `pipeline.yaml` has no effect on artifact paths.
+- **Description:** SDLC workflow nodes with a `phase` config field must store output artifacts in phase-organized subdirectories (`.flowai-workflow/runs/<run-id>/<phase>/<node-id>/`). Nodes without `phase` use flat layout (`.flowai-workflow/runs/<run-id>/<node-id>/`). Depends on engine FR-E9 implementation.
+- **Rationale:** SDLC workflow nodes are grouped into `plan`, `impl`, `report` phases in `workflow.yaml`. Phase-organized storage improves navigability and aligns artifact structure with declared execution flow. Without engine FR-E9 (phase registry + phase-aware `getNodeDir()`), the `phase` field in `workflow.yaml` has no effect on artifact paths.
 - **Acceptance criteria:**
-  - [x] All SDLC pipeline nodes in `.flowai-workflow/pipeline.yaml` have `phase:` field set to `plan`, `impl`, or `report` as appropriate. Evidence: `.flowai-workflow/pipeline.yaml` (specification, design, decision → `plan`; implementation → `impl`; tech-lead-review, optimize → `report`).
+  - [x] All SDLC workflow nodes in `.flowai-workflow/workflow.yaml` have `phase:` field set to `plan`, `impl`, or `report` as appropriate. Evidence: `.flowai-workflow/workflow.yaml` (specification, design, decision → `plan`; implementation → `impl`; tech-lead-review, optimize → `report`).
   - [x] After engine FR-E9 implementation, artifact directories follow `.flowai-workflow/runs/<run-id>/<phase>/<node-id>/` layout for all phased nodes. Evidence: `engine/state.ts:20-36` (`setPhaseRegistry()`), `engine/state.ts:98-103` (`getNodeDir()` phase-aware path), `engine/engine.ts:129-130` (init at run start).
   - [x] `{{input.<node-id>}}` and `{{node_dir}}` template variables resolve to phase-aware paths for phased nodes. Evidence: `engine/state.ts:44-46` (`getPhaseForNode()`); `getNodeDir()` underpins template variable resolution.
-  - [x] SDLC pipeline runs end-to-end successfully with phase subdirectory layout.
+  - [x] SDLC workflow runs end-to-end successfully with phase subdirectory layout.
     Evidence: `.flowai-workflow/runs/20260314T154052/plan/specification/`,
     `.flowai-workflow/runs/20260314T154052/plan/design/`,
     `.flowai-workflow/runs/20260314T154052/plan/decision/`,
@@ -588,13 +588,13 @@
   - [x] `deno task check` passes. Evidence: `deno task check` exit 0, 498 tests
     passed, 0 failed, run 20260314T154052.
 
-### 3.26 FR-S26: Pipeline Asset Directory Consolidation
+### 3.26 FR-S26: Workflow Asset Directory Consolidation
 
-- **Desc:** All pipeline assets (config, agent prompts, scripts, tasks, runs) MUST be consolidated under `.flowai-workflow/` directory. Eliminates `.flowai-workflow/` (domain-specific naming, violates engine's domain-agnostic principle) and decouples agent prompts from `.claude/skills/` (Claude Code's skill-system coupling).
+- **Desc:** All workflow assets (config, agent prompts, scripts, tasks, runs) MUST be consolidated under `.flowai-workflow/` directory. Eliminates `.flowai-workflow/` (domain-specific naming, violates engine's domain-agnostic principle) and decouples agent prompts from `.claude/skills/` (Claude Code's skill-system coupling).
 - **Directory layout:**
   ```
   .flowai-workflow/
-  ├── pipeline.yaml          # from .flowai-workflow/pipeline.yaml
+  ├── workflow.yaml          # from .flowai-workflow/workflow.yaml
   ├── agents/                # from .flowai-workflow/agents/agent-*/
   │   └── <name>/SKILL.md   # 6 agents
   ├── scripts/               # active scripts only (from .flowai-workflow/scripts/)
@@ -608,17 +608,17 @@
 - **Rationale:** Single discoverable location; easier portability between projects; `.flowai-workflow/` is engine-brand-aligned and domain-agnostic.
 - **Migration actions:**
   - Delete deprecated `stage-*.sh` scripts and their `*_test.ts` files (already marked DEPRECATED).
-  - Update all internal path references: `pipeline.yaml`, engine CLI defaults, `deno.json` tasks, docs, `CLAUDE.md`.
+  - Update all internal path references: `workflow.yaml`, engine CLI defaults, `deno.json` tasks, docs, `CLAUDE.md`.
   - `.claude/hooks/guard-deno-direct.sh` stays in `.claude/hooks/` (Claude Code hooks dir is fixed by Claude Code; not movable).
 - **Acceptance:**
-  - [ ] `pipeline.yaml` at `.flowai-workflow/pipeline.yaml`
+  - [ ] `workflow.yaml` at `.flowai-workflow/workflow.yaml`
   - [ ] Agent prompts at `.flowai-workflow/agents/<name>/SKILL.md` (6 agents: pm, architect, tech-lead, developer, qa, tech-lead-review)
   - [ ] Active scripts at `.flowai-workflow/scripts/` (rollback-uncommitted.sh, hitl-ask.sh, hitl-check.sh, lib.sh)
   - [ ] Tasks at `.flowai-workflow/tasks/`; runs at `.flowai-workflow/runs/`
   - [ ] Deprecated stage scripts (`stage-*.sh`) and their `*_test.ts` files deleted
   - [x] Zero `.flowai-workflow/` path references remain in codebase (except git history). Evidence: completed in this commit.
   - [x] Zero `.flowai-workflow/agents/agent-*` path references remain in codebase. Evidence: completed in this commit.
-  - [ ] `deno task run` works with `.flowai-workflow/pipeline.yaml` as default config path
+  - [ ] `deno task run` works with `.flowai-workflow/workflow.yaml` as default config path
   - [ ] `deno task check` passes clean
   - [ ] All docs (CLAUDE.md, AGENTS.md, SRS, SDS) updated with new paths
   - [ ] `.claude/hooks/guard-deno-direct.sh` placement decision documented (stays in `.claude/hooks/`)
@@ -638,7 +638,7 @@
 ### 3.28 FR-S28: Per-Agent Reflection Memory
 
 - **Description:** Each agent owns its own reflection memory stored at `.flowai-workflow/memory/<agent-name>.md`. At session start, agent reads its memory file. At session end, agent rewrites the file in full (not append) with compressed current-state knowledge: anti-patterns, effective strategies, environment quirks, baseline metrics. Agent decides what to retain, evicting stale or resolved items.
-- **Motivation:** Centralized `documents/meta.md` caused: (1) git history pollution from per-run updates to `documents/`; (2) merge conflicts on concurrent runs; (3) ~60% dead-weight content (resolved patterns duplicate git history); (4) no measurable quality improvement; (5) scope violation (pipeline-level data in project docs). Per-agent decentralized memory eliminates all five issues.
+- **Motivation:** Centralized `documents/meta.md` caused: (1) git history pollution from per-run updates to `documents/`; (2) merge conflicts on concurrent runs; (3) ~60% dead-weight content (resolved patterns duplicate git history); (4) no measurable quality improvement; (5) scope violation (workflow-level data in project docs). Per-agent decentralized memory eliminates all five issues.
 - **Storage:** `.flowai-workflow/memory/<agent-name>.md` — one file per agent. Git tracking TBD (tracked enables review; gitignored avoids noise — open decision per issue #117).
 - **Lifecycle per agent run:**
   1. Read `.flowai-workflow/memory/<self>.md` at session start before main work.
@@ -649,19 +649,19 @@
   - Effective strategies discovered empirically.
   - Environment quirks and gotchas.
   - Baseline metrics (turns, cost) for self-assessment.
-- **Scope:** All 6 pipeline agents: pm, architect, tech-lead, tech-lead-review, developer, qa.
+- **Scope:** All 6 workflow agents: pm, architect, tech-lead, tech-lead-review, developer, qa.
 - **Acceptance criteria:**
   - [ ] `.flowai-workflow/memory/` directory exists in repo.
   - [ ] Each of 6 agent `SKILL.md` files includes: (a) read-memory step at session start, (b) rewrite-memory step at session end.
-  - [ ] `pipeline.yaml` `task_templates` or `defaults` exposes `.flowai-workflow/memory/<agent-name>.md` path to each agent.
+  - [ ] `workflow.yaml` `task_templates` or `defaults` exposes `.flowai-workflow/memory/<agent-name>.md` path to each agent.
   - [ ] `documents/meta.md` removed or repurposed (no longer used as shared cross-run memory).
-  - [ ] At least one end-to-end pipeline run completes with agents reading/writing their own memory files.
+  - [ ] At least one end-to-end workflow run completes with agents reading/writing their own memory files.
   - [ ] `deno task check` passes after changes.
 
 ### 3.29 FR-S29: AGENTS.md Agent List Accuracy
 
-- **Description:** `AGENTS.md` must list exactly the 6 active pipeline agents: PM, Architect, Tech Lead, Developer, QA, Tech Lead Review. Deprecated/absorbed agents (e.g., Presenter, absorbed into Tech Lead + Tech Lead Review per FR-S15; Meta-Agent, removed per FR-S9) must not appear as active agents.
-- **Rationale:** Stale agent references in `AGENTS.md` mislead contributors about pipeline structure. Presenter agent was absorbed into Tech Lead + Tech Lead Review per FR-S15. Meta-Agent removed per FR-S9. `AGENTS.md` now lists exactly 6 correct agents; Presenter and Meta-Agent references removed.
+- **Description:** `AGENTS.md` must list exactly the 6 active workflow agents: PM, Architect, Tech Lead, Developer, QA, Tech Lead Review. Deprecated/absorbed agents (e.g., Presenter, absorbed into Tech Lead + Tech Lead Review per FR-S15; Meta-Agent, removed per FR-S9) must not appear as active agents.
+- **Rationale:** Stale agent references in `AGENTS.md` mislead contributors about workflow structure. Presenter agent was absorbed into Tech Lead + Tech Lead Review per FR-S15. Meta-Agent removed per FR-S9. `AGENTS.md` now lists exactly 6 correct agents; Presenter and Meta-Agent references removed.
 - **Acceptance criteria:**
   - [x] `AGENTS.md` agent list contains exactly: PM, Architect, Tech Lead, Developer, QA, Tech Lead Review (6 agents total). Evidence: `AGENTS.md` (6 agents listed, no Presenter, no Meta-Agent), `scripts/check.ts:134-171` (`validateAgentListContent`), `scripts/check_test.ts:96-100` (real AGENTS.md integration test).
   - [x] No reference to "Presenter" as an active agent in `AGENTS.md`. Evidence: `scripts/check.ts:134-171` (`validateAgentListContent` rejects deprecated agents), `scripts/check_test.ts:73-78` (Presenter rejection test).
@@ -701,32 +701,32 @@
 
 ### 3.32 FR-S32: SDLC Artifact File Numbering Standard
 
-- **Description:** SDLC pipeline artifact filenames MUST use gapless sequential
-  numeric prefixes reflecting actual pipeline execution order.
+- **Description:** SDLC workflow artifact filenames MUST use gapless sequential
+  numeric prefixes reflecting actual workflow execution order.
 - **Motivation:** Non-gapless or inverted prefix numbering (e.g., `06-impl-summary`
   produced before `05-qa-report`) breaks alphabetical-sort as an execution-order
   proxy, creating confusion for developers and tooling relying on prefix ordering.
 - **Rules:**
   - Prefix sequence MUST be gapless (`01, 02, 03, …`) — no skipped numbers.
   - Prefix order MUST match DAG execution order.
-  - All references (pipeline.yaml, agent SKILL.md prompts, docs, validation rules)
+  - All references (workflow.yaml, agent SKILL.md prompts, docs, validation rules)
     MUST use the canonical gapless filenames.
 - **Acceptance criteria:**
   - [x] Artifact sequence is `01-spec → 02-plan → 03-decision → 04-impl-summary →
     05-qa-report → 06-review` — no gaps, no ordering inversions. Evidence:
-    `.flowai-workflow/pipeline.yaml` outputs, `documents/design-sdlc.md §2.2`.
-  - [x] `pipeline.yaml`, all agent SKILL.md files, and documentation reference the
+    `.flowai-workflow/workflow.yaml` outputs, `documents/design-sdlc.md §2.2`.
+  - [x] `workflow.yaml`, all agent SKILL.md files, and documentation reference the
     canonical gapless filenames exclusively (zero matches for old names
     `04-decision`, `06-impl-summary`, `08-review`). Evidence: grep sweep
     post-implementation confirms zero matches across all SKILL.md files and docs.
 
 ### 3.33 FR-S33: Remove Stale Agent Symlinks from .claude/skills/
 
-- **Description:** Remove 6 legacy `agent-*` symlinks from `.claude/skills/` (pointing to `.flowai-workflow/agents/agent-*/`), remove obsolete symlink validation from `scripts/check.ts`, and update documentation. Symlinks were legacy from pre-FR-S26 layout; since FR-S17, agent prompts are discovered directly from `.flowai-workflow/agents/agent-<name>/SKILL.md`. Keeping symlinks caused Claude Code to expose pipeline-only agents as interactive skills — undesirable.
+- **Description:** Remove 6 legacy `agent-*` symlinks from `.claude/skills/` (pointing to `.flowai-workflow/agents/agent-*/`), remove obsolete symlink validation from `scripts/check.ts`, and update documentation. Symlinks were legacy from pre-FR-S26 layout; since FR-S17, agent prompts are discovered directly from `.flowai-workflow/agents/agent-<name>/SKILL.md`. Keeping symlinks caused Claude Code to expose workflow-only agents as interactive skills — undesirable.
 - **Supersedes:** `.claude/skills/ agent-*/` symlink pattern (from FR-S17 migration; now fully removed).
 - **Acceptance criteria:**
   - [x] 6 `agent-*` symlinks deleted from `.claude/skills/` (`agent-pm`, `agent-architect`, `agent-tech-lead`, `agent-tech-lead-review`, `agent-developer`, `agent-qa`). Evidence: `git diff main...HEAD --name-only` shows `deleted file mode 120000` for all 6; `ls .claude/skills/` confirms no `agent-*` entries.
-  - [x] `scripts/check.ts` symlink validation block removed. Evidence: `scripts/check.ts` `pipelineIntegrity()` (lines 89–102) retains only `loadConfig()` delegation; no symlink loop remains.
+  - [x] `scripts/check.ts` symlink validation block removed. Evidence: `scripts/check.ts` `workflowIntegrity()` (lines 89–102) retains only `loadConfig()` delegation; no symlink loop remains.
   - [x] `documents/design-sdlc.md` updated: §2.2 Agent Runtime symlink clause removed, §3.4 Purpose/Interfaces/Migration updated with FR-S33 reference. Evidence: `documents/design-sdlc.md §2.2`, `§3.4`.
   - [x] `documents/requirements-sdlc.md` updated: this section (3.33) added; Section 4 NFR Reproducibility updated; Appendix B symlink lines removed; Appendix C FR-S33 row added.
   - [x] `deno task check` passes. Evidence: `deno task check` PASS (493 tests, run `20260319T192055`).
@@ -775,7 +775,7 @@
     any failed → "failed", otherwise "running". Always-node status computed
     independently. Evidence: `scripts/generate-dashboard.ts`,
     `scripts/generate-dashboard_test.ts`.
-  - [x] CLI entry extracts `run_on: always` from pipeline config, builds
+  - [x] CLI entry extracts `run_on: always` from workflow config, builds
     `Set<string>` of always-nodes; passes to `renderHtml()`. Phase heading
     renders secondary `phase-badge-always` badge when `alwaysStatus` present.
     Evidence: `scripts/generate-dashboard.ts`.
@@ -784,18 +784,18 @@
 
 ### 3.35 FR-S35: HITL Artifact Source Node Reference
 
-- **Description:** `defaults.hitl.artifact_source` in `pipeline.yaml` MUST
+- **Description:** `defaults.hitl.artifact_source` in `workflow.yaml` MUST
   reference the upstream node via `{{input.<node-id>}}/…` template syntax
   instead of a hardcoded relative path. Engine interpolates the template at
   runtime in `buildScriptArgs()`. SDLC-level validator emits a parse-time error
   if a hardcoded path (no `{{input.`) is detected. HITL polling behavior and
   timing remain unchanged.
-- **Extends:** FR-S24 (Pipeline Config Validation) — concrete application of
+- **Extends:** FR-S24 (Workflow Config Validation) — concrete application of
   config validation for `hitl.artifact_source`.
 - **Acceptance criteria:**
-  - [x] `pipeline.yaml` `defaults.hitl.artifact_source` uses
+  - [x] `workflow.yaml` `defaults.hitl.artifact_source` uses
     `{{input.specification}}/01-spec.md` template syntax. Evidence:
-    `.flowai-workflow/pipeline.yaml:23`.
+    `.flowai-workflow/workflow.yaml:23`.
   - [x] `interpolate()` applied to `artifact_source` in
     `engine/hitl.ts:buildScriptArgs()` before passing value to scripts; ctx
     threaded through `HitlRunOptions`. Evidence: `engine/hitl.ts:257,264`.
@@ -803,7 +803,7 @@
     error message for hardcoded path (no `{{`), empty array for template or
     absent field. Evidence: `scripts/check.ts:110–118`.
   - [x] `hitlArtifactSource()` validation function in `scripts/check.ts` reads
-    pipeline config, calls `validateHitlArtifactSource()`, emits error and
+    workflow config, calls `validateHitlArtifactSource()`, emits error and
     exits 1 on hardcoded path. Evidence: `scripts/check.ts:120–146`.
   - [x] Test `runHitlLoop — artifact_source template resolved via ctx` in
     `engine/hitl_test.ts` verifies `{{input.specification}}/01-spec.md` →
@@ -817,7 +817,7 @@
 
 ### 3.36 FR-S36: After-Script Failure Observability
 
-- **Description:** The `after:` script in `pipeline.yaml` for the
+- **Description:** The `after:` script in `workflow.yaml` for the
   `tech-lead-review` node MUST surface non-zero exit codes as a warning-level
   log entry rather than silently suppressing them. A wrapper script replaces
   the `|| true` pattern: it runs `deno task dashboard --run-dir "$1"`, emits
@@ -835,43 +835,43 @@
     to stderr. Evidence: `.flowai-workflow/scripts/run-dashboard.sh`.
   - [x] Wrapper always exits 0 — non-blocking behavior retained. Evidence:
     `.flowai-workflow/scripts/run-dashboard.sh`.
-  - [x] `pipeline.yaml` `tech-lead-review` `after:` field updated from
+  - [x] `workflow.yaml` `tech-lead-review` `after:` field updated from
     `deno task dashboard --run-dir {{run_dir}} || true` to
     `.flowai-workflow/scripts/run-dashboard.sh {{run_dir}}`. Evidence:
-    `.flowai-workflow/pipeline.yaml`.
+    `.flowai-workflow/workflow.yaml`.
   - [x] `on_error: continue` and `run_on: always` retained unchanged. Evidence:
-    `.flowai-workflow/pipeline.yaml`.
+    `.flowai-workflow/workflow.yaml`.
   - [x] `deno task check` passes. Evidence: PASS (528 tests, run
     `20260319T215851`).
 
 ### 3.37 FR-S37: Verify Node Verdict Frontmatter Validation
 
-- **Description:** The `verify` node in `.flowai-workflow/pipeline.yaml` MUST declare a
+- **Description:** The `verify` node in `.flowai-workflow/workflow.yaml` MUST declare a
   `frontmatter_field` rule for `verdict` in its `validate` block, with
   `allowed: [PASS, FAIL]`. This ensures the engine validates the QA agent's verdict
   field at parse time (via FR-E36) and at runtime (presence check), preventing the QA
   agent from silently omitting the verdict.
 - **Acceptance criteria:**
-  - [x] `pipeline.yaml` `verify` node `validate` block includes `type: frontmatter_field`,
-    `field: verdict`, `allowed: [PASS, FAIL]`. Evidence: `.flowai-workflow/pipeline.yaml:162-165`.
-  - [x] `deno task check` passes (pipeline integrity validation confirms
+  - [x] `workflow.yaml` `verify` node `validate` block includes `type: frontmatter_field`,
+    `field: verdict`, `allowed: [PASS, FAIL]`. Evidence: `.flowai-workflow/workflow.yaml:162-165`.
+  - [x] `deno task check` passes (workflow integrity validation confirms
     `frontmatter_field: verdict` rule present in verify node). Evidence: run
     `20260319T221833` (533 tests, 0 failures).
 
-### 3.38 FR-S38: Pipeline Agent Context via file() Injection in task_template
+### 3.38 FR-S38: Workflow Agent Context via file() Injection in task_template
 
-- **Description:** All 6 agent nodes in `.flowai-workflow/pipeline.yaml` MUST inject
+- **Description:** All 6 agent nodes in `.flowai-workflow/workflow.yaml` MUST inject
   shared rules and their SKILL.md into the agent prompt via `{{file(...)}}` in
   `task_template`, separated by `---`. No agent node may use the `prompt:` field.
-  This makes prompt composition explicit and declarative in the pipeline config,
+  This makes prompt composition explicit and declarative in the workflow config,
   replacing the implicit `prompt:` loading mechanism.
 - **Acceptance criteria:**
   - [x] All 6 agent nodes include `{{file(".flowai-workflow/agents/shared-rules.md")}}`
-    in `task_template`. Evidence: `.flowai-workflow/pipeline.yaml:39, 77, 102, 138, 162, 191`.
+    in `task_template`. Evidence: `.flowai-workflow/workflow.yaml:39, 77, 102, 138, 162, 191`.
   - [x] All 6 agent nodes include `{{file(".flowai-workflow/agents/agent-<name>/SKILL.md")}}`
-    in `task_template`. Evidence: `.flowai-workflow/pipeline.yaml:41, 79, 104, 140, 164, 193`.
-  - [x] No agent node in `pipeline.yaml` uses the `prompt:` field. Evidence:
-    `pipeline_integrity_test.ts` test "pipeline.yaml — no agent node uses prompt: field
+    in `task_template`. Evidence: `.flowai-workflow/workflow.yaml:41, 79, 104, 140, 164, 193`.
+  - [x] No agent node in `workflow.yaml` uses the `prompt:` field. Evidence:
+    `workflow_integrity_test.ts` test "workflow.yaml — no agent node uses prompt: field
     (FR-S38 AC#3)" passes; run `20260319T224519` (533 tests, 0 failures).
   - [x] `deno task check` passes. Evidence: PASS (533 tests, run `20260319T224519`).
 
@@ -882,7 +882,7 @@
   ANYTHING" block instructing agents to read `shared-rules.md` in each SKILL.md
   is therefore redundant (dead code). FR-S39 removes this block from all 6
   SKILL.md files, eliminating one wasted turn and unnecessary token cost per
-  pipeline run.
+  workflow run.
 - **Dep:** FR-S38 (file() injection must be implemented first).
 - **Acceptance criteria:**
   - [x] "BEFORE YOU DO ANYTHING" heading + shared-rules read instruction removed
@@ -901,14 +901,14 @@
   - [x] `deno task check` passes. Evidence: PASS (533 tests, run
     `20260319T230952`).
 
-### 3.40 FR-S40: Pipeline Format Change Documentation Sync
+### 3.40 FR-S40: Workflow Format Change Documentation Sync
 
 - **Description:** After PRs #147–#157 implemented FR-S26–FR-S39, multiple
-  documentation artifacts were out of sync with the actual pipeline structure:
+  documentation artifacts were out of sync with the actual workflow structure:
   SRS referenced 7 agents including removed meta-agent; Appendix A showed Stage
   7 Meta-Agent and old artifact filename `05-qa-report-N.md`; Appendix B listed
   `agent-meta-agent/SKILL.md` and old `prompt:` field pattern; SDS described
-  `phases:` block and `prompt:` fields; `pipeline-report.md` had outdated
+  `phases:` block and `prompt:` fields; `workflow-report.md` had outdated
   artifact numbering; `spec-unified-task-template.md` marked Phase 1/2 as
   not-started. FR-S40 formalizes the full documentation sync across SRS, SDS,
   and supporting docs.
@@ -933,9 +933,9 @@
   - [x] `documents/design-sdlc.md`: §3.4 marks `prompt:` field as removed with
     `{{file(...)}}` replacement; §8 FR-S40 evidence entry present. Evidence:
     `documents/design-sdlc.md` (Tech Lead pre-applied), run `20260319T233247`.
-  - [x] `documents/rnd/pipeline-report.md`: artifact numbering updated to
+  - [x] `documents/rnd/workflow-report.md`: artifact numbering updated to
     `01-spec → 02-plan → 03-decision → 04-impl-summary → 05-qa-report →
-    06-review`. Evidence: `documents/rnd/pipeline-report.md:5`, run
+    06-review`. Evidence: `documents/rnd/workflow-report.md:5`, run
     `20260319T233247`.
   - [x] `documents/adrs/001-agent-context-setup-method/spec-unified-task-template.md`:
     Phase 1 status → "done"; Phase 2 status → "done". Evidence:
@@ -952,7 +952,7 @@
   branch + diff stat, stashes all changes (tracked, staged, untracked) with a
   timestamped message, and confirms the stash ref + restore command. Clean
   working trees proceed silently with no behavior change.
-- **Dep:** FR-S15 (pipeline git workflow).
+- **Dep:** FR-S15 (workflow git workflow).
 - **Acceptance criteria:**
   - [x] Display branch name and diff stat (tracked + staged + untracked) when
     working tree is dirty before stashing. Evidence:
@@ -969,9 +969,9 @@
     `git checkout -f main`, `git reset --hard origin/main`, `git clean -fd`.
     Evidence: `reset-to-main.sh:22-27`, run `20260320T000829`.
 
-### 3.42 FR-S42: Migrate Pipeline Validate Rules to Composite Artifact Type
+### 3.42 FR-S42: Migrate Workflow Validate Rules to Composite Artifact Type
 
-- **Description:** The SDLC pipeline config (`.flowai-workflow/pipeline.yaml`)
+- **Description:** The SDLC workflow config (`.flowai-workflow/workflow.yaml`)
   validates each agent artifact using 2–3 separate rules (`file_exists`,
   `file_not_empty`, `contains_section`) per node, creating ~20 lines of
   redundant config across 6 agent nodes. FR-S42 migrates all 6 nodes to the
@@ -984,25 +984,25 @@
 - **Acceptance criteria:**
   - [x] `specification` node validates `01-spec.md` with `type: artifact`,
     sections `["Problem Statement", "Scope", "Summary"]`. Evidence:
-    `.flowai-workflow/pipeline.yaml`, run `20260320T092158`.
+    `.flowai-workflow/workflow.yaml`, run `20260320T092158`.
   - [x] `design` node validates `02-plan.md` with `type: artifact`, sections
-    `["Summary"]`. Evidence: `.flowai-workflow/pipeline.yaml`, run `20260320T092158`.
+    `["Summary"]`. Evidence: `.flowai-workflow/workflow.yaml`, run `20260320T092158`.
   - [x] `decision` node validates `03-decision.md` with `type: artifact`,
-    sections `["Summary"]`. Evidence: `.flowai-workflow/pipeline.yaml`, run
+    sections `["Summary"]`. Evidence: `.flowai-workflow/workflow.yaml`, run
     `20260320T092158`.
   - [x] `build` node validates `04-impl-summary.md` with `type: artifact`,
     sections `["Summary"]`; `custom_script` preserved. Evidence:
-    `.flowai-workflow/pipeline.yaml`, run `20260320T092158`.
+    `.flowai-workflow/workflow.yaml`, run `20260320T092158`.
   - [x] `verify` node validates `05-qa-report.md` with `type: artifact`,
     sections `["Summary"]`; `frontmatter_field: verdict` preserved. Evidence:
-    `.flowai-workflow/pipeline.yaml`, run `20260320T092158`.
+    `.flowai-workflow/workflow.yaml`, run `20260320T092158`.
   - [x] `tech-lead-review` node validates `06-review.md` with `type: artifact`,
-    sections `["Summary"]`. Evidence: `.flowai-workflow/pipeline.yaml`, run
+    sections `["Summary"]`. Evidence: `.flowai-workflow/workflow.yaml`, run
     `20260320T092158`.
   - [x] `frontmatter_field` rules for `specification` (issue, scope) unchanged.
-    Evidence: `.flowai-workflow/pipeline.yaml`, run `20260320T092158`.
+    Evidence: `.flowai-workflow/workflow.yaml`, run `20260320T092158`.
   - [x] `deno task check` passes. Evidence: run `20260320T092158` (533 tests,
-    pipeline integrity valid).
+    workflow integrity valid).
 
 ### 3.43 FR-S43: Codebase Exploration inside Architect Agent
 
@@ -1011,7 +1011,7 @@
   areas: prior art/existing patterns, architecture layers/module boundaries, and
   integration points/external dependencies. Sub-agent findings are incorporated
   as concrete `file:line` references in the variant design. This reduces vague
-  component references and improves variant quality without adding new pipeline
+  component references and improves variant quality without adding new workflow
   phases.
 - **Dep:** FR-S3 (Architect stage).
 - **Acceptance criteria:**
@@ -1062,10 +1062,10 @@
 
 ## 4. Non-functional requirements
 
-- **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one pipeline at a time). Concurrent execution is not supported.
+- **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one workflow at a time). Concurrent execution is not supported.
 - **Reproducibility:** Agent prompts are versioned in the repository under `.flowai-workflow/agents/`.
-- **Observability:** Full logs stored per stage in `.flowai-workflow/runs/<run-id>/logs/`. Total pipeline duration reported in the final PR description.
-- **Fault tolerance:** If a stage fails (agent error, timeout, continuation limit exhausted), the pipeline stops. Manual restart via `--resume <run-id>`.
+- **Observability:** Full logs stored per stage in `.flowai-workflow/runs/<run-id>/logs/`. Total workflow duration reported in the final PR description.
+- **Fault tolerance:** If a stage fails (agent error, timeout, continuation limit exhausted), the workflow stops. Manual restart via `--resume <run-id>`.
 - **Timeouts:** Each stage has a configurable timeout via `SDLC_STAGE_TIMEOUT_MINUTES` env var (default: 30 min). Engine enforces timeout per node. When a timeout fires, the stage is treated as failed.
 - **Security:** Enforced at the engine/stage script level via diff-based checks (see engine SRS FR-8). Agents run with the local user's permissions.
 
@@ -1073,28 +1073,28 @@
 
 - **Trigger:** Single entry point `deno task run [--prompt "..."]`. PM agent autonomously selects and triages open GitHub issues. `--prompt` passes optional additional context to PM. Common engine flags: `--resume`, `--dry-run`, `-v`, `-q`, `--config`.
 - **Agent runtime:** `claude` CLI invoked by the Deno engine. Agent context (shared rules + SKILL.md) injected via `{{file(...)}}` in `task_template`, delivered as user message (`-p`) per FR-S38. Key flags:
-  - `-p "<task>"` — passes task prompt derived from `task_template`. Shared rules and SKILL.md inlined via `{{file(...)}}` template function (FR-S38). No `--append-system-prompt` used for pipeline agents.
+  - `-p "<task>"` — passes task prompt derived from `task_template`. Shared rules and SKILL.md inlined via `{{file(...)}}` template function (FR-S38). No `--append-system-prompt` used for workflow agents.
   - `--output-format stream-json` — streams JSON events line-by-line; `result` event contains `result`, `session_id`, `total_cost_usd`, `duration_ms`, `num_turns`, `is_error`.
   - `--resume <session-id>` — re-invokes agent in the same session for continuations (engine SRS FR-8).
   - `-p "<prompt>"` — non-interactive mode, task description is passed as the prompt argument.
-- **Pipeline engine:** Deno/TypeScript engine (`engine/`) reads DAG config from `.flowai-workflow/pipeline.yaml`, resolves node dependencies, executes nodes in topological order, manages state in `.flowai-workflow/runs/<run-id>/state.json`.
+- **Workflow engine:** Deno/TypeScript engine (`engine/`) reads DAG config from `.flowai-workflow/workflow.yaml`, resolves node dependencies, executes nodes in topological order, manages state in `.flowai-workflow/runs/<run-id>/state.json`.
 - **Legacy stage scripts:** `.flowai-workflow/scripts/stage-<N>-<role>.sh` — handle invocation, validation, continuation, artifact commit. Superseded by engine but preserved.
-- **Inter-stage communication:** Engine: artifacts in `.flowai-workflow/runs/<run-id>/[<phase>/]<node-id>/`, linked via templates. Legacy: `.flowai-workflow/pipeline/<issue-number>/`. Filesystem is source of truth.
+- **Inter-stage communication:** Engine: artifacts in `.flowai-workflow/runs/<run-id>/[<phase>/]<node-id>/`, linked via templates. Legacy: `.flowai-workflow/workflow/<issue-number>/`. Filesystem is source of truth.
 - **Branching & commits:** Feature branch `sdlc/issue-<N>` created by Tech Lead (fallback `sdlc/{{run_id}}` for `--prompt` mode). Developer owns commits (`git add`, `git commit`, `git push` per task). Commit format: `sdlc(impl): <summary>`. Failed stages produce no commits.
 
 ## 6. Acceptance criteria
 
 The system is considered accepted if:
 
-1. Running `deno task run` triggers the full pipeline; PM autonomously selects the highest-priority open GitHub issue.
+1. Running `deno task run` triggers the full workflow; PM autonomously selects the highest-priority open GitHub issue.
 2. Each stage produces its expected artifact with all required sections.
 3. The Continuation mechanism catches and fixes `deno task check` failures without human intervention.
 4. The Developer+QA loop iterates until quality checks pass.
 5. Tech Lead creates draft PR; Tech Lead Review performs final review and merge.
 6. All agent logs are preserved and accessible.
-7. Re-running the pipeline on the same issue cleanly overwrites artifacts.
+7. Re-running the workflow on the same issue cleanly overwrites artifacts.
 
-## Appendix A: Pipeline Stage Map
+## Appendix A: Workflow Stage Map
 
 | Stage | Role             | Artifact                                | Key Validation                               |
 | ----- | ---------------- | --------------------------------------- | -------------------------------------------- |
@@ -1104,18 +1104,18 @@ The system is considered accepted if:
 | 4-5   | Developer + QA   | Code + commits + `05-qa-report.md`      | `deno task check` passes, PR reviews posted  |
 | 6*    | Tech Lead Review | PR review + merge                       | CI green, code review passed                 |
 
-\* Post-pipeline node. Tech Lead Review runs as `run_on: always`.
+\* Post-workflow node. Tech Lead Review runs as `run_on: always`.
 
 ## Appendix B: File Structure
 
 ```
 .claude/skills/                          # Non-agent project skills (agent-* symlinks removed by FR-S33)
-.flowai-workflow/                              # Pipeline assets (FR-S26)
+.flowai-workflow/                              # Workflow assets (FR-S26)
   agents/                               # Canonical agent prompts (agentskills.io-compliant, FR-S17)
     agent-pm/SKILL.md                    # PM: issue triage + spec
     agent-architect/SKILL.md             # Architect: design-solution plan with variants
     agent-tech-lead/SKILL.md             # Tech Lead: critique + decision + SDS + branch + PR
-    agent-tech-lead-review/SKILL.md      # Final code review + CI gate + merge (post-pipeline)
+    agent-tech-lead-review/SKILL.md      # Final code review + CI gate + merge (post-workflow)
     agent-developer/SKILL.md             # Implementation + commits + push (FR-S18)
     agent-qa/SKILL.md                    # QA via PR reviews
   scripts/                              # HITL scripts (engine infrastructure)
@@ -1129,8 +1129,8 @@ The system is considered accepted if:
         <node-id>.json                # CLI JSON output (metadata)
         <node-id>.jsonl               # Full session transcript
       state.json                      # Run state (node statuses, session IDs)
-  pipeline.yaml                         # DAG-based pipeline configuration
-engine/                                # Deno/TypeScript pipeline engine
+  workflow.yaml                         # DAG-based workflow configuration
+engine/                                # Deno/TypeScript workflow engine
     cli.ts                             # Entry point: deno task run
     engine.ts                          # DAG executor
     ...
@@ -1140,7 +1140,7 @@ engine/                                # Deno/TypeScript pipeline engine
 
 | Old ID | New ID | Title |
 | ------ | ------ | ----- |
-| FR-1   | FR-S1  | Pipeline Trigger |
+| FR-1   | FR-S1  | Workflow Trigger |
 | FR-2   | FR-S2  | Stage 1 — Project Manager (Specification) |
 | FR-3   | FR-S3  | Stage 2 — Architect (Design-Solution Plan) |
 | FR-4   | FR-S4  | Plan Critique & Revision (absorbed into Tech Lead) |
@@ -1154,7 +1154,7 @@ engine/                                # Deno/TypeScript pipeline engine
 | FR-16  | FR-S12 | Secrets |
 | FR-19  | FR-S13 | Agents as Skills |
 | FR-22  | FR-S14 | Project Documentation (README) |
-| FR-26  | FR-S15 | Align Pipeline Git Workflow with Standard GitHub Practices |
+| FR-26  | FR-S15 | Align Workflow Git Workflow with Standard GitHub Practices |
 | FR-35  | FR-S16 | Dashboard Result Summary Display |
 | FR-36  | FR-S17 | Agentskills.io-Compliant Skill Layout |
 | FR-37  | FR-S18 | Rename Executor Agent to Developer |
@@ -1163,9 +1163,9 @@ engine/                                # Deno/TypeScript pipeline engine
 | FR-42  | FR-S21 | Agent Output Summary Section |
 | FR-43  | FR-S22 | Agent First-Person Voice in GitHub Interactions |
 | —      | FR-S23 | SDLC Documentation Accuracy |
-| —      | FR-S24 | Pipeline Config Validation |
+| —      | FR-S24 | Workflow Config Validation |
 | —      | FR-S25 | Phase-Organized SDLC Artifact Directories |
-| —      | FR-S26 | Pipeline Asset Directory Consolidation |
+| —      | FR-S26 | Workflow Asset Directory Consolidation |
 | —      | FR-S27 | CLI Help for SDLC Utility Scripts |
 | —      | FR-S28 | Per-Agent Reflection Memory |
 | —      | FR-S29 | AGENTS.md Agent List Accuracy |
@@ -1177,11 +1177,11 @@ engine/                                # Deno/TypeScript pipeline engine
 | —      | FR-S35 | HITL Artifact Source Node Reference |
 | —      | FR-S36 | After-Script Failure Observability |
 | —      | FR-S37 | Verify Node Verdict Frontmatter Validation |
-| —      | FR-S38 | Pipeline Agent Context via file() Injection in task_template |
+| —      | FR-S38 | Workflow Agent Context via file() Injection in task_template |
 | —      | FR-S39 | Remove Redundant shared-rules.md Read Instruction from SKILL.md Files |
-| —      | FR-S40 | Pipeline Format Change Documentation Sync |
+| —      | FR-S40 | Workflow Format Change Documentation Sync |
 | —      | FR-S41 | pre_run Auto-Stash of Uncommitted Changes           |
-| —      | FR-S42 | Migrate Pipeline Validate Rules to Composite Artifact Type |
+| —      | FR-S42 | Migrate Workflow Validate Rules to Composite Artifact Type |
 | —      | FR-S43 | Codebase Exploration inside Architect Agent                |
 | —      | FR-S44 | Confidence-Scored QA Review                               |
 | —      | FR-S45 | Multi-Focus Parallel Review inside QA Agent               |

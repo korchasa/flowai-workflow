@@ -3,18 +3,18 @@ import type {
   EngineOptions,
   NodeConfig,
   NodeState,
-  PipelineConfig,
   RunState,
+  WorkflowConfig,
 } from "./types.ts";
 import { resolveInputArtifacts } from "./agent.ts";
 import { collectAllNodeIds, findNodeConfig } from "./config.ts";
 import { Engine, runPrepareCommand, runPreRunScript } from "./engine.ts";
 import {
-  collectPostPipelineNodes,
-  executePostPipeline,
+  collectPostWorkflowNodes,
+  executePostWorkflow,
   runFailureHook,
-  sortPostPipelineNodes,
-} from "./post-pipeline.ts";
+  sortPostWorkflowNodes,
+} from "./post-workflow.ts";
 import type { AgentResult } from "./agent.ts";
 import {
   createRunState,
@@ -36,7 +36,7 @@ function createCapture(): { lines: string[]; writer: (text: string) => void } {
 
 function makeOptions(overrides?: Partial<EngineOptions>): EngineOptions {
   return {
-    config_path: ".flowai-workflow/pipeline.yaml",
+    config_path: ".flowai-workflow/workflow.yaml",
     verbosity: "quiet",
     args: {},
     env_overrides: {},
@@ -46,7 +46,7 @@ function makeOptions(overrides?: Partial<EngineOptions>): EngineOptions {
 
 Deno.test("EngineOptions — default structure", () => {
   const opts = makeOptions();
-  assertEquals(opts.config_path, ".flowai-workflow/pipeline.yaml");
+  assertEquals(opts.config_path, ".flowai-workflow/workflow.yaml");
   assertEquals(opts.verbosity, "quiet");
   assertEquals(opts.resume, undefined);
   assertEquals(opts.dry_run, undefined);
@@ -206,50 +206,50 @@ Deno.test("resolveInputArtifacts — skips subdirectories", async () => {
   }
 });
 
-// --- post-pipeline node support tests ---
+// --- post-workflow node support tests ---
 
-Deno.test("collectPostPipelineNodes — collects nodes with run_on set", () => {
+Deno.test("collectPostWorkflowNodes — collects nodes with run_on set", () => {
   const nodes: Record<string, NodeConfig> = {
     pm: { type: "agent", label: "PM" },
     developer: { type: "agent", label: "Developer" },
     "meta-agent": { type: "agent", label: "Meta-Agent", run_on: "always" },
   };
-  const result = collectPostPipelineNodes(nodes);
+  const result = collectPostWorkflowNodes(nodes);
   assertEquals(result, ["meta-agent"]);
 });
 
-Deno.test("collectPostPipelineNodes — returns empty when no run_on nodes", () => {
+Deno.test("collectPostWorkflowNodes — returns empty when no run_on nodes", () => {
   const nodes: Record<string, NodeConfig> = {
     pm: { type: "agent", label: "PM" },
     developer: { type: "agent", label: "Developer" },
   };
-  const result = collectPostPipelineNodes(nodes);
+  const result = collectPostWorkflowNodes(nodes);
   assertEquals(result, []);
 });
 
-Deno.test("collectPostPipelineNodes — multiple run_on nodes", () => {
+Deno.test("collectPostWorkflowNodes — multiple run_on nodes", () => {
   const nodes: Record<string, NodeConfig> = {
     pm: { type: "agent", label: "PM" },
     "meta-agent": { type: "agent", label: "Meta-Agent", run_on: "always" },
     commit: { type: "agent", label: "Commit", run_on: "success" },
   };
-  const result = collectPostPipelineNodes(nodes);
+  const result = collectPostWorkflowNodes(nodes);
   assertEquals(result.length, 2);
   assertEquals(result.includes("meta-agent"), true);
   assertEquals(result.includes("commit"), true);
 });
 
-Deno.test("post-pipeline nodes excluded from regular DAG levels", () => {
+Deno.test("post-workflow nodes excluded from regular DAG levels", () => {
   const nodes: Record<string, NodeConfig> = {
     pm: { type: "agent", label: "PM" },
     "meta-agent": { type: "agent", label: "Meta-Agent", run_on: "always" },
   };
-  const postPipeline = collectPostPipelineNodes(nodes);
+  const postWorkflow = collectPostWorkflowNodes(nodes);
   const regularNodes = Object.keys(nodes).filter(
-    (id) => !postPipeline.includes(id),
+    (id) => !postWorkflow.includes(id),
   );
   assertEquals(regularNodes, ["pm"]);
-  assertEquals(postPipeline, ["meta-agent"]);
+  assertEquals(postWorkflow, ["meta-agent"]);
 });
 
 // --- NodeConfig.env field tests ---
@@ -330,9 +330,9 @@ Deno.test("state.json — no failed nodes when all complete successfully", () =>
   assertEquals(failed.length, 0);
 });
 
-// --- post-pipeline node ordering tests ---
+// --- post-workflow node ordering tests ---
 
-Deno.test("sortPostPipelineNodes — orders by dependency (commit-meta after meta-agent)", () => {
+Deno.test("sortPostWorkflowNodes — orders by dependency (commit-meta after meta-agent)", () => {
   const nodes: Record<string, NodeConfig> = {
     "commit-meta": {
       type: "agent",
@@ -346,12 +346,12 @@ Deno.test("sortPostPipelineNodes — orders by dependency (commit-meta after met
       run_on: "always",
     },
   };
-  const postPipelineIds = ["commit-meta", "meta-agent"];
-  const sorted = sortPostPipelineNodes(postPipelineIds, nodes);
+  const postWorkflowIds = ["commit-meta", "meta-agent"];
+  const sorted = sortPostWorkflowNodes(postWorkflowIds, nodes);
   assertEquals(sorted, ["meta-agent", "commit-meta"]);
 });
 
-Deno.test("sortPostPipelineNodes — single node returns as-is", () => {
+Deno.test("sortPostWorkflowNodes — single node returns as-is", () => {
   const nodes: Record<string, NodeConfig> = {
     "meta-agent": {
       type: "agent",
@@ -359,23 +359,23 @@ Deno.test("sortPostPipelineNodes — single node returns as-is", () => {
       run_on: "always",
     },
   };
-  const sorted = sortPostPipelineNodes(["meta-agent"], nodes);
+  const sorted = sortPostWorkflowNodes(["meta-agent"], nodes);
   assertEquals(sorted, ["meta-agent"]);
 });
 
-Deno.test("sortPostPipelineNodes — no dependencies preserves alphabetical order", () => {
+Deno.test("sortPostWorkflowNodes — no dependencies preserves alphabetical order", () => {
   const nodes: Record<string, NodeConfig> = {
     "cleanup": { type: "agent", label: "Cleanup", run_on: "always" },
     "meta-agent": { type: "agent", label: "Meta-Agent", run_on: "always" },
   };
-  const sorted = sortPostPipelineNodes(["cleanup", "meta-agent"], nodes);
+  const sorted = sortPostWorkflowNodes(["cleanup", "meta-agent"], nodes);
   assertEquals(sorted, ["cleanup", "meta-agent"]);
 });
 
 // --- collectAllNodeIds tests ---
 
 Deno.test("collectAllNodeIds — includes top-level and nested body node IDs", () => {
-  const config: PipelineConfig = {
+  const config: WorkflowConfig = {
     name: "test",
     version: "1",
     nodes: {
@@ -411,7 +411,7 @@ Deno.test("collectAllNodeIds — includes top-level and nested body node IDs", (
 });
 
 Deno.test("collectAllNodeIds — no loop nodes returns top-level only", () => {
-  const config: PipelineConfig = {
+  const config: WorkflowConfig = {
     name: "test",
     version: "1",
     nodes: {
@@ -426,7 +426,7 @@ Deno.test("collectAllNodeIds — no loop nodes returns top-level only", () => {
 // --- findNodeConfig tests ---
 
 Deno.test("findNodeConfig — finds top-level node", () => {
-  const config: PipelineConfig = {
+  const config: WorkflowConfig = {
     name: "test",
     version: "1",
     nodes: {
@@ -438,7 +438,7 @@ Deno.test("findNodeConfig — finds top-level node", () => {
 });
 
 Deno.test("findNodeConfig — finds loop body node", () => {
-  const config: PipelineConfig = {
+  const config: WorkflowConfig = {
     name: "test",
     version: "1",
     nodes: {
@@ -474,31 +474,31 @@ Deno.test("findNodeConfig — finds loop body node", () => {
 
 // --- run_on filtering tests ---
 
-Deno.test("collectPostPipelineNodes — collects all run_on variants", () => {
+Deno.test("collectPostWorkflowNodes — collects all run_on variants", () => {
   const nodes: Record<string, NodeConfig> = {
     pm: { type: "agent", label: "PM" },
     "meta-agent": { type: "agent", label: "Meta-Agent", run_on: "always" },
     commit: { type: "agent", label: "Commit", run_on: "success" },
     notify: { type: "agent", label: "Notify", run_on: "failure" },
   };
-  const result = collectPostPipelineNodes(nodes);
+  const result = collectPostWorkflowNodes(nodes);
   assertEquals(result.length, 3);
   assertEquals(result.includes("meta-agent"), true);
   assertEquals(result.includes("commit"), true);
   assertEquals(result.includes("notify"), true);
 });
 
-Deno.test("collectPostPipelineNodes — run_on: 'failure' node is collected", () => {
+Deno.test("collectPostWorkflowNodes — run_on: 'failure' node is collected", () => {
   const nodes: Record<string, NodeConfig> = {
     pm: { type: "agent", label: "PM" },
     notify: { type: "agent", label: "Notify", run_on: "failure" },
   };
-  const result = collectPostPipelineNodes(nodes);
+  const result = collectPostWorkflowNodes(nodes);
   assertEquals(result, ["notify"]);
 });
 
 Deno.test("findNodeConfig — returns undefined for unknown node", () => {
-  const config: PipelineConfig = {
+  const config: WorkflowConfig = {
     name: "test",
     version: "1",
     nodes: {
@@ -509,9 +509,9 @@ Deno.test("findNodeConfig — returns undefined for unknown node", () => {
   assertEquals(node, undefined);
 });
 
-// --- dryRunPlan post-pipeline section tests ---
+// --- dryRunPlan post-workflow section tests ---
 
-Deno.test("dryRunPlan — renders Post-pipeline section when postPipelineNodeIds provided", () => {
+Deno.test("dryRunPlan — renders Post-workflow section when postWorkflowNodeIds provided", () => {
   const cap = createCapture();
   const out = new OutputManager("normal", cap.writer);
   const levels = [["pm", "architect"], ["tech-lead"]];
@@ -522,39 +522,39 @@ Deno.test("dryRunPlan — renders Post-pipeline section when postPipelineNodeIds
     "meta-agent": "Meta Agent",
     "tech-lead-review": "Tech Lead Review",
   };
-  const postPipelineNodeIds = ["meta-agent", "tech-lead-review"];
+  const postWorkflowNodeIds = ["meta-agent", "tech-lead-review"];
   const runOnMap: Record<string, string> = {
     "meta-agent": "always",
     "tech-lead-review": "always",
   };
-  out.dryRunPlan(levels, labels, postPipelineNodeIds, runOnMap);
+  out.dryRunPlan(levels, labels, postWorkflowNodeIds, runOnMap);
   const output = cap.lines.join("");
   assertEquals(output.includes("Level 1"), true);
   assertEquals(output.includes("pm"), true);
-  assertEquals(output.includes("Post-pipeline:"), true);
+  assertEquals(output.includes("Post-workflow:"), true);
   assertEquals(output.includes("meta-agent"), true);
   assertEquals(output.includes("always"), true);
   assertEquals(output.includes("tech-lead-review"), true);
 });
 
-Deno.test("dryRunPlan — no Post-pipeline section when postPipelineNodeIds is empty", () => {
+Deno.test("dryRunPlan — no Post-workflow section when postWorkflowNodeIds is empty", () => {
   const cap = createCapture();
   const out = new OutputManager("normal", cap.writer);
   const levels = [["pm"]];
   const labels: Record<string, string> = { pm: "PM Agent" };
   out.dryRunPlan(levels, labels, [], {});
   const output = cap.lines.join("");
-  assertEquals(output.includes("Post-pipeline:"), false);
+  assertEquals(output.includes("Post-workflow:"), false);
 });
 
-Deno.test("dryRunPlan — no Post-pipeline section when params omitted (backward compat)", () => {
+Deno.test("dryRunPlan — no Post-workflow section when params omitted (backward compat)", () => {
   const cap = createCapture();
   const out = new OutputManager("normal", cap.writer);
   const levels = [["pm"]];
   const labels: Record<string, string> = { pm: "PM Agent" };
   out.dryRunPlan(levels, labels);
   const output = cap.lines.join("");
-  assertEquals(output.includes("Post-pipeline:"), false);
+  assertEquals(output.includes("Post-workflow:"), false);
   assertEquals(output.includes("Level 1"), true);
 });
 
@@ -675,7 +675,7 @@ Deno.test("executeLoopNode onNodeComplete — skips nodeResult() when result has
   assertEquals(output.includes("RESULT:"), false);
 });
 
-Deno.test("dry-run — post-pipeline nodes excluded from regular levels filtering logic", () => {
+Deno.test("dry-run — post-workflow nodes excluded from regular levels filtering logic", () => {
   const nodes: Record<string, NodeConfig> = {
     pm: { type: "agent", label: "PM" },
     architect: { type: "agent", label: "Architect", inputs: ["pm"] },
@@ -687,9 +687,9 @@ Deno.test("dry-run — post-pipeline nodes excluded from regular levels filterin
     },
   };
   const levels = [["pm"], ["architect"], ["meta-agent", "tech-lead-review"]];
-  const postPipelineIds = collectPostPipelineNodes(nodes);
+  const postWorkflowIds = collectPostWorkflowNodes(nodes);
   const filteredLevels = levels
-    .map((l) => l.filter((id) => !postPipelineIds.includes(id)))
+    .map((l) => l.filter((id) => !postWorkflowIds.includes(id)))
     .filter((l) => l.length > 0);
 
   assertEquals(filteredLevels.length, 2);
@@ -699,9 +699,9 @@ Deno.test("dry-run — post-pipeline nodes excluded from regular levels filterin
     assertEquals(level.includes("meta-agent"), false);
     assertEquals(level.includes("tech-lead-review"), false);
   }
-  assertEquals(postPipelineIds.length, 2);
-  assertEquals(postPipelineIds.includes("meta-agent"), true);
-  assertEquals(postPipelineIds.includes("tech-lead-review"), true);
+  assertEquals(postWorkflowIds.length, 2);
+  assertEquals(postWorkflowIds.includes("meta-agent"), true);
+  assertEquals(postWorkflowIds.includes("tech-lead-review"), true);
 });
 
 // --- FR-32: Cost field integration tests ---
@@ -855,7 +855,7 @@ Deno.test("summary() — renders node results from RunSummary nodeResults field"
   }
 
   out.summary({
-    name: "test-pipeline",
+    name: "test-workflow",
     runId: state.run_id,
     status: "completed",
     durationMs: 60000,
@@ -878,7 +878,7 @@ Deno.test("summary() — omits nodeResults section when no nodes have results", 
   const out = new OutputManager("normal", cap.writer);
 
   out.summary({
-    name: "test-pipeline",
+    name: "test-workflow",
     runId: "test-run",
     status: "completed",
     durationMs: 5000,
@@ -889,7 +889,7 @@ Deno.test("summary() — omits nodeResults section when no nodes have results", 
   });
 
   const joined = cap.lines.join("");
-  assertEquals(joined.includes("Pipeline:"), true);
+  assertEquals(joined.includes("Workflow:"), true);
   assertEquals(joined.includes("1/1 completed"), true);
   // No extra result lines injected
   assertEquals(
@@ -1019,12 +1019,12 @@ Deno.test("FR-E34 — continue-d failure: info log emitted, hook not called", as
     const nodes: Record<string, NodeConfig> = {
       p1: { type: "agent", label: "P1", run_on: "success" },
     };
-    // pipelineSuccess=true: continue-d failure does NOT set pipelineSuccess false
-    await executePostPipeline({
+    // workflowSuccess=true: continue-d failure does NOT set workflowSuccess false
+    await executePostWorkflow({
       nodeIds: ["p1"],
       nodes,
       state,
-      pipelineSuccess: true,
+      workflowSuccess: true,
       failureScript: tmpScript,
       output: out,
       executeNode: (_id) => {
@@ -1047,31 +1047,31 @@ Deno.test("FR-E34 — continue-d failure: info log emitted, hook not called", as
   }
 });
 
-Deno.test("FR-E34 — all failures continue-d: pipelineSuccess true, hook not called", async () => {
+Deno.test("FR-E34 — all failures continue-d: workflowSuccess true, hook not called", async () => {
   const tmpScript = await Deno.makeTempFile({ suffix: ".sh" });
   try {
     await Deno.writeTextFile(tmpScript, "#!/bin/bash\necho 'HOOK_CALLED'");
     await Deno.chmod(tmpScript, 0o755);
     const cap = createCapture();
     const out = new OutputManager("normal", cap.writer);
-    // Replicate executeLevel loop: all nodes continue-d → pipelineSuccess stays true
-    let pipelineSuccess = true;
+    // Replicate executeLevel loop: all nodes continue-d → workflowSuccess stays true
+    let workflowSuccess = true;
     for (const result of [true, true]) {
       if (!result) {
-        pipelineSuccess = false;
+        workflowSuccess = false;
         break;
       }
     }
-    assertEquals(pipelineSuccess, true);
+    assertEquals(workflowSuccess, true);
     const state = createRunState("fre34-t2", "cfg.yaml", ["p1"], {}, {});
     const nodes: Record<string, NodeConfig> = {
       p1: { type: "agent", label: "P1", run_on: "success" },
     };
-    await executePostPipeline({
+    await executePostWorkflow({
       nodeIds: ["p1"],
       nodes,
       state,
-      pipelineSuccess,
+      workflowSuccess,
       failureScript: tmpScript,
       output: out,
       executeNode: (_id) => Promise.resolve(true),
@@ -1092,23 +1092,23 @@ Deno.test("FR-E34 — one fatal failure among continue-d: hook called exactly on
     const cap = createCapture();
     const out = new OutputManager("normal", cap.writer);
     // Replicate executeLevel loop: node-a continue-d (true), node-b fatal (false)
-    let pipelineSuccess = true;
+    let workflowSuccess = true;
     for (const result of [true, false]) {
       if (!result) {
-        pipelineSuccess = false;
+        workflowSuccess = false;
         break;
       }
     }
-    assertEquals(pipelineSuccess, false);
+    assertEquals(workflowSuccess, false);
     const state = createRunState("fre34-t3", "cfg.yaml", ["p1"], {}, {});
     const nodes: Record<string, NodeConfig> = {
       p1: { type: "agent", label: "P1", run_on: "failure" },
     };
-    await executePostPipeline({
+    await executePostWorkflow({
       nodeIds: ["p1"],
       nodes,
       state,
-      pipelineSuccess,
+      workflowSuccess,
       failureScript: tmpScript,
       output: out,
       executeNode: (_id) => Promise.resolve(true),
@@ -1133,12 +1133,12 @@ Deno.test("FR-E34 — hook script fails after continue-d failure: warn emitted, 
     const nodes: Record<string, NodeConfig> = {
       p1: { type: "agent", label: "P1", run_on: "failure" },
     };
-    // pipelineSuccess=false: one fatal failure (hook is attempted)
-    await executePostPipeline({
+    // workflowSuccess=false: one fatal failure (hook is attempted)
+    await executePostWorkflow({
       nodeIds: ["p1"],
       nodes,
       state,
-      pipelineSuccess: false,
+      workflowSuccess: false,
       failureScript: tmpScript,
       output: out,
       executeNode: (_id) => Promise.resolve(true),

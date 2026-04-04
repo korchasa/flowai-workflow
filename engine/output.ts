@@ -1,6 +1,6 @@
 /**
  * @module
- * Terminal output management for pipeline execution.
+ * Terminal output management for workflow execution.
  * {@link OutputManager} centralises all stderr writes and enforces verbosity
  * levels (quiet / normal / semi-verbose / verbose) so callers never need to
  * check verbosity themselves.
@@ -113,7 +113,7 @@ export class OutputManager {
   summary(stats: RunSummary): void {
     this.write("\n");
     this.write(`${"=".repeat(60)}\n`);
-    this.write(`Pipeline: ${stats.name}\n`);
+    this.write(`Workflow: ${stats.name}\n`);
     this.write(`Run ID:   ${stats.runId}\n`);
     this.write(`Status:   ${stats.status}\n`);
     this.write(`Duration: ${this.formatDuration(stats.durationMs)}\n`);
@@ -202,7 +202,7 @@ export class OutputManager {
   dryRunPlan(
     levels: string[][],
     labels: Record<string, string>,
-    postPipelineNodeIds?: string[],
+    postWorkflowNodeIds?: string[],
     runOnMap?: Record<string, string>,
   ): void {
     this.write("\nExecution Plan (dry run):\n");
@@ -216,9 +216,9 @@ export class OutputManager {
         this.write(`  - ${nodeId}: ${label}\n`);
       }
     }
-    if (postPipelineNodeIds && postPipelineNodeIds.length > 0) {
-      this.write(`Post-pipeline:\n`);
-      for (const nodeId of postPipelineNodeIds) {
+    if (postWorkflowNodeIds && postWorkflowNodeIds.length > 0) {
+      this.write(`Post-workflow:\n`);
+      for (const nodeId of postWorkflowNodeIds) {
         const label = labels[nodeId] ?? nodeId;
         const condition = runOnMap?.[nodeId] ?? "always";
         this.write(`  - ${nodeId}: ${label} (run_on: ${condition})\n`);
@@ -256,9 +256,9 @@ export class OutputManager {
   }
 }
 
-/** Summary statistics for a pipeline run. */
+/** Summary statistics for a workflow run. */
 export interface RunSummary {
-  /** Pipeline name from config. */
+  /** Workflow name from config. */
   name: string;
   /** Unique run identifier (timestamp-based). */
   runId: string;
@@ -266,7 +266,7 @@ export interface RunSummary {
   status: string;
   /** Total wall-clock duration in milliseconds. */
   durationMs: number;
-  /** Total number of nodes in the pipeline. */
+  /** Total number of nodes in the workflow. */
   total: number;
   /** Count of successfully completed nodes. */
   completed: number;

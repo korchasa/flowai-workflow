@@ -4,10 +4,10 @@ import { topoSort } from "./dag.ts";
 import { isNodeCompleted, markNodeSkipped, saveState } from "./state.ts";
 
 /**
- * Collect node IDs with `run_on` set from pipeline config.
- * These nodes execute in a final post-pipeline step after all DAG levels complete.
+ * Collect node IDs with `run_on` set from workflow config.
+ * These nodes execute in a final post-workflow step after all DAG levels complete.
  */
-export function collectPostPipelineNodes(
+export function collectPostWorkflowNodes(
   nodes: Record<string, NodeConfig>,
 ): string[] {
   return Object.entries(nodes)
@@ -16,17 +16,17 @@ export function collectPostPipelineNodes(
 }
 
 /**
- * Sort post-pipeline nodes topologically using their `inputs` field.
- * Only considers dependencies within the post-pipeline subset.
+ * Sort post-workflow nodes topologically using their `inputs` field.
+ * Only considers dependencies within the post-workflow subset.
  * Guarantees e.g. post-B (inputs: [post-A]) runs after post-A.
  */
-export function sortPostPipelineNodes(
-  postPipelineIds: string[],
+export function sortPostWorkflowNodes(
+  postWorkflowIds: string[],
   nodes: Record<string, NodeConfig>,
 ): string[] {
-  const subset = new Set(postPipelineIds);
+  const subset = new Set(postWorkflowIds);
   const deps = new Map<string, Set<string>>();
-  for (const id of postPipelineIds) {
+  for (const id of postWorkflowIds) {
     const node = nodes[id];
     const internalInputs = (node.inputs ?? []).filter((inp) => subset.has(inp));
     deps.set(id, new Set(internalInputs));
@@ -64,31 +64,31 @@ export async function runFailureHook(
   }
 }
 
-/** Options for executePostPipeline. */
-export interface PostPipelineOptions {
+/** Options for executePostWorkflow. */
+export interface PostWorkflowOptions {
   nodeIds: string[];
   nodes: Record<string, NodeConfig>;
   state: RunState;
-  pipelineSuccess: boolean;
+  workflowSuccess: boolean;
   failureScript?: string;
   output: OutputManager;
-  /** Execute a single node by ID. Errors are swallowed by executePostPipeline. */
+  /** Execute a single node by ID. Errors are swallowed by executePostWorkflow. */
   executeNode: (nodeId: string) => Promise<boolean>;
 }
 
 /**
- * Execute post-pipeline nodes (those with `run_on` set).
- * Runs failure hook if pipeline failed, then executes each node filtered by run_on condition.
- * Node errors are swallowed — post-pipeline failures must not block finalization.
+ * Execute post-workflow nodes (those with `run_on` set).
+ * Runs failure hook if workflow failed, then executes each node filtered by run_on condition.
+ * Node errors are swallowed — post-workflow failures must not block finalization.
  */
-export async function executePostPipeline(
-  opts: PostPipelineOptions,
+export async function executePostWorkflow(
+  opts: PostWorkflowOptions,
 ): Promise<void> {
   const {
     nodeIds,
     nodes,
     state,
-    pipelineSuccess,
+    workflowSuccess,
     failureScript,
     output,
     executeNode,
@@ -96,7 +96,7 @@ export async function executePostPipeline(
 
   if (nodeIds.length === 0) return;
 
-  if (!pipelineSuccess) {
+  if (!workflowSuccess) {
     await runFailureHook(failureScript, output);
   }
 
@@ -104,17 +104,17 @@ export async function executePostPipeline(
     if (isNodeCompleted(state, nodeId)) continue;
 
     const nodeRunOn = nodes[nodeId].run_on;
-    if (nodeRunOn === "success" && !pipelineSuccess) {
+    if (nodeRunOn === "success" && !workflowSuccess) {
       markNodeSkipped(state, nodeId);
-      output.nodeSkipped(nodeId, "skipped: run_on=success but pipeline failed");
+      output.nodeSkipped(nodeId, "skipped: run_on=success but workflow failed");
       await saveState(state);
       continue;
     }
-    if (nodeRunOn === "failure" && pipelineSuccess) {
+    if (nodeRunOn === "failure" && workflowSuccess) {
       markNodeSkipped(state, nodeId);
       output.nodeSkipped(
         nodeId,
-        "skipped: run_on=failure but pipeline succeeded",
+        "skipped: run_on=failure but workflow succeeded",
       );
       await saveState(state);
       continue;
@@ -124,7 +124,7 @@ export async function executePostPipeline(
       await executeNode(nodeId);
     } catch (err) {
       output.warn(
-        `Post-pipeline node ${nodeId} failed: ${(err as Error).message}`,
+        `Post-workflow node ${nodeId} failed: ${(err as Error).message}`,
       );
     }
   }

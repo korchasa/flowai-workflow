@@ -1,6 +1,6 @@
 /**
  * @module
- * HTML dashboard generator for a pipeline run.
+ * HTML dashboard generator for a workflow run.
  * Reads state.json + per-node logs/<nodeId>.json from a run directory and
  * produces a self-contained index.html with node cards, Gantt timeline, and
  * cost chart. Entry point: {@link renderHtml}.
@@ -127,7 +127,7 @@ export function computePhaseStatus(
 const PREVIEW_LINES = 3;
 
 /**
- * Render an HTML card for a single pipeline node.
+ * Render an HTML card for a single workflow node.
  * Multi-line results use <details>/<summary> with first 3 lines in summary.
  * Single-line results render inline without wrapper.
  * When streamLogHref is provided, renders a link to the stream log after card-meta.
@@ -343,7 +343,7 @@ export function renderCostChart(bars: CostBar[], totalCost: number): string {
  *
  * @param state - Parsed run state (provides run_id, timestamps, node statuses)
  * @param logs  - Map of nodeId → ClaudeCliOutput (or null if log unavailable)
- * @param phases - Optional phase grouping from pipeline config
+ * @param phases - Optional phase grouping from workflow config
  * @param streamLogHrefs - Optional map of nodeId → relative href to stream.log
  * @param streamLogContents - Optional map of nodeId → truncated stream.log text
  * @param alwaysNodes - Optional set of nodeIds with run_on:always for phase badge separation
@@ -404,14 +404,14 @@ export function renderHtml(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pipeline Run: ${escHtml(state.run_id)}</title>
+<title>Workflow Run: ${escHtml(state.run_id)}</title>
 <style>
 ${CSS}
 </style>
 </head>
 <body>
 <header>
-  <h1>Pipeline Run: <code>${escHtml(state.run_id)}</code></h1>
+  <h1>Workflow Run: <code>${escHtml(state.run_id)}</code></h1>
   <p>Status: <strong class="${escHtml(state.status)}">${
     escHtml(state.status)
   }</strong></p>
@@ -481,13 +481,13 @@ strong.aborted{color:#854d0e}
   .trim();
 
 export function printUsage(): string {
-  return `HTML dashboard generator — produces a self-contained dashboard for a pipeline run
+  return `HTML dashboard generator — produces a self-contained dashboard for a workflow run
 
 Usage:
   deno task dashboard --run-dir <path>
 
 Options:
-  --run-dir <path>   Path to the pipeline run directory (required)
+  --run-dir <path>   Path to the workflow run directory (required)
   --help, -h         Show this help
 
 Example:
@@ -535,7 +535,7 @@ if (import.meta.main) {
 
   const state = await readRunState(runDir);
 
-  // Load phases and node configs from pipeline config (best-effort)
+  // Load phases and node configs from workflow config (best-effort)
   let phases: Record<string, string[]> | undefined;
   const alwaysNodes = new Set<string>();
   try {

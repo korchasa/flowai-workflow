@@ -1,6 +1,6 @@
 /**
  * @module
- * Output artifact validation for pipeline nodes.
+ * Output artifact validation for workflow nodes.
  * Supports five rule types: file_exists, file_not_empty, contains_section,
  * custom_script, and frontmatter_field.
  * Entry point: {@link runValidations}.

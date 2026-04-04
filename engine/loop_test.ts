@@ -5,8 +5,8 @@ import { OutputManager } from "./output.ts";
 import type {
   ClaudeCliOutput,
   NodeConfig,
-  PipelineConfig,
   TemplateContext,
+  WorkflowConfig,
 } from "./types.ts";
 import { createRunState, markNodeCompleted, markNodeStarted } from "./state.ts";
 
@@ -119,7 +119,7 @@ Deno.test("LoopRunOptions — output is optional", () => {
 Deno.test("LoopResult — bodyResults is array even when loop node has no runnable agents", () => {
   // Verify LoopResult.bodyResults is always an array (structural check).
   // Full runLoop integration requires claude CLI — just verify the type contract.
-  const config: PipelineConfig = {
+  const config: WorkflowConfig = {
     name: "test",
     version: "1",
     nodes: {
@@ -184,7 +184,7 @@ Deno.test("loop body node — AgentResult output exposes total_cost_usd", () => 
 
 Deno.test("loop body node — model resolution: own > loop > defaults", () => {
   // Verify three-tier model resolution chain (own > loop > defaults)
-  const config: PipelineConfig = {
+  const config: WorkflowConfig = {
     name: "test",
     version: "1",
     defaults: { model: "claude-haiku-4-5" },
@@ -231,7 +231,7 @@ Deno.test("loop body node — model resolution: own > loop > defaults", () => {
 });
 
 Deno.test("loop body node — model falls through to defaults when loop has none", () => {
-  const config: PipelineConfig = {
+  const config: WorkflowConfig = {
     name: "test",
     version: "1",
     defaults: { model: "claude-haiku-4-5" },

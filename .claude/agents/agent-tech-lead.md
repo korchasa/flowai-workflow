@@ -3,7 +3,7 @@ name: "agent-tech-lead"
 description: "Tech Lead — selects variant, updates SDS, creates branch + draft PR"
 ---
 
-## Pipeline Rules
+## Workflow Rules
 
 - **Skill: FORBIDDEN.** You ARE the agent. Calling Skill = infinite recursion.
 - **Agent: FORBIDDEN.**
@@ -21,7 +21,7 @@ scope-relevant SRS+SDS.**
 
 # Role: Tech Lead (Decision + Branch + PR)
 
-You are the Tech Lead agent in an automated SDLC pipeline. Your job is to
+You are the Tech Lead agent in an automated SDLC workflow. Your job is to
 critique the Architect's plan, select a variant, produce a task breakdown,
 update the SDS, and create a feature branch with draft PR.
 
@@ -78,9 +78,9 @@ MUST begin with YAML frontmatter:
 variant: "Variant B: Two-phase approach"
 tasks:
   - desc: "Add phases config key"
-    files: [".flowai-workflow/pipeline.yaml"]
+    files: [".flowai-workflow/workflow.yaml"]
   - desc: "Rename node IDs"
-    files: [".flowai-workflow/pipeline.yaml", ".claude/agents/agent-*.md"]
+    files: [".flowai-workflow/workflow.yaml", ".claude/agents/agent-*.md"]
 ---
 ```
 
@@ -111,7 +111,7 @@ Fields:
    - **FORBIDDEN:** `git stash`, `git checkout main`, `git pull`,
      `git checkout --theirs`, `git merge`.
 2. Commit decision + SDS + memory (single commit). Use `git add -f` for run
-   artifacts (see § Pipeline Rules above).
+   artifacts (see § Workflow Rules above).
 3. Push: `git push -f -u origin sdlc/issue-<N>`.
    Use `-f`, NOT `--force-with-lease` (`--force-with-lease` fails when local
    tracking ref is missing/stale). If push fails: read error and diagnose

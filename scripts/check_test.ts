@@ -19,7 +19,7 @@ Deno.test("printUsage — mentions checks performed", () => {
   assertEquals(text.includes("Formatting check"), true);
   assertEquals(text.includes("Linting"), true);
   assertEquals(text.includes("Tests"), true);
-  assertEquals(text.includes("Pipeline integrity"), true);
+  assertEquals(text.includes("Workflow integrity"), true);
   assertEquals(text.includes("AGENTS.md agent list accuracy"), true);
   assertEquals(text.includes("Comment marker scan"), true);
 });

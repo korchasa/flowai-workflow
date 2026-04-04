@@ -2,7 +2,7 @@
 
 ## 1. Intro
 
-- **Purpose:** Implementation details for the SDLC pipeline (example use case
+- **Purpose:** Implementation details for the SDLC workflow (example use case
   of flowai-workflow engine).
 - **Rel to SRS:** Implements FRs from `documents/requirements-sdlc.md`.
 
@@ -10,7 +10,7 @@
 
 ### 2.1 Legacy: Shell Script Pipeline (REMOVED — superseded by FR-S15)
 
-Legacy 9-stage shell pipeline (`Stage 1–9`) removed. Stages 3 (Reviewer),
+Legacy 9-stage shell workflow (`Stage 1–9`) removed. Stages 3 (Reviewer),
 4 (Architect), 5 (SDS Update), 8 (Presenter) absorbed/eliminated per FR-S15.
 Current architecture: see §2.2 Pipeline DAG.
 
@@ -28,7 +28,7 @@ graph LR
   not who does it. Mapping: `pm`→`specification`, `architect`→`design`,
   `tech-lead`→`decision`, `impl-loop`→`implementation`, `developer`→`build`,
   `qa`→`verify`, `tech-lead-review`→`tech-lead-review`.
-- **Phases (FR-33):** Top-level `phases:` key in `pipeline.yaml` declares named
+- **Phases (FR-33):** Top-level `phases:` key in `workflow.yaml` declares named
   phase groups. Each phase lists member stage IDs:
   - `plan`: [specification, design, decision]
   - `impl`: [implementation]
@@ -45,7 +45,7 @@ graph LR
     directory remains at `.flowai-workflow/runs/` — engine-controlled hardcoded path;
     configurable `runs_dir` deferred to separate engine FR.
     - **Artifact File Numbering (FR-S32):** Gapless sequential prefixes
-      `01`–`06` reflecting pipeline execution order. Convention:
+      `01`–`06` reflecting workflow execution order. Convention:
       `<NN>-<base-name>.md`. Current mapping:
       - `01-spec.md` (specification)
       - `02-plan.md` (design)
@@ -53,7 +53,7 @@ graph LR
       - `04-impl-summary.md` (build)
       - `05-qa-report.md` (verify)
       - `06-review.md` (tech-lead-review)
-      All pipeline YAML, agent prompts, SRS, and SDS references MUST use these
+      All workflow YAML, agent prompts, SRS, and SDS references MUST use these
       canonical filenames. Alphabetical sorting = execution order.
   - **Legacy Shell Scripts** (`.flowai-workflow/scripts/`): Deprecated stage scripts
     deleted per FR-S26. HITL, rollback, and dashboard wrapper scripts retained.
@@ -63,7 +63,7 @@ graph LR
     ops, checks `git status --porcelain`; if dirty, displays branch + diff stat,
     runs `git stash push --include-untracked -m "flowai-workflow pre_run: <timestamp>"`,
     displays stash ref + restore command. Clean tree → silent proceed. Stash
-    failure aborts pipeline (`set -euo pipefail`).
+    failure aborts workflow (`set -euo pipefail`).
 
 ## 3. Components
 
@@ -76,11 +76,11 @@ graph LR
 ### 3.2 Stage Scripts — DELETED (FR-S26)
 
 - **Status:** Deleted. Legacy stage orchestration scripts (`stage-*.sh`) and
-  associated tests removed per FR-S26. Superseded by Deno/TypeScript pipeline
+  associated tests removed per FR-S26. Superseded by Deno/TypeScript workflow
   engine (`engine/`). Use `deno task run`.
 - **Legacy `test:*` deno.json tasks:** Removed alongside scripts. No backward
   compatibility retention needed — engine execution via `deno task run` is the
-  sole pipeline entry point.
+  sole workflow entry point.
 
 ### 3.3 Shared Library (`.flowai-workflow/scripts/lib.sh`)
 
@@ -105,7 +105,7 @@ graph LR
   construction time. Agent-specific "first tool call MUST be" instruction
   (5 of 6 agents) preserved as standalone paragraph before `# Role:`.
   Legacy `.claude/skills/` symlinks removed per FR-S33 — interactive
-  `/agent-<name>` slash commands no longer supported (pipeline-only agents
+  `/agent-<name>` slash commands no longer supported (workflow-only agents
   should not be exposed as interactive skills).
 - **Directory structure:** `.flowai-workflow/agents/agent-<name>/SKILL.md` — 6 agents:
   - `agent-pm` — triages open GitHub issues, selects highest-priority, produces
@@ -118,7 +118,7 @@ graph LR
     **Codebase Exploration (FR-S43):** Before variant design, launches 2–3
     parallel `Agent` sub-agents with distinct focus areas (prior art,
     architecture layers, integration points). Sub-agents run within same
-    session — no separate pipeline node. Exploration findings provide concrete
+    session — no separate workflow node. Exploration findings provide concrete
     file:line evidence consumed by variant design phase. Explicit `Agent` tool
     allowance overrides `shared-rules.md` default prohibition.
   - `agent-tech-lead` — critique + decision + SDS update + branch creation
@@ -144,10 +144,10 @@ graph LR
     **Multi-Focus Parallel Review (FR-S45):** Launches 2–3 parallel `Agent`
     sub-agents with distinct focus: (1) correctness/bugs, (2) simplicity/DRY,
     (3) conventions/abstractions. Sub-agents run within same QA session — no
-    new pipeline node. Findings consolidated into per-focus sections in QA
+    new workflow node. Findings consolidated into per-focus sections in QA
     report. All findings subject to confidence scoring per FR-S44. Explicit
     `Agent` tool allowance overrides `shared-rules.md` default prohibition.
-  - `agent-tech-lead-review` — post-pipeline: final code review + CI gate
+  - `agent-tech-lead-review` — post-workflow: final code review + CI gate
     check + merge. `run_on: always`. Handles missing-PR case gracefully.
 - **Removed agents (FR-26):** `tech-lead-reviewer`, `tech-lead-sds`,
   `committer`, `code-reviewer`.
@@ -158,7 +158,7 @@ graph LR
   `.flowai-workflow/agents/reflection-protocol.md` — single source of truth for
   two-layer reflection protocol (MEMORY + HISTORY). Referenced by each agent's
   `## Reflection Memory` section in SKILL.md and reinforced via `task_template`
-  in `pipeline.yaml`. See §3.4.1 for details.
+  in `workflow.yaml`. See §3.4.1 for details.
 - **SKILL.md frontmatter (agentskills.io-compliant):**
   ```yaml
   ---
@@ -217,7 +217,7 @@ graph LR
   1. FR-36: `agents/<name>/` → `.flowai-workflow/agents/agent-<name>/` (symlinks
      eliminated, `.claude/skills/` became canonical).
   2. FR-S26: `.flowai-workflow/agents/agent-<name>/` → `.flowai-workflow/agents/agent-<name>/`
-     (consolidated into pipeline directory; `.claude/skills/agent-<name>`
+     (consolidated into workflow directory; `.claude/skills/agent-<name>`
      symlinks created for Claude Code discovery).
   3. FR-S33: `.claude/skills/agent-<name>` symlinks removed. Canonical path
      `.flowai-workflow/agents/agent-<name>/SKILL.md` is sole discovery mechanism.
@@ -251,7 +251,7 @@ graph LR
 - **Shared Protocol:** `.flowai-workflow/agents/reflection-protocol.md` — single
   source of truth for the two-layer reflection protocol. Referenced by each
   agent's `## Reflection Memory` section in SKILL.md (~3-5 line reference
-  block) and reinforced via `task_template` in `pipeline.yaml`. Contains:
+  block) and reinforced via `task_template` in `workflow.yaml`. Contains:
   - Layer 1 (MEMORY) format and rules
   - Layer 2 (HISTORY) format and rules
   - Lifecycle instructions
@@ -279,11 +279,11 @@ graph LR
   - Memory path: `.flowai-workflow/memory/<agent>.md`
   - History path: `.flowai-workflow/memory/<agent>-history.md`
   - Agent-specific HISTORY format hint.
-- **Pipeline integration:** Each agent's `task_template` in `pipeline.yaml`
+- **Pipeline integration:** Each agent's `task_template` in `workflow.yaml`
   includes both memory and history file paths as reinforcement.
 - **Git tracking:** Memory and history files are git-tracked (not gitignored).
   Each agent reads/writes only its own files — no cross-agent access.
-- **Interfaces:** File I/O only. No engine awareness — memory is pipeline-level
+- **Interfaces:** File I/O only. No engine awareness — memory is workflow-level
   concern. Agents read/write via standard file tools.
 - **Deps:** None (static files, versioned in git).
 
@@ -311,14 +311,14 @@ graph LR
     - Exit 0 + body on stdout = reply found. Exit 1 = no reply yet.
     - Deps: `jq`, `yq`, `gh`.
 - **Interfaces:** Called by engine via `defaults.hitl.ask_script` /
-  `defaults.hitl.check_script` paths in `pipeline.yaml`.
+  `defaults.hitl.check_script` paths in `workflow.yaml`.
 
 ### 3.6 Pipeline Trigger
 
-- **Purpose:** Single entry point for pipeline. PM agent autonomously triages
+- **Purpose:** Single entry point for workflow. PM agent autonomously triages
   open GitHub issues.
 - **Author constraint (FR-S31):** Only issues authored by `korchasa` are valid
-  pipeline inputs. Enforced in PM agent prompt (§3.4), not engine-level.
+  workflow inputs. Enforced in PM agent prompt (§3.4), not engine-level.
   Two enforcement points: `gh issue list --author` (triage) and
   `gh issue view --json author` (resume guard).
 - **Interfaces:** CLI: `deno task run [--prompt "..."]`. PM selects
@@ -327,7 +327,7 @@ graph LR
 
 ### 3.7 Dashboard Generator (`scripts/generate-dashboard.ts`) (FR-33, FR-35, FR-38, FR-40, FR-S26, issue #15, issue #93)
 
-- **Purpose:** Generate self-contained HTML dashboard summarizing pipeline run
+- **Purpose:** Generate self-contained HTML dashboard summarizing workflow run
   results. Reads `state.json` + per-node `logs/*.json`. Produces `index.html`
   in run directory with all CSS inlined (no CDN deps).
 - **Functions:**
@@ -397,7 +397,7 @@ graph LR
 - **Inline log content flow (FR-S34, issue #149):** CLI entry reads each
   `stream.log` via `readStreamLog()` (truncated to 200+50 lines). Builds
   `Record<string, string>` content map, passes to `renderHtml()` → threaded to
-  `renderCard()`. Extracts `run_on` from pipeline config nodes to build
+  `renderCard()`. Extracts `run_on` from workflow config nodes to build
   `Set<string>` of always-nodes, passed to `renderHtml()` for phase aggregate.
   Header status CSS: 4 distinct rules for `completed`/`failed`/`aborted`/
   `running`.
@@ -425,9 +425,9 @@ graph LR
 
 ### 3.8 Pipeline Config Validation (FR-S24)
 
-- **Purpose:** Validate `.flowai-workflow/pipeline.yaml` against engine schema as part
+- **Purpose:** Validate `.flowai-workflow/workflow.yaml` against engine schema as part
   of `deno task check`. Prevents config drift causing runtime failures.
-- **Implementation:** `pipelineIntegrity()` in `scripts/check.ts` delegates to
+- **Implementation:** `workflowIntegrity()` in `scripts/check.ts` delegates to
   engine's `loadConfig()` (`engine/config.ts`). The engine validation covers:
   - Node type validation (agent, merge, loop, human)
   - Required field validation per node type
@@ -436,10 +436,10 @@ graph LR
   - Loop body node validation
   - Phase configuration validation
   - Prompt file existence check
-- **Validation flow:** `pipelineIntegrity()` → `loadConfig()` →
+- **Validation flow:** `workflowIntegrity()` → `loadConfig()` →
   `validateSchema()` → `validateNode()` (per node). Errors thrown as exceptions
-  with descriptive messages; `pipelineIntegrity()` catches and reports.
-- **Interfaces:** Called as part of `deno task check` pipeline. No separate CLI
+  with descriptive messages; `workflowIntegrity()` catches and reports.
+- **Interfaces:** Called as part of `deno task check` sequence. No separate CLI
   entry point (deferred).
 - **Deps:** `engine/config.ts` (`loadConfig` function).
 
@@ -449,16 +449,16 @@ graph LR
   template syntax instead of a hardcoded path. Prevents silent breakage when
   specification node is renamed or artifact layout changes.
 - **Implementation:** `hitlArtifactSource()` in `scripts/check.ts`:
-  1. Loads pipeline config via `loadConfig()`.
+  1. Loads workflow config via `loadConfig()`.
   2. Reads `config.defaults?.hitl?.artifact_source`.
   3. If field present and does not contain `{{input.`: reports error
      "hitl.artifact_source must use template syntax".
   4. If field absent: skips (no error).
 - **Validation flow:** `hitlArtifactSource()` → `loadConfig()` → string match
   for `{{input.` → error collection → report. Pattern follows
-  `pipelineIntegrity()` (§3.8): catch + report, non-throwing.
-- **Interfaces:** Called as part of `deno task check` pipeline in
-  `scripts/check.ts` main sequence, alongside `pipelineIntegrity()` and
+  `workflowIntegrity()` (§3.8): catch + report, non-throwing.
+- **Interfaces:** Called as part of `deno task check` sequence in
+  `scripts/check.ts` main sequence, alongside `workflowIntegrity()` and
   `agentListAccuracy()`.
 - **Deps:** `engine/config.ts` (`loadConfig` function).
 
@@ -467,11 +467,11 @@ graph LR
 - **Purpose:** `--help`/`-h` support for `scripts/self_runner.ts` and
   `scripts/loop_in_claude.ts`. Each script gets inline `printUsage()` following
   `engine/cli.ts` format (description, usage, options, examples).
-- **`scripts/self_runner.ts`:** `printUsage()` describes pipeline loop runner.
+- **`scripts/self_runner.ts`:** `printUsage()` describes workflow loop runner.
   Usage: `deno task loop [interval] [-- claude-args...]`. `--help`/`-h` →
   print + exit 0. Unknown `--`-prefixed flags → error + exit 1. Exported
   `printUsage()`/`checkArgs()` for unit testing.
-- **`scripts/loop_in_claude.ts`:** `printUsage()` describes in-Claude pipeline
+- **`scripts/loop_in_claude.ts`:** `printUsage()` describes in-Claude workflow
   runner. Usage: `deno task loop-in-claude [claude-args...]`. `--help`/`-h`
   detected before passthrough to Claude CLI. Exported helpers for unit testing.
 - **Pattern:** Identical to `engine/cli.ts`: static string, `Deno.args` scan,
@@ -493,7 +493,7 @@ graph LR
 
 - **Purpose:** Validate `AGENTS.md` lists exactly 6 active agents with no
   deprecated entries. Runs as part of `deno task check` alongside
-  `pipelineIntegrity()` (§3.8).
+  `workflowIntegrity()` (§3.8).
 - **Implementation:** `agentListAccuracy()` in `scripts/check.ts`:
   1. Reads `AGENTS.md` content.
   2. Extracts agent list from Project Vision section (parenthetical list after
@@ -505,8 +505,8 @@ graph LR
   5. Reports pass/fail with descriptive messages per check.
 - **Validation flow:** `agentListAccuracy()` → `Deno.readTextFile("AGENTS.md")`
   → string matching against expected/deprecated lists → error collection →
-  report. Pattern follows `pipelineIntegrity()`: catch + report, non-throwing.
-- **Interfaces:** Called as part of `deno task check` pipeline in
+  report. Pattern follows `workflowIntegrity()`: catch + report, non-throwing.
+- **Interfaces:** Called as part of `deno task check` sequence in
   `scripts/check.ts` main sequence. No separate CLI entry point.
 - **Deps:** None (reads `AGENTS.md` directly, no engine dependency).
 
@@ -524,11 +524,11 @@ graph LR
   task. Commit messages follow `sdlc(impl): <summary>` format.
 - **PR creation:** Tech-lead creates draft PR (`gh pr create --draft`) before
   impl-loop. Developer pushes to same branch. QA posts PR review verdicts.
-- **Post-pipeline:** Tech-lead-review performs final review + CI gate + merge.
+- **Post-workflow:** Tech-lead-review performs final review + CI gate + merge.
 - **Engine invariant:** Engine does NOT auto-commit (FR-14 preserved). All git
   operations happen inside agent prompts.
 - **Failure behavior:** Failed nodes produce no commits. On_error: "fail" stops
-  pipeline; "continue" proceeds to next nodes. Each failed `NodeState` gets
+  workflow; "continue" proceeds to next nodes. Each failed `NodeState` gets
   `error_category?: ErrorCategory` — domain-agnostic enum:
   `continuations_exhausted | timeout | cli_crash | hook_failure | hitl_timeout |
   aborted | unknown`. Set by engine at failure point; downstream agents map
@@ -548,20 +548,20 @@ graph LR
   Combined with engine FR-E36 parse-time cross-check, guarantees
   `condition_field: verdict` is contractually declared in the condition node.
 - **Pre-Run Auto-Stash (FR-S41):** `reset-to-main.sh` (invoked via `pre_run:`
-  in `pipeline.yaml`) preserves uncommitted changes before destructive reset.
+  in `workflow.yaml`) preserves uncommitted changes before destructive reset.
   Flow: `git status --porcelain` → if non-empty: display branch name
   (`git branch --show-current`), diff stat (`git diff --stat HEAD`,
   `git diff --stat --cached`, untracked list), stash
   (`git stash push --include-untracked -m "flowai-workflow pre_run: <ISO timestamp>"`),
   display stash ref + restore command (`git stash pop`). If clean: silent
   proceed. Post-stash: existing fetch/checkout/reset/clean unchanged. Stash
-  failure → pipeline abort (script uses `set -euo pipefail`).
+  failure → workflow abort (script uses `set -euo pipefail`).
 - **Secret Detection**: `gitleaks detect --no-git` runs as part of
   `deno task check` (`scripts/check.ts`). `allowFailure=true` — skips if
   gitleaks binary not found. Engine-level `safetyCheckDiff()` removed.
-- **Tech-Lead-Review Node**: Post-pipeline agent (`run_on: always`). Performs
+- **Tech-Lead-Review Node**: Post-workflow agent (`run_on: always`). Performs
   final code review, checks CI gates, merges PR if all pass. Handles
-  missing-PR case gracefully (no-op with clear message when pipeline failed
+  missing-PR case gracefully (no-op with clear message when workflow failed
   before tech-lead created PR). **After-hook observability (FR-S36):**
   `after:` field invokes `.flowai-workflow/scripts/run-dashboard.sh {{run_dir}}`
   (replaces `deno task dashboard ... || true`). Wrapper runs dashboard
@@ -577,7 +577,7 @@ graph LR
      `tool_name == "AskUserQuestion"`: extract `tool_input.questions` (structured
      question with `question`, `header`, `options[]`, `multiSelect`) and
      `session_id` from result.
-  3. Engine calls `defaults.hitl.ask_script` (external pipeline script) with
+  3. Engine calls `defaults.hitl.ask_script` (external workflow script) with
      question JSON + context args (repo, issue, run-id, node-id).
   4. Engine sets node state to `waiting` in `state.json`, saves `session_id`.
   5. Engine enters poll loop: `sleep(poll_interval)` → call
@@ -586,7 +586,7 @@ graph LR
      --output-format json`. Agent sees full previous context + reply as new
      user message.
   7. On `timeout` exceeded: node marked `failed`.
-  Pipeline config:
+  Workflow config:
   ```yaml
   defaults:
     on_failure_script: .flowai-workflow/scripts/rollback-uncommitted.sh
@@ -603,8 +603,8 @@ graph LR
 
 ## 6. Non-Functional
 
-- **Scale:** Single pipeline per issue. Sequential stages (no parallel agents).
-- **Fault:** Stage failure stops pipeline, failure reported on issue.
+- **Scale:** Single workflow per issue. Sequential stages (no parallel agents).
+- **Fault:** Stage failure stops workflow, failure reported on issue.
 - **Sec:** Secret detection via `gitleaks detect --no-git` in `deno task check`
   (`scripts/check.ts`). Engine-level scope checks removed. Agents run with
   local user's permissions.
@@ -615,7 +615,7 @@ graph LR
 ## 7. Constraints
 
 - **Simplified:** Pipeline runs sequentially (no parallel stages in v1).
-- **Deferred:** Multi-repo support. Parallel pipelines for multiple issues.
+- **Deferred:** Multi-repo support. Parallel workflows for multiple issues.
   Issue size/complexity limits. Cost budget limits and alerts (per-node cost
   aggregation implemented in FR-32; budget enforcement deferred).
 
@@ -637,11 +637,11 @@ All FR evidence for issue #15 is complete:
   evidence recorded — `scripts/generate-dashboard.ts` (`streamLogHref`,
   `.log-link` CSS). Tests in `scripts/generate-dashboard_test.ts`.
 - **FR-42 (Agent Output Summary):** Already implemented. All 6 agent SKILL.md
-  files document `## Summary` in output format. `pipeline.yaml` enforces
+  files document `## Summary` in output format. `workflow.yaml` enforces
   `contains_section: Summary` on 5 agent nodes (`specification`, `design`,
   `decision`, `verify`, `tech-lead-review`); Developer (`build`) enforced via
   `custom_script: deno task check`. Evidence:
-  `.flowai-workflow/agents/agent-*/SKILL.md` (6 files), `.flowai-workflow/pipeline.yaml`.
+  `.flowai-workflow/agents/agent-*/SKILL.md` (6 files), `.flowai-workflow/workflow.yaml`.
 - **FR-43 (Agent First-Person Voice — GitHub Interactions):** Voice sections
   strengthened with explicit GitHub interaction scope + third example pair per
   agent. Hardcoded `gh issue comment --body` templates in PM, Architect, Tech
@@ -665,7 +665,7 @@ Engine FR evidence (issue #99):
 FR-S24 evidence (issue #96):
 
 - **FR-S24 (Pipeline Config Validation):** Existing implementation satisfies
-  all acceptance criteria. `scripts/check.ts:84-96` (`pipelineIntegrity()`
+  all acceptance criteria. `scripts/check.ts:84-96` (`workflowIntegrity()`
   calls `loadConfig()`), `engine/config.ts:43-103` (schema validation),
   `engine/config.ts:105-249` (node validation — types, inputs, run_on).
   No new code required — Variant A (evidence-only) selected.
@@ -676,7 +676,7 @@ FR-S24 evidence (issue #96):
 - **FR-S25 (Phase-Organized SDLC Artifact Directories):** FR-E9 phase registry
   implemented (`engine/state.ts:20-36`, `engine/engine.ts:129-130`). Artifact
   paths resolve to `.flowai-workflow/runs/<run-id>/<phase>/<node-id>/` for nodes with
-  `phase:` field. SDLC pipeline nodes have `phase:` fields in `pipeline.yaml`
+  `phase:` field. SDLC workflow nodes have `phase:` fields in `workflow.yaml`
   (`plan`, `impl`, `report`). ACs #1-3 marked with evidence. ACs #4-5 pending
   verification (end-to-end run + `deno task check`). Selected Variant A
   (Verification-Only) — no code changes, evidence marking only. Dashboard
@@ -688,23 +688,23 @@ FR-S40 documentation sync (issue #158):
   SDS verified post-FR-S38: §2.2 `phases:` description accurate, §3.4
   `prompt:` correctly marked as removed with `{{file(...)}}` replacement
   documented, §3.4 Interfaces shows current `task_template` pattern. No stale
-  `phases:` or `prompt:` references found in SDS. SRS, pipeline-report, and
+  `phases:` or `prompt:` references found in SDS. SRS, workflow-report, and
   spec-unified-task-template corrections handled by developer.
 
-FR-S42 pipeline validate migration (issue #174):
+FR-S42 workflow validate migration (issue #174):
 
 - **FR-S42 (Migrate Pipeline Validate Rules to Composite Artifact Type):**
-  All 6 agent node validate blocks in `pipeline.yaml` migrated from separate
+  All 6 agent node validate blocks in `workflow.yaml` migrated from separate
   `file_exists` + `file_not_empty` + `contains_section` rules to single
   composite `type: artifact` rule per node. `build` node gains implicit
   `file_not_empty` check (no-op tightening — file with `## Summary` cannot
   be empty). `frontmatter_field` and `custom_script` rules unchanged.
-  Variant C selected. Evidence: `.flowai-workflow/pipeline.yaml` validate blocks.
+  Variant C selected. Evidence: `.flowai-workflow/workflow.yaml` validate blocks.
 
 Engine refactoring (issue #92):
 
 - **engine.ts module size reduction:** Pure engine-scope refactoring — no SDLC
-  pipeline impact. Variant A selected: extract `engine/hitl-handler.ts` (HITL
-  orchestration) and `engine/post-pipeline.ts` (post-pipeline executor) from
+  workflow impact. Variant A selected: extract `engine/hitl-handler.ts` (HITL
+  orchestration) and `engine/post-workflow.ts` (post-workflow executor) from
   `engine/engine.ts`. Target: ≤500 LOC (from 849). Engine public interfaces
-  unchanged; SDLC pipeline transparent to internal restructuring.
+  unchanged; SDLC workflow transparent to internal restructuring.

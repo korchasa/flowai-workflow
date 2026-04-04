@@ -1,5 +1,5 @@
 // scripts/loop_in_claude.ts
-// Autonomous loop: check GitHub issues → run pipeline via claude CLI → repeat.
+// Autonomous loop: check GitHub issues → run workflow via claude CLI → repeat.
 // Streams claude output as JSON and displays in readable format.
 // Exponential backoff (30s → 4h) when no actionable tickets found.
 
@@ -49,8 +49,8 @@ async function fetchActionableIssues(): Promise<
 /** Grace period (ms) after result event before killing a hanging process. */
 const KILL_GRACE_MS = 30_000;
 
-/** Run the pipeline via claude CLI with stream-json output. Returns true on success. */
-async function runPipelineViaClaude(): Promise<boolean> {
+/** Run the workflow via claude CLI with stream-json output. Returns true on success. */
+async function runWorkflowViaClaude(): Promise<boolean> {
   const prompt = Deno.args.join(" ") ||
     "Run the application using `deno task run`. Monitor the output and report the result.";
   console.log(`> claude -p "${prompt}" --output-format stream-json`);
@@ -116,7 +116,7 @@ async function sleep(sec: number): Promise<void> {
 }
 
 export function printUsage(): string {
-  return `Pipeline loop runner (via claude CLI) — check GitHub issues and run pipeline via claude
+  return `Workflow loop runner (via claude CLI) — check GitHub issues and run workflow via claude
 
 Usage:
   deno task loop-in-claude [claude-args...]
@@ -174,12 +174,12 @@ if (import.meta.main) {
       console.log(`  #${i.number} ${i.title}`);
     }
 
-    const ok = await runPipelineViaClaude();
+    const ok = await runWorkflowViaClaude();
     if (ok) {
-      console.log("Pipeline (via claude) completed successfully.");
+      console.log("Workflow (via claude) completed successfully.");
     } else {
       console.error(
-        "Pipeline (via claude) failed. Will re-check issues on next cycle.",
+        "Workflow (via claude) failed. Will re-check issues on next cycle.",
       );
       // Brief pause before retry on failure
       await sleep(MIN_PAUSE_SEC);

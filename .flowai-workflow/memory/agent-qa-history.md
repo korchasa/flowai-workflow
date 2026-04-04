@@ -97,10 +97,10 @@
 - **Turns:** ~6
 - **Cost:** ~$0.16 (est)
 - **Verdict:** FAIL
-- **Outcome:** 7/10 acceptance criteria passed. 514 tests, 0 failures. Implementation correct: mutual-exclusivity validation added to `engine/config.ts` (lines 133–149), `setPhaseRegistry()` simplified to exclusive if/else in `engine/state.ts`, 4 new tests in `config_test.ts`, 2 new tests in `state_test.ts`. `.flowai-workflow/pipeline.yaml` fixed (necessary — engine now rejects both mechanisms). Blocking: `documents/requirements-engine.md` not in diff, 0 matches for FR-E33 — PM agent never added section 3.33, FR-E9 update, or Appendix cross-reference row. Self-approval failed → used `gh issue comment` fallback on issue #150.
+- **Outcome:** 7/10 acceptance criteria passed. 514 tests, 0 failures. Implementation correct: mutual-exclusivity validation added to `engine/config.ts` (lines 133–149), `setPhaseRegistry()` simplified to exclusive if/else in `engine/state.ts`, 4 new tests in `config_test.ts`, 2 new tests in `state_test.ts`. `.flowai-workflow/workflow.yaml` fixed (necessary — engine now rejects both mechanisms). Blocking: `documents/requirements-engine.md` not in diff, 0 matches for FR-E33 — PM agent never added section 3.33, FR-E9 update, or Appendix cross-reference row. Self-approval failed → used `gh issue comment` fallback on issue #150.
 - **Key learnings:**
   - PM-stage SRS persistence failure now extends to engine scope (requirements-engine.md), not just sdlc scope. Same grep-first strategy applies.
-  - `pipeline.yaml` modification is expected and necessary when engine enforcement would break it — not out-of-scope.
+  - `workflow.yaml` modification is expected and necessary when engine enforcement would break it — not out-of-scope.
   - State test at line 408 retains "falls back" name semantically (implies old dual-mechanism), but body is correct — non-blocking.
   - 514 tests (up from 509) confirms new config_test.ts + state_test.ts tests added.
 
@@ -109,7 +109,7 @@
 - **Turns:** ~5
 - **Cost:** ~$0.14 (est)
 - **Verdict:** FAIL
-- **Outcome:** 7/9 acceptance criteria passed. 519 tests, 0 failures. All 5 implementation tasks correct: pipeline.yaml uses `{{input.specification}}/01-spec.md` (line 23), `interpolate()` in `hitl.ts:buildScriptArgs()` (line 264), template resolution test in `hitl_test.ts` (lines 232–277), `validateHitlArtifactSource()` + `hitlArtifactSource()` in `check.ts` (lines 110–146), 4 tests in `check_test.ts` (lines 109–130). Blocking: `documents/requirements-sdlc.md` not in diff, 0 matches for FR-S35 — PM agent never added section 3.35 or Appendix C row. Self-approval failed → used `gh issue comment` fallback on issue #151.
+- **Outcome:** 7/9 acceptance criteria passed. 519 tests, 0 failures. All 5 implementation tasks correct: workflow.yaml uses `{{input.specification}}/01-spec.md` (line 23), `interpolate()` in `hitl.ts:buildScriptArgs()` (line 264), template resolution test in `hitl_test.ts` (lines 232–277), `validateHitlArtifactSource()` + `hitlArtifactSource()` in `check.ts` (lines 110–146), 4 tests in `check_test.ts` (lines 109–130). Blocking: `documents/requirements-sdlc.md` not in diff, 0 matches for FR-S35 — PM agent never added section 3.35 or Appendix C row. Self-approval failed → used `gh issue comment` fallback on issue #151.
 - **Key learnings:**
   - PM-stage SRS persistence failure confirmed again (6th consecutive issue: #147, #148, #149, #150, #151). Grep for FR number as 1st action after git diff — pattern is 100% reliable now.
   - 519 tests (up from 514) confirms new hitl_test + check_test tests were added.
@@ -120,11 +120,11 @@
 - **Turns:** ~6
 - **Cost:** ~$0.16 (est)
 - **Verdict:** PASS
-- **Outcome:** All 10 acceptance criteria passed. 514 tests, 0 failures. FR-E33 present at line 665 (section 3.33), FR-E9 updated at line 180, Appendix row at line 751. Implementation confirmed: mutual-exclusivity validation in config.ts (lines 133–149), setPhaseRegistry() exclusive if/else in state.ts (lines 28–45), 4 config tests + 2 state tests all passing. pipeline.yaml fixed. One non-blocking: stale test name "falls back" at state_test.ts:408 (body correct). Self-approval failed → used `gh issue comment` fallback on issue #150.
+- **Outcome:** All 10 acceptance criteria passed. 514 tests, 0 failures. FR-E33 present at line 665 (section 3.33), FR-E9 updated at line 180, Appendix row at line 751. Implementation confirmed: mutual-exclusivity validation in config.ts (lines 133–149), setPhaseRegistry() exclusive if/else in state.ts (lines 28–45), 4 config tests + 2 state tests all passing. workflow.yaml fixed. One non-blocking: stale test name "falls back" at state_test.ts:408 (body correct). Self-approval failed → used `gh issue comment` fallback on issue #150.
 - **Key learnings:**
   - Parallel strategy (deno task check + git diff + gh issue view + grep FR-E33) confirmed PASS in one parallel turn — all SRS changes present.
   - When SRS file IS in diff and grep confirms FR presence at all promised locations, proceed directly to source file read — no further SRS investigation needed.
-  - Pipeline.yaml fix (removing dual-mechanism usage) is always expected when engine adds a new validation rule that rejects it.
+  - Workflow.yaml fix (removing dual-mechanism usage) is always expected when engine adds a new validation rule that rejects it.
   - 10 ACs across SRS + config implementation + state implementation + tests is the correct decomposition for this class of issue.
 
 ## 2026-03-19T29:XX — Issue #152 (iteration 1)
@@ -156,12 +156,12 @@
 - **Turns:** ~5
 - **Cost:** ~$0.12 (est)
 - **Verdict:** PASS
-- **Outcome:** All 7 acceptance criteria passed. 528 tests, 0 failures. FR-S36 present at line 821 (section 3.36) and Appendix C at line 968 — blocking issue from iteration 1 resolved. Implementation: `run-dashboard.sh` wrapper (warns on failure, exits 0), `pipeline.yaml` `after:` updated to `.flowai-workflow/scripts/run-dashboard.sh {{run_dir}}` (line 180), `on_error: continue` and `run_on: always` retained. Self-approval failed → used `gh issue comment` fallback on issue #154.
+- **Outcome:** All 7 acceptance criteria passed. 528 tests, 0 failures. FR-S36 present at line 821 (section 3.36) and Appendix C at line 968 — blocking issue from iteration 1 resolved. Implementation: `run-dashboard.sh` wrapper (warns on failure, exits 0), `workflow.yaml` `after:` updated to `.flowai-workflow/scripts/run-dashboard.sh {{run_dir}}` (line 180), `on_error: continue` and `run_on: always` retained. Self-approval failed → used `gh issue comment` fallback on issue #154.
 - **Key learnings:**
   - PM-stage SRS persistence failure for issue #154 was fixed in iteration 2 — `requirements-sdlc.md` IS in diff and FR-S36 found at lines 821 and 968.
   - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S36) confirmed PASS in one parallel turn — optimal pattern for fix iterations.
   - 528 tests unchanged from iteration 1 — no new tests needed for this sdlc-only change.
-  - SDLC pipeline pattern (wrapper script replacing `|| true`) is correct approach for observable non-blocking after-script failures.
+  - SDLC workflow pattern (wrapper script replacing `|| true`) is correct approach for observable non-blocking after-script failures.
 
 ## 2026-03-20T42:XX — Issue #159 (iteration 1)
 
@@ -179,9 +179,9 @@
 - **Turns:** ~5
 - **Cost:** ~$0.12 (est)
 - **Verdict:** FAIL
-- **Outcome:** 8/9 criteria passed. 533 tests, 0 failures. Pipeline.yaml implementation fully correct: all 6 nodes use `type: artifact` with correct sections; `frontmatter_field` rules for specification (issue, scope) and verify (verdict) preserved; `custom_script` in build preserved; deno task check passes. Blocking: `documents/requirements-sdlc.md` not in diff, 0 matches for FR-S42 — PM-stage SRS persistence failure (16th consecutive: #147–#174). Self-request-changes failed (author = reviewer) → used `gh issue comment` fallback on issue #174.
+- **Outcome:** 8/9 criteria passed. 533 tests, 0 failures. Workflow.yaml implementation fully correct: all 6 nodes use `type: artifact` with correct sections; `frontmatter_field` rules for specification (issue, scope) and verify (verdict) preserved; `custom_script` in build preserved; deno task check passes. Blocking: `documents/requirements-sdlc.md` not in diff, 0 matches for FR-S42 — PM-stage SRS persistence failure (16th consecutive: #147–#174). Self-request-changes failed (author = reviewer) → used `gh issue comment` fallback on issue #174.
 - **Key learnings:**
-  - PM-stage SRS persistence failure continues (16th consecutive). Pipeline config-only changes are no exception to the SRS verification step.
+  - PM-stage SRS persistence failure continues (16th consecutive). Workflow config-only changes are no exception to the SRS verification step.
   - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S42) confirmed FAIL in one parallel turn — optimal pattern.
   - `design-sdlc.md` IS in diff (Tech Lead SDS update) but spec doesn't promise it — not a blocking issue.
 
@@ -335,9 +335,9 @@
 - **Turns:** ~8
 - **Cost:** ~$0.14 (est)
 - **Verdict:** PASS
-- **Outcome:** All 8 acceptance criteria passed. 533 tests, 0 failures. FR-S42 present at line 972 (§3.42, all 8 ACs marked [x]) and Appendix C at line 1128 — blocking issue from iteration 1 resolved. `requirements-sdlc.md` IS in diff. pipeline.yaml: 6/6 nodes use `type: artifact`; `frontmatter_field` (spec: issue, scope; verify: verdict) and `custom_script` (build) preserved. Self-approval failed → used `gh issue comment` fallback on issue #174.
+- **Outcome:** All 8 acceptance criteria passed. 533 tests, 0 failures. FR-S42 present at line 972 (§3.42, all 8 ACs marked [x]) and Appendix C at line 1128 — blocking issue from iteration 1 resolved. `requirements-sdlc.md` IS in diff. workflow.yaml: 6/6 nodes use `type: artifact`; `frontmatter_field` (spec: issue, scope; verify: verdict) and `custom_script` (build) preserved. Self-approval failed → used `gh issue comment` fallback on issue #174.
 - **Key learnings:**
   - PM-stage SRS persistence failure for issue #174 resolved in iteration 2 — `requirements-sdlc.md` in diff with FR-S42 at lines 972 and 1128.
-  - Config-only changes (pipeline.yaml) with no TypeScript/test changes: test count stays at 533 — non-blocking.
+  - Config-only changes (workflow.yaml) with no TypeScript/test changes: test count stays at 533 — non-blocking.
   - 16th consecutive pattern: PM stage fails on iter 1, dev restores on iter 2. Pattern continues unchanged.
   - Parallel strategy (deno task check + git diff + gh issue view + grep FR-S42) confirmed PASS in one turn — optimal fix-iteration pattern.

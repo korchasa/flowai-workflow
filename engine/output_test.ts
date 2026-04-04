@@ -25,7 +25,7 @@ Deno.test("OutputManager — constructs with verbose verbosity", () => {
 
 Deno.test("RunSummary — structure", () => {
   const summary: RunSummary = {
-    name: "test-pipeline",
+    name: "test-workflow",
     runId: "20260308T143022",
     status: "completed",
     durationMs: 125000,
@@ -42,7 +42,7 @@ Deno.test("RunSummary — structure", () => {
 
 Deno.test("RunSummary — with failures", () => {
   const summary: RunSummary = {
-    name: "test-pipeline",
+    name: "test-workflow",
     runId: "20260308T143022",
     status: "failed",
     durationMs: 60000,
@@ -336,7 +336,7 @@ Deno.test("summary — renders node results when nodeResults present", () => {
   const cap = createCapture();
   const out = new OutputManager("normal", cap.writer);
   const stats: RunSummary = {
-    name: "test-pipeline",
+    name: "test-workflow",
     runId: "20260308T143022",
     status: "completed",
     durationMs: 60000,
@@ -361,7 +361,7 @@ Deno.test("summary — omits node results section when nodeResults absent", () =
   const cap = createCapture();
   const out = new OutputManager("normal", cap.writer);
   const stats: RunSummary = {
-    name: "test-pipeline",
+    name: "test-workflow",
     runId: "20260308T143022",
     status: "completed",
     durationMs: 60000,
@@ -373,7 +373,7 @@ Deno.test("summary — omits node results section when nodeResults absent", () =
   out.summary(stats);
   const joined = cap.lines.join("");
   // Should still have the standard fields
-  assertEquals(joined.includes("Pipeline:"), true);
+  assertEquals(joined.includes("Workflow:"), true);
   assertEquals(joined.includes("Status:"), true);
   // No extra result lines
   assertEquals(joined.includes("RESULT:"), false);
@@ -383,7 +383,7 @@ Deno.test("summary — renders standard fields correctly", () => {
   const cap = createCapture();
   const out = new OutputManager("normal", cap.writer);
   const stats: RunSummary = {
-    name: "my-pipeline",
+    name: "my-workflow",
     runId: "20260308T143022",
     status: "failed",
     durationMs: 125000,
@@ -394,7 +394,7 @@ Deno.test("summary — renders standard fields correctly", () => {
   };
   out.summary(stats);
   const joined = cap.lines.join("");
-  assertEquals(joined.includes("my-pipeline"), true);
+  assertEquals(joined.includes("my-workflow"), true);
   assertEquals(joined.includes("20260308T143022"), true);
   assertEquals(joined.includes("failed"), true);
   assertEquals(joined.includes("3/5 completed"), true);

@@ -1,9 +1,9 @@
 import type {
   EngineOptions,
   NodeConfig,
-  PipelineConfig,
   RunState,
   TemplateContext,
+  WorkflowConfig,
 } from "./types.ts";
 import type { AgentResult } from "./agent.ts";
 import {
@@ -20,10 +20,10 @@ import { onShutdown } from "./process-registry.ts";
 import { OutputManager } from "./output.ts";
 import type { RunSummary } from "./output.ts";
 import {
-  collectPostPipelineNodes,
-  executePostPipeline,
-  sortPostPipelineNodes,
-} from "./post-pipeline.ts";
+  collectPostWorkflowNodes,
+  executePostWorkflow,
+  sortPostWorkflowNodes,
+} from "./post-workflow.ts";
 import {
   createRunState,
   generateRunId,
@@ -49,9 +49,9 @@ import {
   executeMergeNode,
 } from "./node-dispatch.ts";
 
-/** Main pipeline engine. Orchestrates node execution across DAG levels. */
+/** Main workflow engine. Orchestrates node execution across DAG levels. */
 export class Engine {
-  private config!: PipelineConfig;
+  private config!: WorkflowConfig;
   private state!: RunState;
   private output: OutputManager;
   private options: EngineOptions;
@@ -65,7 +65,7 @@ export class Engine {
     this.userInput = userInput;
   }
 
-  /** Run the pipeline. Main entry point. */
+  /** Run the workflow. Main entry point. */
   async run(): Promise<RunState> {
     this.startTime = Date.now();
 
@@ -93,23 +93,23 @@ export class Engine {
       for (const [id, node] of Object.entries(this.config.nodes)) {
         labels[id] = node.label;
       }
-      const rawPostPipelineIds = collectPostPipelineNodes(this.config.nodes);
-      const postPipelineNodeIds = sortPostPipelineNodes(
-        rawPostPipelineIds,
+      const rawPostWorkflowIds = collectPostWorkflowNodes(this.config.nodes);
+      const postWorkflowNodeIds = sortPostWorkflowNodes(
+        rawPostWorkflowIds,
         this.config.nodes,
       );
       const filteredLevels = levels
-        .map((level) => level.filter((id) => !postPipelineNodeIds.includes(id)))
+        .map((level) => level.filter((id) => !postWorkflowNodeIds.includes(id)))
         .filter((level) => level.length > 0);
       const runOnMap: Record<string, string> = {};
-      for (const id of postPipelineNodeIds) {
+      for (const id of postWorkflowNodeIds) {
         const node = this.config.nodes[id];
         if (node.run_on) runOnMap[id] = node.run_on;
       }
       this.output.dryRunPlan(
         filteredLevels,
         labels,
-        postPipelineNodeIds,
+        postWorkflowNodeIds,
         runOnMap,
       );
       return this.createDryRunState(levels);
@@ -132,7 +132,7 @@ export class Engine {
       );
     }
 
-    // Acquire pipeline lock (prevents parallel runs)
+    // Acquire workflow lock (prevents parallel runs)
     const lockPath = this.options.lock_path ?? defaultLockPath();
     await acquireLock(lockPath, this.state.run_id);
 
@@ -156,7 +156,7 @@ export class Engine {
     }
   }
 
-  /** Execute the pipeline after lock is acquired. */
+  /** Execute the workflow after lock is acquired. */
   private async runWithLock(
     levels: string[][],
     _lockPath: string,
@@ -181,54 +181,54 @@ export class Engine {
       );
     }
 
-    // Identify post-pipeline nodes (run_on set) — execute after all DAG levels
-    // Sort topologically so dependencies within post-pipeline subset are respected
-    const rawPostPipelineIds = collectPostPipelineNodes(this.config.nodes);
-    const postPipelineNodeIds = sortPostPipelineNodes(
-      rawPostPipelineIds,
+    // Identify post-workflow nodes (run_on set) — execute after all DAG levels
+    // Sort topologically so dependencies within post-workflow subset are respected
+    const rawPostWorkflowIds = collectPostWorkflowNodes(this.config.nodes);
+    const postWorkflowNodeIds = sortPostWorkflowNodes(
+      rawPostWorkflowIds,
       this.config.nodes,
     );
 
-    // Filter post-pipeline nodes out of regular DAG levels
+    // Filter post-workflow nodes out of regular DAG levels
     const filteredLevels = levels
-      .map((level) => level.filter((id) => !postPipelineNodeIds.includes(id)))
+      .map((level) => level.filter((id) => !postWorkflowNodeIds.includes(id)))
       .filter((level) => level.length > 0);
 
-    // Ensure post-pipeline node dirs exist
-    for (const nodeId of postPipelineNodeIds) {
+    // Ensure post-workflow node dirs exist
+    for (const nodeId of postWorkflowNodeIds) {
       await Deno.mkdir(getNodeDir(this.state.run_id, nodeId), {
         recursive: true,
       });
     }
 
     // Execute regular levels
-    let pipelineSuccess = true;
+    let workflowSuccess = true;
     try {
       for (const level of filteredLevels) {
         const success = await this.executeLevel(level);
         if (!success) {
-          pipelineSuccess = false;
+          workflowSuccess = false;
           break;
         }
       }
     } catch (err) {
-      pipelineSuccess = false;
+      workflowSuccess = false;
       this.output.error((err as Error).message);
     }
 
-    // Execute post-pipeline nodes (filtered by run_on condition)
-    await executePostPipeline({
-      nodeIds: postPipelineNodeIds,
+    // Execute post-workflow nodes (filtered by run_on condition)
+    await executePostWorkflow({
+      nodeIds: postWorkflowNodeIds,
       nodes: this.config.nodes,
       state: this.state,
-      pipelineSuccess,
+      workflowSuccess,
       failureScript: this.config.defaults?.on_failure_script,
       output: this.output,
       executeNode: (nodeId) => this.executeNode(nodeId),
     });
 
     // Finalize run state
-    if (pipelineSuccess) {
+    if (workflowSuccess) {
       markRunCompleted(this.state);
     } else {
       markRunFailed(this.state);
@@ -407,7 +407,7 @@ export class Engine {
   ): TemplateContext {
     const node = findNodeConfig(this.config, nodeId);
     if (!node) {
-      throw new Error(`Node '${nodeId}' not found in pipeline config`);
+      throw new Error(`Node '${nodeId}' not found in workflow config`);
     }
     const input: Record<string, string> = {};
 
@@ -498,7 +498,7 @@ export class Engine {
 /**
  * Execute the pre_run shell script before full config loading.
  * Enables self-healing workflows (e.g. reset to stable branch).
- * Throws on script failure — pipeline cannot start from unstable state.
+ * Throws on script failure — workflow cannot start from unstable state.
  */
 export async function runPreRunScript(
   scriptPath: string,
@@ -526,8 +526,8 @@ export async function runPreRunScript(
 /**
  * Execute prepare_command once before the node level loop on fresh runs.
  * Supports template interpolation for run_dir, run_id, env.*, args.*.
- * node_dir and input.* resolve to empty string (not meaningful at pipeline scope).
- * Throws on non-zero exit — caller saves state and pipeline aborts (FR-E30).
+ * node_dir and input.* resolve to empty string (not meaningful at workflow scope).
+ * Throws on non-zero exit — caller saves state and workflow aborts (FR-E30).
  * Call site guards with !options.resume so this is skipped on resumed runs.
  */
 export async function runPrepareCommand(

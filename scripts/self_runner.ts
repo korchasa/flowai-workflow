@@ -1,8 +1,8 @@
 /**
  * @module
- * Autonomous pipeline loop runner.
+ * Autonomous workflow loop runner.
  * Polls GitHub for open issues (excluding "in-progress"), runs the engine
- * pipeline when actionable issues exist, and applies exponential backoff
+ * workflow when actionable issues exist, and applies exponential backoff
  * (30 s → 4 h) when the queue is empty. Run via: deno task loop
  */
 
@@ -69,11 +69,11 @@ function loadEnvFile(envOverrides: Record<string, string>): void {
   }
 }
 
-/** Run the pipeline via direct Engine import. Returns true on success. */
-async function runPipeline(): Promise<boolean> {
+/** Run the workflow via direct Engine import. Returns true on success. */
+async function runWorkflow(): Promise<boolean> {
   console.log("> Engine.run()");
   try {
-    const options = parseArgs(["--config", ".flowai-workflow/pipeline.yaml"]);
+    const options = parseArgs(["--config", ".flowai-workflow/workflow.yaml"]);
     loadEnvFile(options.env_overrides);
     const engine = new Engine(options);
     const state = await engine.run();
@@ -97,7 +97,7 @@ async function sleep(sec: number): Promise<void> {
 }
 
 export function printUsage(): string {
-  return `Pipeline loop runner — check GitHub issues and run pipeline repeatedly
+  return `Workflow loop runner — check GitHub issues and run workflow repeatedly
 
 Usage:
   deno task loop
@@ -160,11 +160,11 @@ if (import.meta.main) {
       console.log(`  #${i.number} ${i.title}`);
     }
 
-    const ok = await runPipeline();
+    const ok = await runWorkflow();
     if (ok) {
-      console.log("Pipeline completed successfully.");
+      console.log("Workflow completed successfully.");
     } else {
-      console.error("Pipeline failed. Will re-check issues on next cycle.");
+      console.error("Workflow failed. Will re-check issues on next cycle.");
       // Brief pause before retry on failure
       await sleep(MIN_PAUSE_SEC);
     }

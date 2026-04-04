@@ -1,4 +1,4 @@
-# Pipeline configuration — 6-node SDLC flow (FR-26, FR-33).
+# Workflow configuration — 6-node SDLC flow (FR-26, FR-33).
 # DAG: specification → design → decision → implementation(build, verify)
 #      ; tech-lead-review(run_on:always)
 # See: documents/requirements-sdlc.md for stage specifications.
@@ -163,7 +163,7 @@ nodes:
             field: verdict
             allowed: [PASS, FAIL]
 
-  # Post-pipeline: Tech Lead Review — final review + CI gate + merge
+  # Post-workflow: Tech Lead Review — final review + CI gate + merge
   tech-lead-review:
     type: agent
     label: "Tech Lead Review — Final Review + CI + Merge"

@@ -6,7 +6,7 @@ Universal DAG-based engine for orchestrating AI agents. Define agent workflows a
 
 ```mermaid
 graph TD
-    CLI["CLI<br/>deno task run"] --> ConfigLoader["Config Loader<br/>YAML → PipelineConfig"]
+    CLI["CLI<br/>deno task run"] --> ConfigLoader["Config Loader<br/>YAML → WorkflowConfig"]
     ConfigLoader --> DAG["DAG Builder<br/>toposort → levels"]
     DAG --> Executor["Level Executor<br/>sequential per level"]
 
@@ -21,15 +21,15 @@ graph TD
     Validate -->|fail| Continue["Continuation<br/>resume with error context"]
     Continue --> Agent
     Validate -->|pass| State["State Manager<br/>state.json"]
-    State --> Next["Next Level / Post-pipeline"]
+    State --> Next["Next Level / Post-workflow"]
 
-    Executor --> PostPipeline["Post-Pipeline Nodes<br/>run_on: always|success|failure"]
-    PostPipeline --> Summary["Run Summary<br/>cost, duration, results"]
+    Executor --> PostWorkflow["Post-Workflow Nodes<br/>run_on: always|success|failure"]
+    PostWorkflow --> Summary["Run Summary<br/>cost, duration, results"]
 ```
 
 ## Core Concepts
 
-The engine (`engine/`, Deno/TypeScript) reads a YAML pipeline config and builds a directed acyclic graph (DAG) of nodes. Nodes are topologically sorted into levels and executed sequentially.
+The engine (`engine/`, Deno/TypeScript) reads a YAML workflow config and builds a directed acyclic graph (DAG) of nodes. Nodes are topologically sorted into levels and executed sequentially.
 
 Four node types:
 
@@ -42,9 +42,9 @@ Inter-agent communication uses structured Markdown artifacts in `<runs-dir>/<run
 
 ## Features
 
-- **YAML-driven DAG** — declarative pipeline definition, no hardcoded stage order
+- **YAML-driven DAG** — declarative workflow definition, no hardcoded stage order
 - **Domain-agnostic** — engine contains no git/GitHub/SDLC logic; any workflow expressible as a DAG
-- **Pipeline-independent** — engine does not reference concrete node names or artifact filenames; one engine, many pipelines
+- **Workflow-independent** — engine does not reference concrete node names or artifact filenames; one engine, many workflows
 - **Loop nodes** — iterative cycles with configurable exit conditions and max iterations
 - **HITL support** — human interaction nodes for manual decisions or approvals
 - **Validation** — rule-based checks per node (file_exists, file_not_empty, contains_section, custom_script, frontmatter_field)
@@ -54,7 +54,7 @@ Inter-agent communication uses structured Markdown artifacts in `<runs-dir>/<run
 ## Quick Start
 
 ```bash
-# Run a pipeline
+# Run a workflow
 deno task run
 
 # Pass additional context
@@ -76,7 +76,7 @@ Options:
   --prompt <text>     Additional context passed to first agent
   --resume <run-id>   Resume a previous run (skip completed nodes)
   --dry-run           Validate config and show DAG without executing
-  --config <path>     Custom pipeline config (default: .flowai-workflow/pipeline.yaml)
+  --config <path>     Custom workflow config (default: .flowai-workflow/workflow.yaml)
   --skip <nodes>      Comma-separated node IDs to skip
   --only <nodes>      Run only specified nodes
   --env KEY=VAL       Set environment variable for the run
@@ -87,7 +87,7 @@ Options:
 
 ## Configuration
 
-Pipeline behavior is defined in a YAML config file. Key settings under `defaults:`:
+Workflow behavior is defined in a YAML config file. Key settings under `defaults:`:
 
 - `max_continuations` — max agent re-invocations on validation failure (default: 3)
 - `max_parallel` — concurrent node execution limit (default: 2)
@@ -96,9 +96,9 @@ Pipeline behavior is defined in a YAML config file. Key settings under `defaults
 
 Node-level overrides are supported for all defaults.
 
-## Example: SDLC Pipeline
+## Example: SDLC Workflow
 
-The engine is developed using its own SDLC pipeline (dogfooding). This pipeline automates the full software development lifecycle — from GitHub Issue triage to merged PR — via a chain of specialized AI agents.
+The engine is developed using its own SDLC workflow (dogfooding). This workflow automates the full software development lifecycle — from GitHub Issue triage to merged PR — via a chain of specialized AI agents.
 
 ```mermaid
 graph TD
@@ -124,7 +124,7 @@ graph TD
     verify -- "verdict: PASS" --> review
 ```
 
-Pipeline config: `.flowai-workflow/pipeline.yaml`
+Workflow config: `.flowai-workflow/workflow.yaml`
 
 | Node | Phase | Role | Output |
 |------|-------|------|--------|
@@ -134,7 +134,7 @@ Pipeline config: `.flowai-workflow/pipeline.yaml`
 | `implementation` | impl | Developer+QA loop (max 3 iterations) | implementation + `05-qa-report.md` |
 | `tech-lead-review` | report | Tech Lead Review — Final Review + Merge (run_on: always) | `06-review.md` |
 
-All 6 pipeline agents are native Claude Code subagents in `.claude/agents/agent-<name>.md`:
+All 6 workflow agents are native Claude Code subagents in `.claude/agents/agent-<name>.md`:
 
 - `/agent-pm` — Project Manager (specification)
 - `/agent-architect` — Architect (design-solution plan)
@@ -149,7 +149,7 @@ All 6 pipeline agents are native Claude Code subagents in `.claude/agents/agent-
 ```
 engine/                          # DAG executor engine (Deno/TypeScript)
 .flowai-workflow/
-  pipeline.yaml                  # SDLC pipeline config (example)
+  workflow.yaml                  # SDLC workflow config (example)
   agents/                        # Agent prompts (symlinked from .claude/skills/)
     agent-pm/SKILL.md
     agent-architect/SKILL.md
@@ -162,9 +162,9 @@ engine/                          # DAG executor engine (Deno/TypeScript)
   scripts/                       # HITL scripts
 documents/
   requirements-engine.md         # SRS — Engine scope
-  requirements-sdlc.md           # SRS — SDLC Pipeline scope
+  requirements-sdlc.md           # SRS — SDLC Workflow scope
   design-engine.md               # SDS — Engine scope
-  design-sdlc.md                 # SDS — SDLC Pipeline scope
+  design-sdlc.md                 # SDS — SDLC Workflow scope
 scripts/
   check.ts                       # Full verification: fmt, lint, test, gitleaks
 ```
@@ -185,8 +185,8 @@ chmod +x flowai-workflow-darwin-arm64 && mv flowai-workflow-darwin-arm64 flowai-
 # Verify
 ./flowai-workflow --version
 
-# Run a pipeline
-./flowai-workflow --config .flowai-workflow/pipeline.yaml
+# Run a workflow
+./flowai-workflow --config .flowai-workflow/workflow.yaml
 ```
 
 Alternatively, run directly with Deno (see Prerequisites below).
@@ -196,13 +196,13 @@ Alternatively, run directly with Deno (see Prerequisites below).
 - [Deno](https://deno.land/) runtime (required only if not using a pre-built binary)
 - Docker / devcontainer (runtime environment)
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (`claude`)
-- [`gh` CLI](https://cli.github.com/) for GitHub API interaction (SDLC pipeline)
+- [`gh` CLI](https://cli.github.com/) for GitHub API interaction (SDLC workflow)
 - Git
 
 ## Development Commands
 
 ```bash
-deno task run              # Run the pipeline
+deno task run              # Run the workflow
 deno task check            # Full verification: format, lint, test, gitleaks
 deno task test             # Run all tests
 deno task test:engine      # Run engine tests only

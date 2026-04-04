@@ -1,12 +1,12 @@
 #!/usr/bin/env -S deno run -A
 /**
  * @module
- * CLI entry point for the pipeline engine.
+ * CLI entry point for the workflow engine.
  * Parses arguments and delegates to {@link Engine}.
  * Usage: deno task run [options]
  *
  * Options:
- *   --config <path>       Pipeline config file (default: .flowai-workflow/pipeline.yaml)
+ *   --config <path>       Workflow config file (default: .flowai-workflow/workflow.yaml)
  *   --prompt <text>       Additional context for PM agent (sets args.prompt)
  *   --resume <run-id>     Resume a previous run from its state
  *   --dry-run             Print execution plan without running
@@ -37,7 +37,7 @@ export function getVersionString(): string {
  * set dedicated fields. Generic `--key value` pairs populate `args`.
  */
 export function parseArgs(args: string[]): EngineOptions {
-  let configPath = ".flowai-workflow/pipeline.yaml";
+  let configPath = ".flowai-workflow/workflow.yaml";
   let runId: string | undefined;
   let resume = false;
   let dryRun = false;
@@ -127,13 +127,13 @@ export function parseArgs(args: string[]): EngineOptions {
 
 function printUsage(): void {
   console.log(`
-Pipeline Engine — Configurable multi-agent pipeline runner
+Workflow Engine — Configurable multi-agent workflow runner
 
 Usage:
   deno task run [options]
 
 Options:
-  --config <path>       Pipeline config file (default: .flowai-workflow/pipeline.yaml)
+  --config <path>       Workflow config file (default: .flowai-workflow/workflow.yaml)
   --prompt <text>       Additional context for PM agent (optional)
   --resume <run-id>     Resume a previous run
   --dry-run             Print execution plan without running

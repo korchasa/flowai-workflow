@@ -1,22 +1,22 @@
 /**
- * Type declarations for the configurable node-based pipeline engine.
+ * Type declarations for the configurable node-based workflow engine.
  * No logic — pure type definitions.
  */
 
-// --- Pipeline Configuration (parsed from YAML) ---
+// --- Workflow Configuration (parsed from YAML) ---
 
-/** Top-level pipeline configuration. */
-export interface PipelineConfig {
-  /** Pipeline identifier used in logs and state files. */
+/** Top-level workflow configuration. */
+export interface WorkflowConfig {
+  /** Workflow identifier used in logs and state files. */
   name: string;
   /** Config schema version; only "1" is currently supported. */
   version: "1";
-  /** Shell script executed before config is fully loaded and pipeline starts.
+  /** Shell script executed before config is fully loaded and workflow starts.
    * Enables self-healing (e.g. reset to stable branch). The engine reads only
    * this field first, runs the script, then re-reads the full config. */
   pre_run?: string;
   /** Global defaults applied to all nodes unless overridden at node level. */
-  defaults?: PipelineDefaults;
+  defaults?: WorkflowDefaults;
   /** Global environment variables accessible via `{{env.<key>}}` in templates. */
   env?: Record<string, string>;
   /** DAG node definitions keyed by unique node ID. */
@@ -27,7 +27,7 @@ export interface PipelineConfig {
 }
 
 /** Global defaults applied to all nodes unless overridden. */
-export interface PipelineDefaults extends NodeSettings {
+export interface WorkflowDefaults extends NodeSettings {
   /** Maximum parallel node executions; 0 means unlimited (default). */
   max_parallel?: number;
   /** Extra CLI args forwarded to every claude invocation (e.g. ["--dangerously-skip-permissions"]). */
@@ -36,15 +36,15 @@ export interface PipelineDefaults extends NodeSettings {
   model?: string;
   /** Human-in-the-loop config: ask/check scripts, poll interval, timeout. */
   hitl?: HitlConfig;
-  /** Path to script executed when the pipeline fails (FR-34). */
+  /** Path to script executed when the workflow fails (FR-34). */
   on_failure_script?: string;
   /** Shell command executed once before the node level loop on fresh runs.
    * Supports template interpolation (run_dir, run_id, env.*, args.*).
-   * Skipped on resume. Non-zero exit aborts the pipeline (FR-E30). */
+   * Skipped on resume. Non-zero exit aborts the workflow (FR-E30). */
   prepare_command?: string;
 }
 
-/** Configuration for a single pipeline node. */
+/** Configuration for a single workflow node. */
 export interface NodeConfig {
   /** Determines execution behavior: agent (Claude CLI), merge, loop, or human prompt. */
   type: "agent" | "merge" | "loop" | "human";
@@ -97,7 +97,7 @@ export interface NodeConfig {
   question?: string;
   /** Allowed response values for the human prompt. */
   options?: string[];
-  /** Response values that cause the pipeline to abort. */
+  /** Response values that cause the workflow to abort. */
   abort_on?: string[];
 
   /** Optional phase this node belongs to. Used by phase registry to determine
@@ -105,7 +105,7 @@ export interface NodeConfig {
    * `phases:` config. When absent, flat `<runDir>/<nodeId>/` is used. */
   phase?: string;
 
-  // post-pipeline execution
+  // post-workflow execution
   /** When set, node executes after all DAG levels complete.
    * "always" = regardless of outcome, "success" = only on success, "failure" = only on failure. */
   run_on?: "always" | "success" | "failure";
@@ -132,7 +132,7 @@ export interface NodeSettings {
   max_continuations?: number;
   /** Wall-clock timeout per node execution in seconds (default 1800). */
   timeout_seconds?: number;
-  /** Whether a node failure aborts the pipeline or allows remaining nodes to proceed. */
+  /** Whether a node failure aborts the workflow or allows remaining nodes to proceed. */
   on_error?: "fail" | "continue";
   /** Number of full retry attempts after node failure (default 3). */
   max_retries?: number;
@@ -218,15 +218,15 @@ export interface NodeState {
 
 /** Persisted run state (state.json). */
 export interface RunState {
-  /** Unique identifier for this pipeline run (timestamp-based). */
+  /** Unique identifier for this workflow run (timestamp-based). */
   run_id: string;
-  /** Path to the YAML pipeline config that produced this run. */
+  /** Path to the YAML workflow config that produced this run. */
   config_path: string;
   /** ISO 8601 timestamp when the run started. */
   started_at: string;
   /** ISO 8601 timestamp when the run finished; absent while running. */
   completed_at?: string;
-  /** Overall pipeline outcome. */
+  /** Overall workflow outcome. */
   status: "running" | "completed" | "failed" | "aborted";
   /** CLI --arg key-value pairs passed at invocation. */
   args: Record<string, string>;
@@ -268,7 +268,7 @@ export type Verbosity = "quiet" | "normal" | "semi-verbose" | "verbose";
 
 /** CLI options passed to the engine. */
 export interface EngineOptions {
-  /** Path to the YAML pipeline config file. */
+  /** Path to the YAML workflow config file. */
   config_path: string;
   /** Existing run ID to resume; requires resume=true. */
   run_id?: string;
@@ -322,7 +322,7 @@ export interface ClaudeCliOutput {
 
 // --- HITL Configuration ---
 
-/** Human-in-the-loop configuration for pipeline defaults. */
+/** Human-in-the-loop configuration for workflow defaults. */
 export interface HitlConfig {
   /** Script invoked to post a question to the human operator. */
   ask_script: string;

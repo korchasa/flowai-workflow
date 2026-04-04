@@ -1,18 +1,18 @@
-# Migrate pipeline assets to native Claude Code primitives
+# Migrate workflow assets to native Claude Code primitives
 
 ## Goal
 
 Eliminate custom agent and memory conventions (`.flowai-workflow/agents/`,
 `.flowai-workflow/memory/`) in favor of standard Claude Code primitives.
-Pipeline becomes a thin YAML wiring layer over native `.claude/agents/` and
+Workflow becomes a thin YAML wiring layer over native `.claude/agents/` and
 `.claude/flowai-workflow-memory/`. Scripts stay in `.flowai-workflow/scripts/`.
-Reduces cognitive overhead; agents reusable outside pipeline context.
+Reduces cognitive overhead; agents reusable outside workflow context.
 
 ## Overview
 
 ### Context
 
-Current SDLC pipeline stores all assets under `.flowai-workflow/`:
+Current SDLC workflow stores all assets under `.flowai-workflow/`:
 - 6 agent SKILL.md files in `.flowai-workflow/agents/agent-*/SKILL.md`
 - shared-rules.md + reflection-protocol.md
 - 6 shell scripts in `.flowai-workflow/scripts/`
@@ -21,11 +21,11 @@ Current SDLC pipeline stores all assets under `.flowai-workflow/`:
 These are custom conventions understood only by the engine. Claude Code has
 native primitives: `.claude/agents/*.md` (subagents with YAML frontmatter),
 `.claude/rules/*.md` (modular rules). Moving to these makes agents usable both
-inside pipeline AND interactively.
+inside workflow AND interactively.
 
 **ADR-001 revision:** ADR-001 (2026-03-17) rejected `--agent` in favor of
 `--system-prompt-file`. This migration revisits that decision:
-- `model` overridable via `--model` CLI flag (pipeline.yaml already does this)
+- `model` overridable via `--model` CLI flag (workflow.yaml already does this)
 - `tools` frontmatter ignored under `--dangerously-skip-permissions`
 - Each SDLC agent is unique — no agent reuse across phases with different params
 - Native primitives bring interactive usability and ecosystem compatibility
@@ -47,10 +47,10 @@ inside pipeline AND interactively.
 Engine (`engine/claude-process.ts:buildClaudeArgs()`) currently:
 1. Passes `task_template` via `-p` (user message)
 2. Supports `prompt`/`prompt_content` fields (→ `--system-prompt-file`/`--system-prompt`)
-   but current SDLC pipeline does NOT use them — all content inlined via `{{file()}}`
+   but current SDLC workflow does NOT use them — all content inlined via `{{file()}}`
 3. Inlines shared-rules.md + SKILL.md into `task_template` via `{{file(...)}}`
 
-Pipeline nodes reference custom paths:
+Workflow nodes reference custom paths:
 ```yaml
 task_template: |
   {{file(".flowai-workflow/agents/shared-rules.md")}}
@@ -61,7 +61,7 @@ task_template: |
 Scripts referenced via `pre_run`, `on_failure_script`, `after`, HITL config.
 
 Existing `scripts/` directory contains engine-level scripts (check.ts,
-compile.ts, generate-dashboard.ts, etc.). Pipeline (SDLC) scripts are in
+compile.ts, generate-dashboard.ts, etc.). Workflow (SDLC) scripts are in
 `.flowai-workflow/scripts/`.
 
 ### Constraints
@@ -69,11 +69,11 @@ compile.ts, generate-dashboard.ts, etc.). Pipeline (SDLC) scripts are in
 - Engine MUST remain domain-agnostic — no SDLC logic in engine code
 - No backward compatibility needed
 - Memory files → `.claude/flowai-workflow-memory/`
-- Scripts stay in `.flowai-workflow/scripts/` (tightly coupled to pipeline.yaml)
+- Scripts stay in `.flowai-workflow/scripts/` (tightly coupled to workflow.yaml)
 - Agent files → `.claude/agents/*.md` with YAML frontmatter
-- shared-rules.md: universal rules → `.claude/rules/`, pipeline-only rules →
+- shared-rules.md: universal rules → `.claude/rules/`, workflow-only rules →
   agent bodies (C1b decision)
-- Pipeline.yaml stays in `.flowai-workflow/`
+- Workflow.yaml stays in `.flowai-workflow/`
 
 ## Definition of Done
 
@@ -84,9 +84,9 @@ compile.ts, generate-dashboard.ts, etc.). Pipeline (SDLC) scripts are in
 - [ ] Engine: `collectPromptPaths()`, `validatePromptPaths()`, `readPromptContent()` removed
 - [ ] Engine: tests cover `--agent`, `--append-system-prompt`, `prompt` interpolation, validation
 - [ ] SDLC: 6 agents migrated to `.claude/agents/*.md`
-- [ ] SDLC: shared-rules split — universal → `.claude/rules/`, pipeline-only → agent bodies
+- [ ] SDLC: shared-rules split — universal → `.claude/rules/`, workflow-only → agent bodies
 - [ ] SDLC: memory files moved to `.claude/flowai-workflow-memory/`
-- [ ] SDLC: pipeline.yaml updated to use `agent`/`prompt` fields
+- [ ] SDLC: workflow.yaml updated to use `agent`/`prompt` fields
 - [ ] SDLC: `.claude/settings.json` cleaned up (stale paths removed)
 - [ ] Docs: ADR-001 updated with superseding decision
 - [ ] All tests pass (`deno task check`)
@@ -103,7 +103,7 @@ Selected: **Variant A — Engine-native `--agent` support** (with critique fixes
   `{{...}}` interpolation. Replaces `task_template`
 - Add `system_prompt?: string` — templateable extra system context
   (→ `--append-system-prompt`). Appended after agent body in system prompt.
-  Supports `{{...}}`. Rare case: pipeline-specific rules, dynamic context
+  Supports `{{...}}`. Rare case: workflow-specific rules, dynamic context
 - Remove `task_template?: string`
 - Remove `prompt_content?: string`
 
@@ -137,7 +137,7 @@ Three fields for agent nodes:
 - Agent node validation: require `prompt` (every agent needs a `-p` message).
   `agent` is optional (allows prompt-only agent nodes for simple tasks)
 - Remove `validatePromptPaths()` + `readPromptContent()` (no prompt file caching)
-- Remove `collectPromptPaths()` (only used in `pipeline_integrity_test.ts` —
+- Remove `collectPromptPaths()` (only used in `workflow_integrity_test.ts` —
   test removed too)
 - Keep `validateFileReferences()` — update to scan `prompt` and `system_prompt`
   fields (was `task_template` and `prompt`)
@@ -158,7 +158,7 @@ Three fields for agent nodes:
 - Config validation: `prompt` without `agent` → valid (simple task node)
 - Config validation: `system_prompt` without `agent` → valid (standalone system prompt)
 - Config validation: `task_template` field → error (removed)
-- Remove `pipeline_integrity_test.ts` (tested `collectPromptPaths`)
+- Remove `workflow_integrity_test.ts` (tested `collectPromptPaths`)
 - Remove dead `promptFile`/`promptContent` test cases
 
 ### Phase 2: Migrate SDLC agents (scope: sdlc)
@@ -177,12 +177,12 @@ Three fields for agent nodes:
 Frontmatter:
 - Keep: `name`, `description`
 - Remove: `compatibility`
-- Do NOT add: `model`, `tools`, `permissionMode` (pipeline concerns)
+- Do NOT add: `model`, `tools`, `permissionMode` (workflow concerns)
 
 Body changes per agent:
 - Update memory paths: `.flowai-workflow/memory/` → `.claude/flowai-workflow-memory/`
 - Update script paths if referenced
-- Add pipeline-only rules from shared-rules.md to each agent body (see 2.2)
+- Add workflow-only rules from shared-rules.md to each agent body (see 2.2)
 
 **Step 2.2: Split shared-rules.md**
 
@@ -193,11 +193,11 @@ Body changes per agent:
 - `scope-aware-docs.md` — scope-aware SRS/SDS reads
 - `bash-prefer-tools.md` — prefer Read/Grep/Glob/Edit/Write over Bash equivalents
 
-**Pipeline-only rules → inline in each agent body:**
+**Workflow-only rules → inline in each agent body:**
 - Tool restrictions (Skill/Agent/ToolSearch FORBIDDEN) — would break interactive
-- `git add -f` for runs/ — pipeline-specific
+- `git add -f` for runs/ — workflow-specific
 - File modification scope — per-agent list already in SKILL.md
-- Reflection memory protocol — pipeline-specific
+- Reflection memory protocol — workflow-specific
 
 ### Phase 3: Migrate memory (scope: sdlc)
 
@@ -207,7 +207,7 @@ Body changes per agent:
 
 12 files (6 memory + 6 history).
 
-### Phase 4: Update pipeline.yaml (scope: sdlc)
+### Phase 4: Update workflow.yaml (scope: sdlc)
 
 **Step 4.1: Update node definitions**
 
@@ -268,7 +268,7 @@ Remove stale entries:
 
 **Step 5.4: Final verification**
 - `deno task check`
-- Dry-run pipeline: `deno task run --dry-run`
+- Dry-run workflow: `deno task run --dry-run`
 
 ### Execution Order
 
@@ -276,7 +276,7 @@ Remove stale entries:
 Phase 1 (engine types + buildClaudeArgs + config + agent runner + tests)
   → Phase 2 (agents + shared-rules)
   → Phase 3 (memory)
-  → Phase 4 (pipeline.yaml + settings.json)
+  → Phase 4 (workflow.yaml + settings.json)
   → Phase 5 (cleanup + docs)
 ```
 
@@ -286,8 +286,8 @@ Phase 1 (engine types + buildClaudeArgs + config + agent runner + tests)
 - **`--agent` + `--append-system-prompt`**: experimentally confirmed — both
   agent body and appended text present in system prompt
 - **`.claude/rules/` in interactive**: only universal rules placed there;
-  pipeline-only rules (tool restrictions, file scope) stay in agent bodies
-- **`--model` precedence**: pipeline.yaml `model` → `--model` flag → overrides
+  workflow-only rules (tool restrictions, file scope) stay in agent bodies
+- **`--model` precedence**: workflow.yaml `model` → `--model` flag → overrides
   agent frontmatter. Same behavior as current `--system-prompt-file` path
 - **`system_prompt` on resume**: skipped (same as `--agent`); Claude Code
   rebuilds system prompt from files on each invocation

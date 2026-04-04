@@ -244,10 +244,10 @@ Deno.test("safety_check_diff: passes when changes are within allowlist", async (
     git config user.email "test@test.com" &&
     git config user.name "Test" &&
     git config commit.gpgsign false &&
-    mkdir -p .flowai-workflow/pipeline/1 &&
-    echo "init" > .flowai-workflow/pipeline/1/01-spec.md &&
+    mkdir -p .flowai-workflow/workflow/1 &&
+    echo "init" > .flowai-workflow/workflow/1/01-spec.md &&
     git add . && git commit -m "init" &&
-    echo "updated" > .flowai-workflow/pipeline/1/01-spec.md
+    echo "updated" > .flowai-workflow/workflow/1/01-spec.md
   `;
   await new Deno.Command("bash", {
     args: ["-c", setup],
@@ -256,7 +256,7 @@ Deno.test("safety_check_diff: passes when changes are within allowlist", async (
   }).output();
 
   const result = await runLib(
-    `cd "${dir}" && safety_check_diff ".flowai-workflow/pipeline/1/01-spec.md"`,
+    `cd "${dir}" && safety_check_diff ".flowai-workflow/workflow/1/01-spec.md"`,
   );
   assertEquals(result.code, 0, `stderr: ${result.stderr}`);
 

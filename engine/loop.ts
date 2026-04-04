@@ -3,10 +3,10 @@ import type {
   ErrorCategory,
   NodeConfig,
   NodeSettings,
-  PipelineConfig,
   RunState,
   TemplateContext,
   Verbosity,
+  WorkflowConfig,
 } from "./types.ts";
 import { buildLoopBodyOrder } from "./dag.ts";
 import { runAgent } from "./agent.ts";
@@ -32,10 +32,10 @@ export interface LoopResult {
 
 /** Options for running a loop node. */
 export interface LoopRunOptions {
-  /** ID of the loop node in the pipeline DAG. */
+  /** ID of the loop node in the workflow DAG. */
   loopNodeId: string;
-  /** Full pipeline configuration (nodes, defaults, env). */
-  config: PipelineConfig;
+  /** Full workflow configuration (nodes, defaults, env). */
+  config: WorkflowConfig;
   /** Mutable run state shared with the engine. */
   state: RunState;
   /** Factory that builds a TemplateContext for a body node at a given iteration. */

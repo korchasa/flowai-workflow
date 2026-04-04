@@ -2,7 +2,7 @@
 
 ## 1. Intro
 
-- **Purpose:** Implementation details for the domain-agnostic DAG pipeline
+- **Purpose:** Implementation details for the domain-agnostic DAG workflow
   engine.
 - **Rel to SRS:** Implements FRs from `documents/requirements-engine.md`.
 
@@ -15,7 +15,7 @@
 ```mermaid
 graph TD
     CLI["CLI<br/>deno task run"] --> Engine
-    Engine --> Config["Config Loader<br/>.flowai-workflow/pipeline.yaml"]
+    Engine --> Config["Config Loader<br/>.flowai-workflow/workflow.yaml"]
     Engine --> DAG["DAG Builder<br/>toposort → levels"]
     Engine --> State["State Manager<br/>state.json"]
 
@@ -39,7 +39,7 @@ graph TD
 ```
 
 - **Subsystems:**
-  - **Pipeline Engine** (`engine/`): Deno/TypeScript DAG-based executor
+  - **Workflow Engine** (`engine/`): Deno/TypeScript DAG-based executor
     with YAML config, template interpolation, sequential levels, loop nodes,
     human nodes, resume support
   - **Artifact Store**: Git-tracked files in `.flowai-workflow/runs/<run-id>/[<phase>/]<node-id>/`
@@ -48,16 +48,16 @@ graph TD
     contains_section, custom_script, frontmatter_field)
   - **Continuation Engine**: `--resume` based re-invocation on validation
     failure or safety-check violation (shared `max_continuations` budget)
-  - **Binary Distribution** (FR-E39): `deno compile`-based build pipeline.
+  - **Binary Distribution** (FR-E39): `deno compile`-based build workflow.
     `scripts/compile.ts` generates self-contained executables for 4 platform
     targets. `.github/workflows/release.yml` publishes GitHub Release assets
     on version tag push
 
 ## 3. Components
 
-### 3.1 Pipeline Engine (`engine/`)
+### 3.1 Workflow Engine (`engine/`)
 
-- **Purpose:** Configurable DAG-based pipeline executor. Replaces hardcoded
+- **Purpose:** Configurable DAG-based workflow executor. Replaces hardcoded
   shell script orchestration with YAML-driven node graph.
 - **Modules:**
   - `types.ts` — type declarations (incl. `ValidationRule.type` union
@@ -68,13 +68,13 @@ graph TD
     defining allowed file modifications for scope-based detection),
     `NodeConfig.run_on` (`"always"|"success"|"failure"`), `NodeConfig.phase`,
     `NodeConfig.env`, `NodeConfig.model` (per-node Claude model override),
-    `PipelineDefaults.model` (default model for all nodes),
+    `WorkflowDefaults.model` (default model for all nodes),
     `LoopNodeConfig.nodes` (inline body node definitions),
     `LoopResult.bodyResults`, `ErrorCategory` (structured failure enum),
     `NodeState.error_category`, `NodeState.cost_usd` (FR-32 per-node cost),
     `RunState.total_cost_usd` (FR-32 aggregated run cost),
-    `PipelineDefaults.on_failure_script` (FR-34 configurable failure hook),
-    `PipelineDefaults.prepare_command` (FR-E30 post-config/pre-node shell hook),
+    `WorkflowDefaults.on_failure_script` (FR-34 configurable failure hook),
+    `WorkflowDefaults.prepare_command` (FR-E30 post-config/pre-node shell hook),
     `HitlConfig.artifact_source` (renamed from `issue_source`),
     `HitlConfig.exclude_login` (renamed from `bot_login`),
     `Verbosity` union: `"quiet"|"normal"|"semi-verbose"|"verbose"` (FR-41))
@@ -176,7 +176,7 @@ graph TD
     (FR-E22) — persists excerpt to `NodeState.result` in `state.json`
   - `agent.ts` — Claude CLI invocation, continuation loop, retry.
     ADR-001: `--system-prompt-file` replaces base system prompt (~5-7K dead
-    tokens eliminated). Useful base prompt sections replicated in pipeline
+    tokens eliminated). Useful base prompt sections replicated in workflow
     shared-rules.md.
     `AgentRunOptions.model` and `InvokeOptions.model`: optional string for
     per-node model selection. `buildClaudeArgs()` emits `--model <value>` when
@@ -290,8 +290,8 @@ graph TD
     `verbosity === "semi-verbose"`. In semi-verbose, tool-call lines already
     excluded upstream by `formatEventForOutput()` — `nodeOutput()` passes
     through whatever it receives.
-    `dryRunPlan(levels, labels, postPipelineNodeIds?, runOnMap?)`: renders
-    regular DAG levels, then optional "Post-pipeline" section listing `run_on`
+    `dryRunPlan(levels, labels, postWorkflowNodeIds?, runOnMap?)`: renders
+    regular DAG levels, then optional "Post-workflow" section listing `run_on`
     nodes with their conditions (FR-28).
     `nodeResult(nodeId, output: ClaudeCliOutput)`: multi-line agent result
     display (FR-E15). Guarded by `verbosity !== "quiet"`. Format:
@@ -316,16 +316,16 @@ graph TD
     level iteration, delegation to `node-dispatch.ts` executors (FR-E30),
     node result summary display (FR-E15/E22),
     phase registry init via `setPhaseRegistry(config)` at engine startup,
-    pre-post-pipeline `on_failure_script` execution.
+    pre-post-workflow `on_failure_script` execution.
     Two-phase config loading (FR-E24): `run()` reads raw YAML →
     `extractPreRun()` → `runPreRunScript()` if present → `loadConfig()`
     re-reads (potentially updated) config.
     **Pipeline Prepare Command (FR-E30):** `runPrepareCommand(cmd, runDir,
     runId, env, args, output): Promise<void>` — exported free function.
-    Builds pipeline-level `TemplateContext` (`node_dir: ""`, `input: {}`,
+    Builds workflow-level `TemplateContext` (`node_dir: ""`, `input: {}`,
     real `run_dir`/`run_id`/`env`/`args`), calls `interpolate()` from
     `template.ts`, executes via `Deno.Command("sh", ["-c", interpolated])`.
-    Non-zero exit throws → caught by `run()` → state saved → pipeline aborts.
+    Non-zero exit throws → caught by `run()` → state saved → workflow aborts.
     Call site: `runWithLock()`, after `ensureRunDirs()` + `saveState()`,
     before level loop. Guarded by `!this.options.resume && cmd` (skipped on
     resume — environment already prepared by original run).
@@ -334,9 +334,9 @@ graph TD
     `executeLoopNode()`: passes result excerpt in `onNodeComplete` callback.
     `printSummary()`: builds `nodeResults` from `state.nodes[*].result`,
     passes to `summary()` for per-node result rendering.
-    Dry-run path (FR-28): applies `collectPostPipelineNodes()` +
-    `sortPostPipelineNodes()` + level filtering before calling
-    `dryRunPlan()`, passing filtered levels and post-pipeline node IDs with
+    Dry-run path (FR-28): applies `collectPostWorkflowNodes()` +
+    `sortPostWorkflowNodes()` + level filtering before calling
+    `dryRunPlan()`, passing filtered levels and post-workflow node IDs with
     `run_on` conditions — mirrors normal execution path's filtering logic.
     On config load: iterates all nodes; for loop nodes with `nodes`
     sub-object, flattens nested body node IDs into master ID list passed
@@ -382,17 +382,17 @@ graph TD
   - CLI: `deno task run [--prompt <text>] [--config <path>] [--resume <run-id>]
     [--dry-run] [-v|-s|-q] [--env KEY=VAL] [--skip nodes] [--only nodes]
     [--version|-V]`
-  - Config: `.flowai-workflow/pipeline.yaml` (YAML, version "1")
+  - Config: `.flowai-workflow/workflow.yaml` (YAML, version "1")
   - State: `.flowai-workflow/runs/<run-id>/state.json` (JSON)
 - **Node types:** `agent`, `merge`, `loop` (with inline `nodes` sub-object
     for body node definitions), `human`
 - **Node flags:**
   - `run_on?: "always" | "success" | "failure"` — execution condition for
-    post-pipeline nodes. When set, node is excluded from DAG levels and executes
-    in a post-pipeline step after all DAG levels complete:
-    - `"always"` — execute regardless of pipeline outcome.
-    - `"success"` — execute only if pipeline succeeded.
-    - `"failure"` — execute only if pipeline failed. Skipped nodes get
+    post-workflow nodes. When set, node is excluded from DAG levels and executes
+    in a post-workflow step after all DAG levels complete:
+    - `"always"` — execute regardless of workflow outcome.
+    - `"success"` — execute only if workflow succeeded.
+    - `"failure"` — execute only if workflow failed. Skipped nodes get
       `markNodeSkipped()` status.
     Backward compat: `run_always: true` in YAML normalized to `run_on: "always"`
     by config loader (see `config.ts` normalization). `run_always` deleted
@@ -438,7 +438,7 @@ graph TD
     and `nodeId` to `runAgent()`. Safety check and commit verbose removed
     (engine no longer performs these — FR-29). `runFailureHook(script?)`:
     private method (~10 lines), executes `on_failure_script` via
-    `Deno.Command()` on pipeline failure. Swallows errors (failure hook must
+    `Deno.Command()` on workflow failure. Swallows errors (failure hook must
     not crash engine). Replaces hard-wired `rollbackUncommitted()`.
   - All existing callers pass no `output` arg — zero behavioral change.
 - **Deps:** `claude` CLI, `deno`, `git`, `jsr:@std/yaml`.
@@ -454,10 +454,10 @@ graph TD
 - **Purpose:** Module-scoped mapping from nodeId → phase string, enabling
   `getNodeDir()` to resolve phase-aware artifact paths without signature change.
 - **Data:** `phaseRegistry: Map<string, string>` — populated from
-  `PipelineConfig` via exactly one mechanism (mutual exclusivity enforced by
+  `WorkflowConfig` via exactly one mechanism (mutual exclusivity enforced by
   config validation — FR-E33).
 - **Interfaces:**
-  - `setPhaseRegistry(config: PipelineConfig)` — exclusive if/else: if
+  - `setPhaseRegistry(config: WorkflowConfig)` — exclusive if/else: if
     `config.phases` exists, populates registry from `phases:` block (iterates
     phase→nodeIds mapping); else iterates config nodes, builds map from
     `nodeId → node.phase` (skips nodes without `phase`). Dual-mechanism merge
@@ -468,7 +468,7 @@ graph TD
   - `getNodeDir(runId, nodeId)` — signature unchanged. Internally: if registry
     has phase for nodeId, returns `${runDir}/${phase}/${nodeId}/`; otherwise
     `${runDir}/${nodeId}/` (backward-compatible fallback).
-- **Deps:** `types.ts` (`PipelineConfig`, `NodeConfig`).
+- **Deps:** `types.ts` (`WorkflowConfig`, `NodeConfig`).
 - **Design rationale:** Module-scoped global state (not instance state) because
   `getNodeDir()` is a free function called from multiple contexts (engine,
   templates, tests). Single-instance engine guarantee prevents sequential
@@ -577,7 +577,7 @@ graph TD
 
 - **Entities:**
   - Run State: JSON (`.flowai-workflow/runs/<run-id>/state.json`)
-  - Pipeline Config: YAML (`.flowai-workflow/pipeline.yaml`). Top-level keys: `name`,
+  - Pipeline Config: YAML (`.flowai-workflow/workflow.yaml`). Top-level keys: `name`,
     `version`, `defaults`, `phases`, `nodes`. `phases` key declares
     named phase groups with member stage IDs. Engine treats `phases` as opaque
     config data. `defaults.prepare_command` (FR-E30): optional string, shell
@@ -606,7 +606,7 @@ graph TD
     completion (FR-32)
   - NodeConfig: `{ ..., run_on?: "always"|"success"|"failure", phase?: string,
     env?: Record<string, string>, model?: string,
-    allowed_paths?: string[] }` — `run_on` for conditional post-pipeline
+    allowed_paths?: string[] }` — `run_on` for conditional post-workflow
     execution; `phase` for artifact directory grouping; `env` for node-level
     env vars; `model` for per-node Claude model override (FR-27);
     `allowed_paths` for scope-based file modification detection (FR-E37) —
@@ -754,17 +754,17 @@ graph TD
     `findViolations()` algorithm: `newMods = after − before` (set difference),
     for each path in `newMods`: match against `allowedPaths` globs; if no
     match → violation. Pure function — unit-testable without I/O.
-  - **Post-Pipeline Node Collection & Ordering**: `collectPostPipelineNodes()`
+  - **Post-Workflow Node Collection & Ordering**: `collectPostWorkflowNodes()`
     collects nodes where `run_on !== undefined` (replaces `run_always`-based
-    collection). `sortPostPipelineNodes()` sorts them topologically using
+    collection). `sortPostWorkflowNodes()` sorts them topologically using
     `inputs` field (reuses `toposort()` from `dag.ts`).
-  - **Post-Pipeline Node Filtering**: Before executing each post-pipeline node,
+  - **Post-Workflow Node Filtering**: Before executing each post-workflow node,
     engine applies per-node filter based on `run_on` value and
-    `pipelineSuccess`:
+    `workflowSuccess`:
     - `run_on: "always"` → execute unconditionally.
-    - `run_on: "success"` → skip if `!pipelineSuccess`, call
+    - `run_on: "success"` → skip if `!workflowSuccess`, call
       `markNodeSkipped()`.
-    - `run_on: "failure"` → skip if `pipelineSuccess`, call
+    - `run_on: "failure"` → skip if `workflowSuccess`, call
       `markNodeSkipped()`.
   - **HITL via AskUserQuestion Interception** (FR-21):
     Engine detects agent HITL requests by inspecting `permission_denials` in
@@ -774,7 +774,7 @@ graph TD
        `tool_name == "AskUserQuestion"`: extract `tool_input.questions` (structured
        question with `question`, `header`, `options[]`, `multiSelect`) and
        `session_id` from result.
-    3. Engine calls `defaults.hitl.ask_script` (external pipeline script) with
+    3. Engine calls `defaults.hitl.ask_script` (external workflow script) with
        question JSON + context args (repo, issue, run-id, node-id).
     4. Engine sets node state to `waiting` in `state.json`, saves `session_id`.
     5. Engine enters poll loop: `sleep(poll_interval)` → call
@@ -783,7 +783,7 @@ graph TD
        --output-format json`. Agent sees full previous context + reply as new
        user message.
     7. On `timeout` exceeded: node marked `failed`.
-    Pipeline config example:
+    Workflow config example:
     ```yaml
     defaults:
       on_failure_script: .flowai-workflow/scripts/rollback-uncommitted.sh
@@ -797,11 +797,11 @@ graph TD
   - **Pipeline Prepare Command (FR-E30):** In `runWithLock()`, after
     `ensureRunDirs()` + `saveState()`, before level loop: if
     `!options.resume && defaults.prepare_command` is non-empty, calls
-    `runPrepareCommand()`. Flow: build pipeline-level `TemplateContext`
+    `runPrepareCommand()`. Flow: build workflow-level `TemplateContext`
     (`node_dir: ""`, `input: {}`, real `run_dir`/`run_id`/`env`/`args`) →
     `interpolate(cmd, ctx)` → `Deno.Command("sh", ["-c", result])` →
     on non-zero exit: throw `Error("prepare_command failed (exit N): cmd")`.
-    Caught by `run()` error handler → state saved → pipeline aborts.
+    Caught by `run()` error handler → state saved → workflow aborts.
     Resume runs skip entirely (environment already prepared).
   - **Phase Registry Init**: `setPhaseRegistry(config)` called at engine
     startup before `ensureRunDirs()` in `engine.ts` `run()`. Uses exclusive
@@ -812,9 +812,9 @@ graph TD
     `engine/state.ts:20-36`, `engine/engine.ts:135`.
   - **Error Handling Precedence (FR-E34)**: Two mechanisms interact:
     - `on_error: continue` (per-node): marks node `failed`, logs info message,
-      continues pipeline. Does NOT trigger `on_failure_script` at node level.
-    - `on_failure_script` (pipeline-end): evaluated once after all DAG levels
-      complete, only when `pipelineSuccess === false`.
+      continues workflow. Does NOT trigger `on_failure_script` at node level.
+    - `on_failure_script` (workflow-end): evaluated once after all DAG levels
+      complete, only when `workflowSuccess === false`.
     - **Log message (AC #1):** At the `on_error: continue` branch in
       `executeNode()` (~engine.ts:384), before `return true`:
       `this.output.status()` emits
@@ -822,14 +822,14 @@ graph TD
       Deterministic — identifies which mechanism took effect.
     - **Interaction rules:**
       1. `on_error: continue` → log suppression, continue. Hook not triggered.
-      2. All failures suppressed → `pipelineSuccess === true` → hook NOT run.
-      3. Any unsuppressed (fatal) failure → `pipelineSuccess === false` → hook
+      2. All failures suppressed → `workflowSuccess === true` → hook NOT run.
+      3. Any unsuppressed (fatal) failure → `workflowSuccess === false` → hook
          runs exactly once via `runFailureHook()`.
       4. Hook failure does not affect `on_error: continue` semantics (FR-E19).
     - **`runFailureHook()`:** private method in engine.ts. Executes
       `config.defaults.on_failure_script` via `Deno.Command()`. Swallows errors
-      (hook must not crash engine). Called before post-pipeline nodes when
-      `pipelineSuccess === false`. Script is pipeline-specific — engine treats
+      (hook must not crash engine). Called before post-workflow nodes when
+      `workflowSuccess === false`. Script is workflow-specific — engine treats
       as opaque invocation (domain-agnostic). Failed node IDs available via
       `state.json` (`nodes[*].status === "failed"`).
   - **Semi-verbose filtering (FR-41):** `formatEventForOutput(event,
@@ -854,20 +854,20 @@ graph TD
 
 ## 6. Non-Functional
 
-- **Scale:** Single pipeline per run. Sequential stages (no parallel agents).
-- **Fault:** Node failure stops pipeline (unless `on_error: continue`). Failure
+- **Scale:** Single workflow per run. Sequential stages (no parallel agents).
+- **Fault:** Node failure stops workflow (unless `on_error: continue`). Failure
   reported via state.json. `on_error: continue` emits info log per suppressed
-  node (FR-E34). Configurable `on_failure_script` hook runs before post-pipeline
-  nodes only when `pipelineSuccess === false` (not when all failures suppressed).
+  node (FR-E34). Configurable `on_failure_script` hook runs before post-workflow
+  nodes only when `workflowSuccess === false` (not when all failures suppressed).
 - **Logs:** Full transcripts per node in `.flowai-workflow/runs/<run-id>/logs/`.
 
 ## 7. Constraints
 
 - **Simplified:** Pipeline runs sequentially (no parallel stages in v1).
-- **Deferred:** Multi-repo support. Parallel pipelines for multiple issues.
+- **Deferred:** Multi-repo support. Parallel workflows for multiple issues.
   Issue size/complexity limits. Cost budget limits and alerts (per-node cost
   aggregation implemented in FR-32; budget enforcement deferred). Binary smoke
-  tests in CI matrix (FR-E39 Variant B — deferred until base release pipeline
+  tests in CI matrix (FR-E39 Variant B — deferred until base release workflow
   proven). Package manager distribution (brew, npm). Windows binary targets.
   Auto-update mechanism. Windows
   binary target (FR-E39). Package manager distribution (brew, npm). Auto-update

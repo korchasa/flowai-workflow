@@ -1,4 +1,4 @@
-/** Pipeline lock to prevent parallel runs.
+/** Workflow lock to prevent parallel runs.
  * Lock file contains JSON with PID, hostname, run_id, and timestamp.
  * Stale detection: always PID check. Hostname is stored for diagnostics only.
  * Rationale: lock file lives on local FS, so if readable — PID is checkable. */
@@ -41,7 +41,7 @@ function isLockAlive(existing: LockInfo): boolean {
   return isProcessAlive(existing.pid);
 }
 
-/** Acquire pipeline lock. Throws if another live process holds it.
+/** Acquire workflow lock. Throws if another live process holds it.
  * Reclaims stale locks (dead PID on same host) automatically. */
 export async function acquireLock(
   lockPath: string,
@@ -52,7 +52,7 @@ export async function acquireLock(
     const existing = await readLockInfo(lockPath);
     if (isLockAlive(existing)) {
       throw new Error(
-        `Pipeline is already running (run_id: ${existing.run_id}, pid: ${existing.pid}, host: ${existing.hostname}). ` +
+        `Workflow is already running (run_id: ${existing.run_id}, pid: ${existing.pid}, host: ${existing.hostname}). ` +
           `Remove ${lockPath} manually if the process is stuck.`,
       );
     }
@@ -86,7 +86,7 @@ export async function acquireLock(
   await Deno.writeTextFile(lockPath, JSON.stringify(info, null, 2) + "\n");
 }
 
-/** Release pipeline lock. No-op if lock file doesn't exist. */
+/** Release workflow lock. No-op if lock file doesn't exist. */
 export async function releaseLock(lockPath: string): Promise<void> {
   try {
     await Deno.remove(lockPath);

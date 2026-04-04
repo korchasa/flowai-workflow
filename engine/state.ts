@@ -1,7 +1,7 @@
 /**
  * @module
  * Run-state management: create, persist, load, and update RunState across a
- * pipeline execution. Also owns the phase registry (nodeId → phase name) used
+ * workflow execution. Also owns the phase registry (nodeId → phase name) used
  * for computing node output directory paths.
  */
 
@@ -9,8 +9,8 @@ import type {
   ErrorCategory,
   NodeState,
   NodeStatus,
-  PipelineConfig,
   RunState,
+  WorkflowConfig,
 } from "./types.ts";
 
 // --- FR-E9: Phase Registry ---
@@ -20,12 +20,12 @@ import type {
 const _phaseRegistry = new Map<string, string>();
 
 /**
- * Build phase registry from pipeline config.
+ * Build phase registry from workflow config.
  * Config validation (parseConfig) guarantees mutual exclusivity: either a top-level
  * `phases:` block is present OR per-node `phase:` fields are used, never both.
  * Called once at run start, before ensureRunDirs().
  */
-export function setPhaseRegistry(config: PipelineConfig): void {
+export function setPhaseRegistry(config: WorkflowConfig): void {
   _phaseRegistry.clear();
   if (config.phases) {
     // Top-level phases block is the sole mechanism
@@ -73,7 +73,7 @@ export function generateRunId(label?: string): string {
   return slug ? `${ts}-${slug}` : ts;
 }
 
-/** Create a fresh RunState for a new pipeline execution. */
+/** Create a fresh RunState for a new workflow execution. */
 export function createRunState(
   runId: string,
   configPath: string,

@@ -30,7 +30,7 @@ type: feedback
 - For fix iterations (iteration > 1): grep for specific content (e.g., `grep -n "FR-E33" file`) to confirm presence before reading the whole file — saves a turn.
 - When spec lists SRS changes, grep for the FR number in the SRS immediately after getting the diff. If not in diff AND not in file → blocking.
 - On fix iteration, once FR is confirmed present in grep, check all spec-promised SRS sub-sections in the same grep output.
-- `pipeline.yaml` modification is expected and necessary when engine enforcement would break it — do not treat as out-of-scope.
+- `workflow.yaml` modification is expected and necessary when engine enforcement would break it — do not treat as out-of-scope.
 - For SKILL.md-only changes: verify each file individually by reading in parallel; the entire implementation IS the SKILL.md content changes.
 - Shell test files (`.sh`) are NOT part of Deno test suite — count stays the same. Behavioral ACs still verified by reading the script directly.
 
@@ -47,7 +47,7 @@ type: feedback
 - First session (issue #129): ~10 turns, PASS verdict
 - Thirty-fifth session (issue #178, iteration 2): ~10 turns, PASS verdict (FR-S43/S44/S45 present in requirements-sdlc.md §3.43/3.44/3.45 + Appendix C; SKILL.md implementations correct; 569 tests; 22nd consecutive PM failure resolved in iter 2)
 - Thirty-fourth session (issue #178, iteration 1): ~9 turns, FAIL verdict (FR-S43/FR-S44/FR-S45 absent from requirements-sdlc.md; 21st consecutive PM failure; all SKILL.md behavioral implementations correct; 569 tests)
-- Twenty-eighth session (issue #174, iteration 1): ~5 turns, FAIL verdict (FR-S42 absent; 16th consecutive PM failure; pipeline.yaml implementation correct)
+- Twenty-eighth session (issue #174, iteration 1): ~5 turns, FAIL verdict (FR-S42 absent; 16th consecutive PM failure; workflow.yaml implementation correct)
 - Twenty-ninth session (issue #174, iteration 2): ~8 turns, PASS verdict (FR-S42 at line 972 §3.42 + Appendix C line 1128; 533 tests, 8/8 ACs)
 - Second session (issue #146): ~8 turns, PASS verdict
 - Third session (issue #147, iteration 1): ~11 turns, FAIL verdict (FR-S32 missing from SRS)

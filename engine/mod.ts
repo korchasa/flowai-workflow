@@ -10,12 +10,12 @@ export type {
   NodeState,
   NodeStatus,
   PermissionDenial,
-  PipelineConfig,
-  PipelineDefaults,
   RunState,
   TemplateContext,
   ValidationRule,
   Verbosity,
+  WorkflowConfig,
+  WorkflowDefaults,
 } from "./types.ts";
 
 export { interpolate } from "./template.ts";

@@ -20,7 +20,7 @@
   ASK USER FOR HELP.
 - IF ISSUE PERSISTS AFTER 2 ATTEMPTS: STOP. OUTPUT "STOP-ANALYSIS REPORT"
   (STATE, EXPECTED, 5-WHY CHAIN, ROOT CAUSE, HYPOTHESES). WAIT FOR USER HELP.
-- WHEN EDITING PIPELINE CONFIG, ALWAYS CHECK LOCALLY FIRST.
+- WHEN EDITING WORKFLOW CONFIG, ALWAYS CHECK LOCALLY FIRST.
 - BEFORE RUNNING `deno task run`, COMMIT OR STASH ALL LOCAL CHANGES.
   Engine's safety check treats uncommitted diffs as out-of-scope modifications.
 - BE PRECISE IN YOUR WORDING. USE A SCIENTIFIC APPROACH. ACCOMPANY HIGHLY
@@ -42,15 +42,15 @@ as YAML configs — engine handles execution, inter-agent communication,
 validation, loops, and resume. Domain-agnostic: no git/GitHub/SDLC logic in
 engine; any workflow expressible as a DAG of agent/merge/loop/human nodes.
 
-The engine is developed using its own SDLC pipeline (dogfooding): a chain of
+The engine is developed using its own SDLC workflow (dogfooding): a chain of
 specialized AI agents (PM, Architect, Tech Lead, Developer, QA, Tech Lead
 Review) that automates the full development lifecycle from GitHub Issue to
-merged PR. This pipeline serves as both the development method and a reference
+merged PR. This workflow serves as both the development method and a reference
 example of engine usage.
 
 ## Project tooling Stack
 
-- Deno (scripting, utilities, validation, task runner, pipeline engine)
+- Deno (scripting, utilities, validation, task runner, workflow engine)
 - Shell/Bash (legacy stage orchestration scripts)
 - Docker (devcontainer runtime environment)
 - Claude Code CLI (`claude`) (AI agent runtime)
@@ -60,7 +60,7 @@ example of engine usage.
 ## Architecture
 
 - **Core:** Domain-agnostic DAG executor engine (`engine/`, Deno/TypeScript).
-  Reads YAML pipeline configs. Entry: `deno task run [--prompt "..."]`
+  Reads YAML workflow configs. Entry: `deno task run [--prompt "..."]`
 - **Node types:** `agent` (Claude CLI), `merge` (combine outputs), `loop`
   (iterative body with exit condition), `human` (terminal prompt)
 - **Inter-agent communication:** Structured artifacts in
@@ -73,7 +73,7 @@ example of engine usage.
   completed nodes skipped based on `state.json`
 - **Observability:** 3 verbosity levels (`-q`/default/`-v`); status lines with
   timestamps; final summary
-- **SDLC pipeline (example):** `.flowai-workflow/pipeline.yaml` — 6 agents automating
+- **SDLC workflow (example):** `.flowai-workflow/workflow.yaml` — 6 agents automating
   full development lifecycle. Agents in `.claude/agents/agent-*.md` (native Claude Code
   subagents). Memory in `.flowai-workflow/memory/`
 - **Docker image:** Single image with claude CLI, deno, git, gh
@@ -86,7 +86,7 @@ Two scopes with strict boundary:
   Node types, validation, continuation, resume, HITL, CLI, templates.
   SRS: `documents/requirements-engine.md`. SDS: `documents/design-engine.md`.
   GitHub label: `scope: engine`.
-- **SDLC Pipeline** (`scope: sdlc`) — example pipeline using the engine.
+- **SDLC Workflow** (`scope: sdlc`) — example workflow using the engine.
   Agents, prompts, GitHub workflow, dashboard, devcontainer.
   SRS: `documents/requirements-sdlc.md`. SDS: `documents/design-sdlc.md`.
   GitHub label: `scope: sdlc`.
@@ -111,15 +111,15 @@ as aliases during migration.
 
 - **Engine is domain-agnostic:** Generic DAG executor. MUST NOT contain git,
   GitHub, branch, PR, or any domain-specific logic. All domain workflows are
-  implemented exclusively via agent nodes wired in pipeline YAML configs
-- **Engine is pipeline-independent:** MUST NOT depend on any specific pipeline
-  config. One engine, many pipelines. Engine code must not reference concrete
-  node names, artifact filenames, or pipeline structure
+  implemented exclusively via agent nodes wired in workflow YAML configs
+- **Engine is workflow-independent:** MUST NOT depend on any specific workflow
+  config. One engine, many workflows. Engine code must not reference concrete
+  node names, artifact filenames, or workflow structure
 - Agents are stateless — all context from file artifacts and system prompts
-- YAML pipeline config defines node graph; no hardcoded stage order
+- YAML workflow config defines node graph; no hardcoded stage order
 - Artifacts stored per-run for isolation
-- SDLC pipeline specifics (diff safety checks, etc.)
-  are pipeline-level concerns, not engine-level
+- SDLC workflow specifics (diff safety checks, etc.)
+  are workflow-level concerns, not engine-level
 
 ## Planning Rules
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# reset-to-main.sh — Hard reset to latest origin/main before pipeline run.
-# Ensures agents always load from main (prompts, pipeline config, memory).
+# reset-to-main.sh — Hard reset to latest origin/main before workflow run.
+# Ensures agents always load from main (prompts, workflow config, memory).
 # Destructive by design: discards uncommitted changes, force-switches branch.
 # Called by self_runner.ts and cli.ts BEFORE engine starts.
 

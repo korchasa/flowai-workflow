@@ -1,6 +1,6 @@
 # Reflection Protocol — Two-Layer Agent Memory
 
-All pipeline agents follow this two-layer reflection protocol to accumulate
+All workflow agents follow this two-layer reflection protocol to accumulate
 operative knowledge across runs.
 
 ## Layer 1: MEMORY (Edit-in-place)

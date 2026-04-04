@@ -35,7 +35,7 @@ type: feedback
 - For extraction refactors (no behavioral change): existing tests are the acceptance gate — no new tests needed
 - When removing imports: trace each symbol to confirm it is truly unused after extraction before deleting
 - **Self-referential safety for prompt deletions:** Don't delete `.claude/agents/agent-*.md` files
-  during a pipeline run — the engine may still need them for later nodes in the current run
+  during a workflow run — the engine may still need them for later nodes in the current run
 
 ## Environment Quirks
 
@@ -43,7 +43,7 @@ type: feedback
 - Memory files require blank lines between `##` headings and first list item (deno fmt rule)
 - deno task check output >50KB persisted to temp file — no `<error>` wrapper = PASS; check tail for "All checks passed!"
 - **CRITICAL**: `scripts/self_runner.ts` runs as background process. When `.flowai-workflow/lock.json` is absent,
-  self_runner starts a new pipeline run → calls `.flowai-workflow/scripts/reset-to-main.sh` →
+  self_runner starts a new workflow run → calls `.flowai-workflow/scripts/reset-to-main.sh` →
   `git checkout -f main && git reset --hard origin/main && git clean -fd`. DESTROYS all uncommitted changes.
 - TypeScript `.some((e) => ...)` callbacks need explicit `: string` type annotation to avoid TS7006
 - "File has been modified since read" appears due to background resets — always re-read before writing
@@ -128,23 +128,23 @@ type: feedback
 - Run 20260319T192055 iter2: ~8 turns, scope sdlc, issue #148 (FR-S33) QA fix — PASS (SRS: added §3.33, NFR §4, Appendix B/C, stale FR-S13/FR-S15 ACs; same pattern as iter2 of issue #147)
 - Run 20260319T194808: ~7 turns, scope sdlc, issue #149 (FR-S34), 2 files changed — PASS (Write both files; deno-lint-ignore inside for-loop header not recognized → extract cast to separate variable before loop)
 - Run 20260319T194808 iter2: ~5 turns, scope sdlc, issue #149 (FR-S34) QA fix — PASS (SRS: added §3.34, Appendix C FR-S34 row; same PM persistence failure pattern as #147/#148)
-- Run 20260319T201620: ~10 turns, scope engine, issue #150 (FR-E33), 5 files changed — PASS (mutual-exclusivity validation; pipeline.yaml used both mechanisms → necessary fix outside tasks[].files; task breakdown should always include all affected files)
+- Run 20260319T201620: ~10 turns, scope engine, issue #150 (FR-E33), 5 files changed — PASS (mutual-exclusivity validation; workflow.yaml used both mechanisms → necessary fix outside tasks[].files; task breakdown should always include all affected files)
 - Run 20260319T201620 iter2: ~5 turns, scope engine, issue #150 QA fix — PASS (SRS: added §3.33, updated FR-E9 criterion, Appendix row; fourth consecutive PM persistence failure across #147/#148/#149/#150)
 - Run 20260319T204544: ~8 turns, scope sdlc, issue #151 (FR-S35), 5 files changed — PASS (template interpolation in buildScriptArgs + SDLC-level validation in check.ts; pure validator function pattern same as validateAgentListContent)
 - Run 20260319T204544 iter2: ~5 turns, scope sdlc, issue #151 (FR-S35) QA fix — PASS (SRS: added §3.35, Appendix C row; fifth consecutive PM persistence failure #147/#148/#149/#150/#151)
 - Run 20260319T211036: ~10 turns, scope engine, issue #152 (FR-E34), 3 files changed — PASS (info log + 5 interaction tests; SDS pre-populated by Tech Lead; `async` lambdas without await → `require-await` lint error → use `Promise.resolve(true)`)
-- Run 20260319T213344: ~7 turns, scope engine, issue #153 (FR-E35), 4 files changed — PASS (forwarding validation in config.ts; SDS already pre-populated by Tech Lead; pipeline.yaml gap caught by new check → fix loop inputs; same coexistence pattern as #150)
+- Run 20260319T213344: ~7 turns, scope engine, issue #153 (FR-E35), 4 files changed — PASS (forwarding validation in config.ts; SDS already pre-populated by Tech Lead; workflow.yaml gap caught by new check → fix loop inputs; same coexistence pattern as #150)
 - Run 20260319T213344 iter2: ~5 turns, scope engine, issue #153 (FR-E35) QA fix — PASS (SRS: added §3.35 + Appendix row; sixth consecutive PM persistence failure #147–#153)
-- Run 20260319T215851: ~5 turns, scope sdlc, issue #154 (FR-S36), 2 files changed — PASS (shell wrapper + pipeline.yaml edit; no TS logic → no new tests; do NOT use set -euo pipefail in wrapper — must capture non-zero exit code)
+- Run 20260319T215851: ~5 turns, scope sdlc, issue #154 (FR-S36), 2 files changed — PASS (shell wrapper + workflow.yaml edit; no TS logic → no new tests; do NOT use set -euo pipefail in wrapper — must capture non-zero exit code)
 - Run 20260319T215851 iter2: ~4 turns, scope sdlc, issue #154 (FR-S36) QA fix — PASS (SRS: added §3.36, Appendix C row; seventh consecutive PM persistence failure #147–#154)
-- Run 20260319T221833: ~8 turns, scope engine+sdlc, issue #155 (FR-E36+FR-S37), 5 files changed — PASS (parse-time cross-check in config.ts; runtime throw in loop.ts; assertRejects not in vendor assert.ts → use try/catch; "validation_failed" not in ErrorCategory → omit error_category; pipeline.yaml coexistence pattern again)
+- Run 20260319T221833: ~8 turns, scope engine+sdlc, issue #155 (FR-E36+FR-S37), 5 files changed — PASS (parse-time cross-check in config.ts; runtime throw in loop.ts; assertRejects not in vendor assert.ts → use try/catch; "validation_failed" not in ErrorCategory → omit error_category; workflow.yaml coexistence pattern again)
 - Run 20260319T221833 iter2: ~5 turns, scope engine+sdlc, issue #155 QA fix — PASS (SRS: added §3.36 FR-E36 to requirements-engine.md + §3.37 FR-S37 to requirements-sdlc.md + both Appendix rows; ninth consecutive PM persistence failure #147–#155)
-- Run 20260319T224519: ~5 turns, scope sdlc, issue #156 (FR-S38), 2 files changed — PASS (pipeline.yaml prompt→file() migration; integrity test inverted: presence→absence assertion for FR-S38 AC#3).
+- Run 20260319T224519: ~5 turns, scope sdlc, issue #156 (FR-S38), 2 files changed — PASS (workflow.yaml prompt→file() migration; integrity test inverted: presence→absence assertion for FR-S38 AC#3).
 - Run 20260319T224519 iter2: ~4 turns, scope sdlc, issue #156 QA fix — PASS (SRS: added §3.38 + Appendix C row; tenth consecutive PM persistence failure #147–#156).
 - Run 20260319T230952 iter2: ~5 turns, scope sdlc, issue #157 (FR-S39) QA fix — PASS (SRS: added §3.39 + Appendix C row; eleventh consecutive PM persistence failure #147–#157).
 - Run 20260320T000829: ~5 turns, scope sdlc, issue #159 (FR-S41), 2 files changed — PASS (shell script + new bash test file; 7 shell tests all green; deno task check unaffected since no TS changes).
 - Run 20260320T000829 iter2: ~4 turns, scope sdlc, issue #159 (FR-S41) QA fix — PASS (SRS: added §3.41 + Appendix C row; fourteenth consecutive PM persistence failure #147–#159).
-- Run 20260320T092158: ~5 turns, scope sdlc, issue #174 (FR-S42), 1 file changed — PASS (config-only: 19 validate rules → 6 artifact rules in pipeline.yaml; pipeline integrity check is acceptance gate; no tests needed).
+- Run 20260320T092158: ~5 turns, scope sdlc, issue #174 (FR-S42), 1 file changed — PASS (config-only: 19 validate rules → 6 artifact rules in workflow.yaml; workflow integrity check is acceptance gate; no tests needed).
 - Run 20260320T092158 iter2: ~4 turns, scope sdlc, issue #174 (FR-S42) QA fix — PASS (SRS: added §3.42 + Appendix C row; sixteenth consecutive PM persistence failure #147–#174).
 - Run 20260320T094502 iter2: ~5 turns, scope engine, issue #175 (FR-E37) QA fix — PASS (SRS: added §3.37, updated FR-E1 §3.1 Future→[x], Appendix FR-E36+FR-E37 rows; seventeenth consecutive PM persistence failure #147–#175).
 - Run 20260320T101834: ~6 turns, scope engine, issue #176 (FR-E7), 4 files changed — PASS (validateTemplateVars() in template.ts + hook validation in config.ts; 12+8 new tests; loop body nodes inherit combined IDs via existing recursive call).
@@ -153,10 +153,10 @@ type: feedback
 - Run 20260320T104440 iter2: ~5 turns, scope sdlc, issue #178 (FR-S43/44/45) QA fix — PASS (SRS: added §3.43/3.44/3.45 + 3 Appendix C rows; twenty-first consecutive PM persistence failure #147–#178).
 - Target: ≤35 turns. Key lesson: commit before deno task check; stash pattern for pre-existing fmt issues.
 
-## Pipeline.yaml Coexistence Pattern
+## Workflow.yaml Coexistence Pattern
 
-- When engine validation is tightened to reject a config pattern, the reference pipeline.yaml may use that pattern and must be fixed simultaneously.
-- Tech-lead task breakdown should include `pipeline.yaml` when validation changes affect it.
+- When engine validation is tightened to reject a config pattern, the reference workflow.yaml may use that pattern and must be fixed simultaneously.
+- Tech-lead task breakdown should include `workflow.yaml` when validation changes affect it.
 - Fix: remove the redundant mechanism (per-node `phase:` fields when top-level `phases:` block is authoritative).
 
 ## QA-Fix Pattern

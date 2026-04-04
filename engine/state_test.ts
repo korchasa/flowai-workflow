@@ -22,7 +22,7 @@ import {
   updateNodeState,
   updateRunCost,
 } from "./state.ts";
-import type { PipelineConfig } from "./types.ts";
+import type { WorkflowConfig } from "./types.ts";
 
 Deno.test("generateRunId — format YYYYMMDDTHHMMSS without label", () => {
   const id = generateRunId();
@@ -54,14 +54,14 @@ Deno.test("generateRunId — empty label ignored", () => {
 Deno.test("createRunState — initializes all nodes as pending", () => {
   const state = createRunState(
     "20260308T143022",
-    ".flowai-workflow/pipeline.yaml",
+    ".flowai-workflow/workflow.yaml",
     ["spec", "plan", "developer"],
     { issue: "42" },
     { API_KEY: "test" },
   );
 
   assertEquals(state.run_id, "20260308T143022");
-  assertEquals(state.config_path, ".flowai-workflow/pipeline.yaml");
+  assertEquals(state.config_path, ".flowai-workflow/workflow.yaml");
   assertEquals(state.status, "running");
   assertEquals(state.args, { issue: "42" });
   assertEquals(state.env, { API_KEY: "test" });
@@ -336,12 +336,12 @@ Deno.test("updateRunCost — total is 0 when no nodes have cost", () => {
 
 // --- FR-E9: Phase Registry tests ---
 
-/** Minimal PipelineConfig stub for phase registry tests. */
+/** Minimal WorkflowConfig stub for phase registry tests. */
 function makeConfig(
   phases?: Record<string, string[]>,
   nodePhases?: Record<string, string>,
-): PipelineConfig {
-  const nodes: PipelineConfig["nodes"] = {};
+): WorkflowConfig {
+  const nodes: WorkflowConfig["nodes"] = {};
   const allNodeIds = new Set<string>([
     ...(phases ? Object.values(phases).flat() : []),
     ...(nodePhases ? Object.keys(nodePhases) : []),

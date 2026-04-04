@@ -1,7 +1,7 @@
 /**
  * @module
  * Full project verification: fmt --check, lint, type-check, CLI smoke test,
- * secret scan, tests, doc lint, pipeline integrity, AGENTS.md accuracy, and
+ * secret scan, tests, doc lint, workflow integrity, AGENTS.md accuracy, and
  * comment-marker scan (TODO/FIXME/HACK/XXX).
  * Run via: deno task check
  */
@@ -41,7 +41,7 @@ async function commentScan(): Promise<void> {
     if (!extensions.some((ext) => entry.endsWith(ext))) continue;
     if (
       entry.includes("node_modules") ||
-      entry.includes(".flowai-workflow/pipeline") ||
+      entry.includes(".flowai-workflow/workflow") ||
       entry.endsWith("scripts/check.ts")
     ) {
       continue;
@@ -87,17 +87,17 @@ async function* walkDir(dir: string): AsyncGenerator<string> {
   }
 }
 
-async function pipelineIntegrity(): Promise<void> {
-  console.log("\n--- Pipeline Integrity ---");
-  const pipelinePath = ".flowai-workflow/pipeline.yaml";
+async function workflowIntegrity(): Promise<void> {
+  console.log("\n--- Workflow Integrity ---");
+  const workflowPath = ".flowai-workflow/workflow.yaml";
 
-  // 1. Load and validate pipeline config (schema + prompt paths + phases)
+  // 1. Load and validate workflow config (schema + prompt paths + phases)
   const { loadConfig } = await import("../engine/config.ts");
   try {
-    await loadConfig(pipelinePath);
-    console.log(`  Pipeline config valid: ${pipelinePath}`);
+    await loadConfig(workflowPath);
+    console.log(`  Workflow config valid: ${workflowPath}`);
   } catch (err) {
-    console.error(`FAILED: Pipeline validation: ${(err as Error).message}`);
+    console.error(`FAILED: Workflow validation: ${(err as Error).message}`);
     Deno.exit(1);
   }
 }
@@ -114,21 +114,21 @@ export function validateHitlArtifactSource(
   if (!artifactSource) return [];
   if (artifactSource.includes("{{")) return [];
   return [
-    `pipeline.yaml: defaults.hitl.artifact_source "${artifactSource}" is a hardcoded path; use template syntax (e.g. {{input.<node>}}/...)`,
+    `workflow.yaml: defaults.hitl.artifact_source "${artifactSource}" is a hardcoded path; use template syntax (e.g. {{input.<node>}}/...)`,
   ];
 }
 
 async function hitlArtifactSource(): Promise<void> {
   console.log("\n--- HITL Artifact Source Validation ---");
-  const pipelinePath = ".flowai-workflow/pipeline.yaml";
+  const workflowPath = ".flowai-workflow/workflow.yaml";
   const { loadConfig } = await import("../engine/config.ts");
   let config;
   try {
-    config = await loadConfig(pipelinePath);
+    config = await loadConfig(workflowPath);
   } catch (err) {
-    // loadConfig errors are already reported by pipelineIntegrity(); skip here
+    // loadConfig errors are already reported by workflowIntegrity(); skip here
     console.log(
-      `  Skipped (pipeline config invalid): ${(err as Error).message}`,
+      `  Skipped (workflow config invalid): ${(err as Error).message}`,
     );
     return;
   }
@@ -149,7 +149,7 @@ async function hitlArtifactSource(): Promise<void> {
 /**
  * Validates AGENTS.md content for agent list accuracy.
  *
- * Checks that the Project Vision section lists all 6 active pipeline agents
+ * Checks that the Project Vision section lists all 6 active workflow agents
  * and that no deprecated agent names appear anywhere in the document.
  * Returns an array of error messages; empty array means validation passed.
  */
@@ -224,7 +224,7 @@ Checks performed:
   - Secret scan (gitleaks)
   - Tests (deno test)
   - Doc lint: JSDoc, private-type-ref, circular deps (deno doc --lint)
-  - Pipeline integrity check
+  - Workflow integrity check
   - AGENTS.md agent list accuracy
   - HITL artifact_source template validation
   - Comment marker scan (TODO/FIXME/HACK/XXX)
@@ -306,7 +306,7 @@ if (import.meta.main) {
     "Doc Lint",
   );
 
-  await pipelineIntegrity();
+  await workflowIntegrity();
   await hitlArtifactSource();
   await agentListAccuracy();
   await commentScan();
