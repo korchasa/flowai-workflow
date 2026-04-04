@@ -119,8 +119,8 @@ function makeBaseOpts(overrides?: Partial<HitlRunOptions>): HitlRunOptions {
     node: {
       type: "agent",
       label: "PM",
-      prompt: ".flowai-pipelines/agents/agent-pm/SKILL.md",
-      task_template: "do something",
+      agent: "agent-pm",
+      prompt: "do something",
     },
     ctx: {
       node_dir: "/tmp/test",

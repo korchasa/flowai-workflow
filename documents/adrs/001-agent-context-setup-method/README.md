@@ -1,8 +1,18 @@
 # ADR-001: Use `--system-prompt-file` for agent context setup
 
-- **Status:** Accepted
+- **Status:** Superseded (2026-04)
 - **Date:** 2026-03-17
+- **Superseded by:** Native `--agent` support with `--append-system-prompt`
 - **Scope:** engine + sdlc
+
+> **Superseded:** Experiments (2026-04-04) confirmed `--agent` + `--resume` +
+> `--model` + `--append-system-prompt` all work correctly together. Coupling
+> concerns mitigated: `tools` frontmatter ignored under
+> `--dangerously-skip-permissions`; `model` overridable via `--model` CLI flag;
+> each SDLC agent is unique (no reuse across phases with different params).
+> Agents now live in `.claude/agents/*.md` as native Claude Code subagents,
+> invoked via `--agent <name>`. Pipeline-specific context appended via
+> `--append-system-prompt`. Universal rules in `AGENTS.md`.
 
 ## Context
 

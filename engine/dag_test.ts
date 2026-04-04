@@ -15,7 +15,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do A"
+    prompt: "do A"
 `);
   assertEquals(buildLevels(config), [["a"]]);
 });
@@ -28,16 +28,16 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do A"
+    prompt: "do A"
   b:
     type: agent
     label: B
-    task_template: "do B"
+    prompt: "do B"
     inputs: [a]
   c:
     type: agent
     label: C
-    task_template: "do C"
+    prompt: "do C"
     inputs: [b]
 `);
   assertEquals(buildLevels(config), [["a"], ["b"], ["c"]]);
@@ -51,16 +51,16 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do A"
+    prompt: "do A"
   b:
     type: agent
     label: B
-    task_template: "do B"
+    prompt: "do B"
     inputs: [a]
   c:
     type: agent
     label: C
-    task_template: "do C"
+    prompt: "do C"
     inputs: [a]
 `);
   const levels = buildLevels(config);
@@ -75,11 +75,11 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do A"
+    prompt: "do A"
   b:
     type: agent
     label: B
-    task_template: "do B"
+    prompt: "do B"
   combined:
     type: merge
     label: Combine
@@ -97,16 +97,16 @@ nodes:
   start:
     type: agent
     label: Start
-    task_template: "start"
+    prompt: "start"
   left:
     type: agent
     label: Left
-    task_template: "left"
+    prompt: "left"
     inputs: [start]
   right:
     type: agent
     label: Right
-    task_template: "right"
+    prompt: "right"
     inputs: [start]
   end:
     type: merge
@@ -125,7 +125,7 @@ nodes:
   spec:
     type: agent
     label: Spec
-    task_template: "spec"
+    prompt: "spec"
   impl-loop:
     type: loop
     label: Impl loop
@@ -137,11 +137,11 @@ nodes:
       developer:
         type: agent
         label: Developer
-        task_template: "implement"
+        prompt: "implement"
       qa:
         type: agent
         label: QA
-        task_template: "verify"
+        prompt: "verify"
         inputs: [developer]
 `);
   const levels = buildLevels(config);
@@ -157,15 +157,15 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do A"
+    prompt: "do A"
   b:
     type: agent
     label: B
-    task_template: "do B"
+    prompt: "do B"
   c:
     type: agent
     label: C
-    task_template: "do C"
+    prompt: "do C"
 `);
   const levels = buildLevels(config);
   assertEquals(levels, [["a", "b", "c"]]);
@@ -178,8 +178,8 @@ Deno.test("buildLevels — cycle detection throws", () => {
     name: "test",
     version: "1",
     nodes: {
-      a: { type: "agent", label: "A", task_template: "x", inputs: ["b"] },
-      b: { type: "agent", label: "B", task_template: "x", inputs: ["a"] },
+      a: { type: "agent", label: "A", prompt: "x", inputs: ["b"] },
+      b: { type: "agent", label: "B", prompt: "x", inputs: ["a"] },
     },
   };
   assertThrows(
@@ -194,9 +194,9 @@ Deno.test("buildLevels — 3-node cycle detection", () => {
     name: "test",
     version: "1",
     nodes: {
-      a: { type: "agent", label: "A", task_template: "x", inputs: ["c"] },
-      b: { type: "agent", label: "B", task_template: "x", inputs: ["a"] },
-      c: { type: "agent", label: "C", task_template: "x", inputs: ["b"] },
+      a: { type: "agent", label: "A", prompt: "x", inputs: ["c"] },
+      b: { type: "agent", label: "B", prompt: "x", inputs: ["a"] },
+      c: { type: "agent", label: "C", prompt: "x", inputs: ["b"] },
     },
   };
   assertThrows(
@@ -223,11 +223,11 @@ nodes:
       developer:
         type: agent
         label: Developer
-        task_template: "implement"
+        prompt: "implement"
       qa:
         type: agent
         label: QA
-        task_template: "verify"
+        prompt: "verify"
         inputs: [developer]
 `);
   const order = buildLoopBodyOrder(config, "impl-loop");
@@ -249,7 +249,7 @@ nodes:
       reviewer:
         type: agent
         label: Reviewer
-        task_template: "review"
+        prompt: "review"
 `);
   const order = buildLoopBodyOrder(config, "review-loop");
   assertEquals(order, ["reviewer"]);
@@ -263,7 +263,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do A"
+    prompt: "do A"
 `);
   assertThrows(
     () => buildLoopBodyOrder(config, "a"),

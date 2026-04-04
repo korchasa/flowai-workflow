@@ -379,7 +379,7 @@ Deno.test("collectAllNodeIds — includes top-level and nested body node IDs", (
     name: "test",
     version: "1",
     nodes: {
-      pm: { type: "agent", label: "PM", task_template: "spec" },
+      pm: { type: "agent", label: "PM", prompt: "spec" },
       "impl-loop": {
         type: "loop",
         label: "Impl loop",
@@ -390,12 +390,12 @@ Deno.test("collectAllNodeIds — includes top-level and nested body node IDs", (
           developer: {
             type: "agent",
             label: "Developer",
-            task_template: "implement",
+            prompt: "implement",
           },
           qa: {
             type: "agent",
             label: "QA",
-            task_template: "verify",
+            prompt: "verify",
             inputs: ["developer"],
           },
         },
@@ -415,8 +415,8 @@ Deno.test("collectAllNodeIds — no loop nodes returns top-level only", () => {
     name: "test",
     version: "1",
     nodes: {
-      a: { type: "agent", label: "A", task_template: "x" },
-      b: { type: "agent", label: "B", task_template: "y" },
+      a: { type: "agent", label: "A", prompt: "x" },
+      b: { type: "agent", label: "B", prompt: "y" },
     },
   };
   const ids = collectAllNodeIds(config);
@@ -430,7 +430,7 @@ Deno.test("findNodeConfig — finds top-level node", () => {
     name: "test",
     version: "1",
     nodes: {
-      pm: { type: "agent", label: "PM", task_template: "spec" },
+      pm: { type: "agent", label: "PM", prompt: "spec" },
     },
   };
   const node = findNodeConfig(config, "pm");
@@ -452,12 +452,12 @@ Deno.test("findNodeConfig — finds loop body node", () => {
           developer: {
             type: "agent",
             label: "Developer",
-            task_template: "impl",
+            prompt: "impl",
           },
           qa: {
             type: "agent",
             label: "QA",
-            task_template: "verify",
+            prompt: "verify",
             inputs: ["developer"],
           },
         },
@@ -502,7 +502,7 @@ Deno.test("findNodeConfig — returns undefined for unknown node", () => {
     name: "test",
     version: "1",
     nodes: {
-      pm: { type: "agent", label: "PM", task_template: "spec" },
+      pm: { type: "agent", label: "PM", prompt: "spec" },
     },
   };
   const node = findNodeConfig(config, "nonexistent");

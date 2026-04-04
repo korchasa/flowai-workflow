@@ -201,9 +201,9 @@ function validateNode(
   const type = node.type as string;
 
   if (type === "agent") {
-    if (!node.prompt && !node.task_template) {
+    if (!node.prompt) {
       throw new Error(
-        `Agent node '${id}' requires at least 'prompt' or 'task_template'`,
+        `Agent node '${id}' requires a 'prompt' field`,
       );
     }
   }
@@ -549,49 +549,12 @@ function mergeDefaults(config: PipelineConfig): PipelineConfig {
     defaults: pipelineDefaults,
     nodes: mergedNodes,
   };
-  validatePromptPaths(result);
   validateFileReferences(result);
   return result;
 }
 
 /**
- * Validate all non-template prompt paths exist on the filesystem
- * and cache their contents into node.prompt_content.
- * Accumulates all missing paths and throws a single error listing them all.
- * Paths containing `{{` are template variables — skipped (unresolvable at load time).
- */
-export function validatePromptPaths(config: PipelineConfig): void {
-  const missing: string[] = [];
-
-  for (const node of Object.values(config.nodes)) {
-    readPromptContent(node, missing);
-    // Recurse into loop body nodes
-    if (node.type === "loop" && node.nodes) {
-      for (const bodyNode of Object.values(node.nodes)) {
-        readPromptContent(bodyNode, missing);
-      }
-    }
-  }
-
-  if (missing.length > 0) {
-    throw new Error(`Missing prompt files:\n  - ${missing.join("\n  - ")}`);
-  }
-}
-
-/** Read prompt file content into node.prompt_content; append to missing[] on NotFound. */
-function readPromptContent(node: NodeConfig, missing: string[]): void {
-  if (!node.prompt || node.prompt.includes("{{")) return;
-  try {
-    node.prompt_content = Deno.readTextFileSync(node.prompt);
-  } catch (e) {
-    if (e instanceof Deno.errors.NotFound) {
-      missing.push(node.prompt);
-    }
-  }
-}
-
-/**
- * Validate all `{{file("path")}}` references in task_template and prompt fields.
+ * Validate all `{{file("path")}}` references in prompt and system_prompt fields.
  *
  * Scans top-level and loop body nodes. Paths containing `{{` are skipped
  * (unresolvable template variables at load time). Throws immediately on the
@@ -601,7 +564,7 @@ export function validateFileReferences(config: PipelineConfig): void {
   const FILE_REF_RE = /\{\{file\("([^"]+)"\)\}\}/g;
 
   function scanNode(nodeId: string, node: NodeConfig): void {
-    const fields = [node.task_template, node.prompt].filter(
+    const fields = [node.prompt, node.system_prompt].filter(
       (f): f is string => typeof f === "string",
     );
     for (const field of fields) {
@@ -629,20 +592,6 @@ export function validateFileReferences(config: PipelineConfig): void {
       }
     }
   }
-}
-
-/** Collect all prompt file paths from a parsed pipeline config (including loop body nodes). */
-export function collectPromptPaths(config: PipelineConfig): string[] {
-  const paths: string[] = [];
-  for (const node of Object.values(config.nodes)) {
-    if (node.prompt) paths.push(node.prompt);
-    if (node.type === "loop" && node.nodes) {
-      for (const bodyNode of Object.values(node.nodes)) {
-        if (bodyNode.prompt) paths.push(bodyNode.prompt);
-      }
-    }
-  }
-  return paths;
 }
 
 /**

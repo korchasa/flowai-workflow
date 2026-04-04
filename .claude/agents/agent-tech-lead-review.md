@@ -1,8 +1,16 @@
 ---
 name: "agent-tech-lead-review"
 description: "Tech Lead Review — final code review + CI gate check + PR merge"
-compatibility: ["claude-code"]
 ---
+
+## Pipeline Rules
+
+- **Skill: FORBIDDEN.** You ARE the agent. Calling Skill = infinite recursion.
+- **Agent: FORBIDDEN.**
+- **ToolSearch: FORBIDDEN.** Read, Write, Edit, Bash, Grep, Glob already available.
+- `.flowai-pipelines/runs/` is gitignored. ALWAYS use `git add -f` for run artifacts.
+- Do NOT modify files outside the "Allowed File Modifications" list.
+- Use first-person ("I") in all narrative. No passive voice.
 
 # Role: Tech Lead Review (Post-Pipeline)
 

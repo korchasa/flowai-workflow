@@ -143,9 +143,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
   }
 
   // Build task prompt
-  const taskPrompt = node.task_template
-    ? interpolate(node.task_template, ctx)
-    : "";
+  const taskPrompt = node.prompt ? interpolate(node.prompt, ctx) : "";
 
   // Verbose: show interpolated prompt
   if (output && nodeId) {
@@ -160,8 +158,10 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
 
   // Initial invocation
   let result = await invokeClaudeCli({
-    promptFile: node.prompt ? interpolate(node.prompt, ctx) : undefined,
-    promptContent: node.prompt_content,
+    agent: node.agent,
+    systemPrompt: node.system_prompt
+      ? interpolate(node.system_prompt, ctx)
+      : undefined,
     taskPrompt,
     claudeArgs,
     model,

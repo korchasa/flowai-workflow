@@ -8,10 +8,10 @@ import {
 
 /** Low-level options for a single claude CLI invocation (initial or resume). */
 export interface InvokeOptions {
-  /** Path to system prompt file passed via --system-prompt-file. Replaces Claude Code base system prompt entirely. */
-  promptFile?: string;
-  /** System prompt content (takes priority over promptFile). Passed via --system-prompt. Replaces base system prompt. */
-  promptContent?: string;
+  /** Name of Claude Code agent (without .md) passed via --agent flag. Skipped on resume. */
+  agent?: string;
+  /** System context passed via --append-system-prompt. Skipped on resume. */
+  systemPrompt?: string;
   /** Task prompt passed to claude via -p flag. */
   taskPrompt: string;
   /** Session ID for --resume continuation (omit for initial invocation). */
@@ -96,10 +96,9 @@ export function buildClaudeArgs(opts: InvokeOptions): string[] {
   args.push("-p", opts.taskPrompt);
 
   if (!opts.resumeSessionId) {
-    if (opts.promptContent) {
-      args.push("--system-prompt", opts.promptContent);
-    } else if (opts.promptFile) {
-      args.push("--system-prompt-file", opts.promptFile);
+    if (opts.agent) args.push("--agent", opts.agent);
+    if (opts.systemPrompt) {
+      args.push("--append-system-prompt", opts.systemPrompt);
     }
   }
 

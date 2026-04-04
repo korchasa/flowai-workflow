@@ -134,7 +134,7 @@ Deno.test("LoopResult — bodyResults is array even when loop node has no runnab
           worker: {
             type: "agent",
             label: "Worker",
-            task_template: "do work",
+            prompt: "do work",
           },
         },
       },
@@ -201,13 +201,13 @@ Deno.test("loop body node — model resolution: own > loop > defaults", () => {
           build: {
             type: "agent",
             label: "Build",
-            task_template: "build",
+            prompt: "build",
             // No model — should inherit from loop node
           },
           verify: {
             type: "agent",
             label: "Verify",
-            task_template: "verify",
+            prompt: "verify",
             model: "claude-opus-4-6", // Own model — takes precedence
           },
         },
@@ -248,7 +248,7 @@ Deno.test("loop body node — model falls through to defaults when loop has none
           verify: {
             type: "agent",
             label: "Verify",
-            task_template: "verify",
+            prompt: "verify",
             // No model on body node either
           },
         },

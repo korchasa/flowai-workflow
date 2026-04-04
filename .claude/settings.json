@@ -7,35 +7,11 @@
       "Read(//Users/korchasa/www/tools/flow/framework/skills/flow-init/**)",
       "Bash(deno task check)",
       "Bash(deno fmt)",
-      "Bash(deno fmt scripts/check.ts)",
-      "Bash(ln -s AGENTS.md CLAUDE.md)",
       "Read(//Users/korchasa/.claude/skills/flow-engineer-hook/**)",
       "Read(//Users/korchasa/www/tools/flow/framework/skills/flow-engineer-hook/**)",
-      "Bash(chmod +x /Users/korchasa/www/tools/auto-sdlc/.claude/hooks/guard-deno-direct.sh)",
-      "Bash(.claude/hooks/guard-deno-direct.sh)",
-      "Bash(echo \"exit: $?\")",
       "WebSearch",
       "Read(//Users/korchasa/.claude/**)",
-      "Bash(grep -v '^agents$')",
-      "Bash(for f in ~/.claude/agents/*.md)",
-      "Bash(do cp -L \"$f\" /Users/korchasa/www/tools/auto-sdlc/.claude/agents/)",
-      "Bash(done)",
-      "Bash(git remote add origin git@github.com:korchasa/flowai-pipelines.git)",
-      "Bash(git stash pop)",
-      "Bash(git stash drop)",
-      "Bash(deno task run:task --task .flowai-pipelines/tasks/fr-10-agent-log-storage.md -v)",
-      "Bash(CLAUDECODE= deno task run:task --task .flowai-pipelines/tasks/fr-10-agent-log-storage.md -v)",
-      "Bash(deno run -A scripts/fmt.ts)",
-      "Bash(deno run -A --allow-run \"deno fmt .flowai-pipelines/engine/agent_test.ts\")",
-      "Bash(deno run --no-check -A .flowai-pipelines/engine/agent_test.ts)",
-      "Bash(wc -l /workspaces/flowai-pipelines/.flowai-pipelines/engine/*.ts)",
-      "Bash(git -C /workspaces/flowai-pipelines log --oneline -20)",
-      "Bash(ls -lh /workspaces/flowai-pipelines/.flowai-pipelines/engine/*.ts)",
-      "Bash(ls -lh /workspaces/flowai-pipelines/.flowai-pipelines/agents/*.md)",
-      "Bash(grep -l \"safety_check_diff\\\\|validate_artifact\\\\|continuation_loop\" /workspaces/flowai-pipelines/.flowai-pipelines/scripts/stage-*.sh)"
-    ],
-    "additionalDirectories": [
-      "/Users/korchasa/www/tools/auto-sdlc/.claude"
+      "Bash(deno run -A scripts/fmt.ts)"
     ]
   },
   "hooks": {

@@ -54,13 +54,15 @@ export interface NodeConfig {
   inputs?: string[];
 
   // agent-specific
-  /** Path to prompt file or inline prompt text for agent nodes. */
+  /** Name of Claude Code agent (without .md extension) passed via --agent flag.
+   * Points to `.claude/agents/<name>.md`. Optional — allows prompt-only nodes. */
+  agent?: string;
+  /** Templateable task prompt sent to the agent via -p flag.
+   * Supports `{{...}}` interpolation. Required for agent nodes. */
   prompt?: string;
-  /** Cached prompt file content, read at config load time.
-   * Populated for non-template prompt paths; undefined for template paths. */
-  prompt_content?: string;
-  /** Template for the task message sent to the agent; supports `{{...}}` interpolation. */
-  task_template?: string;
+  /** Templateable system context passed via --append-system-prompt.
+   * Supports `{{...}}` interpolation and `{{file()}}` for inlining agent definitions. */
+  system_prompt?: string;
   /** Claude model override for this node (e.g. "claude-opus-4-6"). */
   model?: string;
 

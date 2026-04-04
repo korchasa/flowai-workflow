@@ -74,7 +74,8 @@ example of engine usage.
 - **Observability:** 3 verbosity levels (`-q`/default/`-v`); status lines with
   timestamps; final summary
 - **SDLC pipeline (example):** `.flowai-pipelines/pipeline.yaml` — 6 agents automating
-  full development lifecycle. Agent prompts in `.flowai-pipelines/agents/agent-*/SKILL.md`
+  full development lifecycle. Agents in `.claude/agents/agent-*.md` (native Claude Code
+  subagents). Memory in `.flowai-pipelines/memory/`
 - **Docker image:** Single image with claude CLI, deno, git, gh
 
 ## Scope Separation
@@ -141,6 +142,29 @@ as aliases during migration.
   sessions.
 - **Proactive Resolution**: Before asking user, exhaust available resources
   (codebase, docs, web) to find the answer autonomously.
+
+## Read Efficiency
+
+- **ONE READ PER FILE. ZERO re-reads.** After Read(file), its FULL content is
+  in context. Do NOT re-read — not even partially, not even after Write/Edit.
+- **No offset/limit.** NEVER pass offset or limit to Read(). All project files
+  are under 2000 lines. Always read full file.
+- **ZERO Grep after Read.** After reading a file, extract ALL needed facts in
+  your SAME text response. Do NOT Grep the same file — the content IS in your
+  context. Use Grep ONLY for files you have NOT read.
+- **Tool-results temp files:** If Bash output is redirected to a temp file,
+  Read it ONCE. Extract facts. Never re-read or Grep it.
+- **Parallel reads:** Issue ALL Read calls in ONE response when possible.
+  Reading files one-per-turn wastes turns.
+
+## Tool Call Efficiency
+
+- **Parallel tool calls:** When multiple independent tool calls are needed,
+  issue ALL of them in a SINGLE response. Do not serialize independent calls
+  across turns.
+- **Context compression:** The system auto-compresses prior messages near
+  context limits. Write down important facts from tool results in your text
+  response — original tool results may be cleared later.
 
 ## CODE DOCS
 

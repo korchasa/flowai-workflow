@@ -50,8 +50,8 @@ Deno.test("AgentRunOptions — type structure with OutputManager", () => {
   const node: NodeConfig = {
     type: "agent",
     label: "Test agent",
-    prompt: ".flowai-pipelines/agents/agent-developer/SKILL.md",
-    task_template: "Do task for issue #{{args.issue}}",
+    agent: "agent-developer",
+    prompt: "Do task for issue #{{args.issue}}",
     validate: [
       { type: "file_exists", path: "{{node_dir}}/output.md" },
     ],
@@ -78,7 +78,7 @@ Deno.test("AgentRunOptions — output and nodeId are optional", () => {
   const node: NodeConfig = {
     type: "agent",
     label: "Test",
-    task_template: "Do something",
+    prompt: "Do something",
   };
 
   const opts: AgentRunOptions = {
@@ -91,11 +91,11 @@ Deno.test("AgentRunOptions — output and nodeId are optional", () => {
   assertEquals(opts.nodeId, undefined);
 });
 
-Deno.test("AgentRunOptions — task_template interpolation structure", () => {
+Deno.test("AgentRunOptions — prompt interpolation structure", () => {
   const node: NodeConfig = {
     type: "agent",
     label: "Test",
-    task_template:
+    prompt:
       "Read {{input.spec}}/spec.md and implement changes. Output to {{node_dir}}/",
   };
 
@@ -110,7 +110,7 @@ Deno.test("AgentRunOptions — task_template interpolation structure", () => {
     settings: makeSettings(),
   };
 
-  assertEquals(opts.node.task_template!.includes("{{input.spec}}"), true);
+  assertEquals(opts.node.prompt!.includes("{{input.spec}}"), true);
   assertEquals(opts.ctx.input.spec, "/runs/test/spec");
 });
 
@@ -162,49 +162,42 @@ Deno.test("buildClaudeArgs — no claudeArgs by default", () => {
   assertEquals(args.includes("--dangerously-skip-permissions"), false);
 });
 
-Deno.test("buildClaudeArgs — resume mode omits promptFile", () => {
+Deno.test("buildClaudeArgs — agent emits --agent flag", () => {
   const args = buildClaudeArgs(
-    makeInvokeOpts({
-      resumeSessionId: "sess-123",
-      promptFile: "prompt.md",
-    }),
+    makeInvokeOpts({ agent: "agent-pm" }),
   );
-  assertEquals(args.includes("--resume"), true);
-  assertEquals(args.includes("--system-prompt-file"), false);
+  const idx = args.indexOf("--agent");
+  assertEquals(idx >= 0, true, "should contain --agent");
+  assertEquals(args[idx + 1], "agent-pm");
 });
 
-Deno.test("buildClaudeArgs — promptContent uses --system-prompt inline", () => {
+Deno.test("buildClaudeArgs — systemPrompt emits --append-system-prompt", () => {
   const args = buildClaudeArgs(
-    makeInvokeOpts({
-      promptContent: "You are a helpful agent.",
-    }),
+    makeInvokeOpts({ systemPrompt: "Extra context here." }),
   );
-  const idx = args.indexOf("--system-prompt");
-  assertEquals(idx >= 0, true, "should contain --system-prompt");
-  assertEquals(args[idx + 1], "You are a helpful agent.");
-  assertEquals(args.includes("--system-prompt-file"), false);
+  const idx = args.indexOf("--append-system-prompt");
+  assertEquals(idx >= 0, true, "should contain --append-system-prompt");
+  assertEquals(args[idx + 1], "Extra context here.");
 });
 
-Deno.test("buildClaudeArgs — promptContent takes priority over promptFile", () => {
+Deno.test("buildClaudeArgs — agent + systemPrompt both present", () => {
   const args = buildClaudeArgs(
-    makeInvokeOpts({
-      promptFile: ".flowai-pipelines/agents/agent-pm/SKILL.md",
-      promptContent: "Cached content here.",
-    }),
+    makeInvokeOpts({ agent: "agent-pm", systemPrompt: "Extra." }),
   );
-  assertEquals(args.includes("--system-prompt"), true);
-  assertEquals(args.includes("--system-prompt-file"), false);
+  assertEquals(args.includes("--agent"), true);
+  assertEquals(args.includes("--append-system-prompt"), true);
 });
 
-Deno.test("buildClaudeArgs — promptContent omitted on resume", () => {
+Deno.test("buildClaudeArgs — agent + systemPrompt omitted on resume", () => {
   const args = buildClaudeArgs(
     makeInvokeOpts({
       resumeSessionId: "sess-456",
-      promptContent: "Cached content.",
+      agent: "agent-pm",
+      systemPrompt: "Extra.",
     }),
   );
-  assertEquals(args.includes("--system-prompt"), false);
-  assertEquals(args.includes("--system-prompt-file"), false);
+  assertEquals(args.includes("--agent"), false);
+  assertEquals(args.includes("--append-system-prompt"), false);
 });
 
 Deno.test("settings — default values", () => {
@@ -1082,7 +1075,7 @@ Deno.test("NodeConfig — allowed_paths field accepted by type system", () => {
   const node: NodeConfig = {
     type: "agent",
     label: "Scoped agent",
-    task_template: "Do task",
+    prompt: "Do task",
     allowed_paths: ["engine/**", "engine/*_test.ts"],
   };
   assertEquals(Array.isArray(node.allowed_paths), true);
@@ -1094,7 +1087,7 @@ Deno.test("NodeConfig — allowed_paths absent by default", () => {
   const node: NodeConfig = {
     type: "agent",
     label: "No scope restriction",
-    task_template: "Do task",
+    prompt: "Do task",
   };
   assertEquals(node.allowed_paths, undefined);
 });

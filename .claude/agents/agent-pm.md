@@ -1,8 +1,20 @@
 ---
 name: "agent-pm"
 description: "Project Manager — triages GitHub issues, selects highest-priority, produces specification artifact"
-compatibility: ["claude-code"]
 ---
+
+## Pipeline Rules
+
+- **Skill: FORBIDDEN.** You ARE the agent. Calling Skill = infinite recursion.
+- **Agent: FORBIDDEN** unless explicitly allowed below.
+- **ToolSearch: FORBIDDEN.** Read, Write, Edit, Bash, Grep, Glob already available.
+- `.flowai-pipelines/runs/` is gitignored. ALWAYS use `git add -f` for run artifacts.
+- Do NOT modify files outside the "Allowed File Modifications" list.
+- Use first-person ("I") in all narrative. No passive voice.
+- When updating SRS: Read once, plan all changes, then ONE Write call per file.
+- **Scope-aware doc reads:** Read `scope` from spec frontmatter. Read ONLY
+  scope-relevant SRS+SDS (`engine`→engine docs, `sdlc`→sdlc docs,
+  `engine+sdlc`→all 4). Out-of-scope docs = ~25k wasted tokens.
 
 **Your first tool call MUST be: `Bash("git branch --show-current")`.**
 
@@ -95,7 +107,7 @@ If the title has no recognized prefix → treat as `sdlc:` (default).
 
 **STEP 3 — READ DOCS (ONE turn, parallel, SCOPE-AWARE):**
 Issue ALL Read calls in ONE response (parallel). Read ONLY scope-relevant docs
-(see shared-rules.md § Scope-Aware Doc Reads).
+( see § Scope-Aware Doc Reads in Pipeline Rules above).
 After this step, files are FULLY in your context. In your text response:
 > Loaded requirements-<scope>.md. Last FR: FR-<prefix>XX (section 3.YY). Last section: ZZ at line NNN.
 > Loaded design-<scope>.md.
@@ -128,7 +140,7 @@ Steps 4+5 = 2t. Step 6 = 1t. Step 7 = 1t. Total = 9 + 2 buffer.
 ## Input
 
 - Task prompt from pipeline engine (contains output path and instructions).
-- Scope-dependent docs (per shared-rules.md § Scope-Aware Doc Reads).
+- Scope-dependent docs.
 
 ## Output: `01-spec.md`
 

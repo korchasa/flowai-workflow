@@ -8,8 +8,8 @@ nodes:
   spec:
     type: agent
     label: "Write spec"
-    prompt: ".flowai-pipelines/agents/agent-pm/SKILL.md"
-    task_template: "Write a spec for issue #{{args.issue}}"
+    agent: agent-pm
+    prompt: "Write a spec for issue #{{args.issue}}"
 `;
 
 const MINIMAL_HUMAN = `
@@ -56,7 +56,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do something"
+    prompt: "do something"
 `;
   const config = parseConfig(yaml);
   assertEquals(config.nodes.a.settings!.max_continuations, 5);
@@ -73,7 +73,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do something"
+    prompt: "do something"
     settings:
       max_continuations: 10
 `;
@@ -97,11 +97,11 @@ nodes:
       developer:
         type: agent
         label: Developer
-        task_template: "implement"
+        prompt: "implement"
       qa:
         type: agent
         label: QA
-        task_template: "verify"
+        prompt: "verify"
         inputs: [developer]
 `;
   const config = parseConfig(yaml);
@@ -129,7 +129,7 @@ nodes:
       worker:
         type: agent
         label: Worker
-        task_template: "do work"
+        prompt: "do work"
 `;
   const config = parseConfig(yaml);
   assertEquals(Object.keys(config.nodes["my-loop"].nodes!).length, 1);
@@ -143,7 +143,7 @@ nodes:
   spec:
     type: agent
     label: Spec
-    task_template: "write spec"
+    prompt: "write spec"
   impl-loop:
     type: loop
     label: Impl loop
@@ -155,12 +155,12 @@ nodes:
       developer:
         type: agent
         label: Developer
-        task_template: "implement"
+        prompt: "implement"
         inputs: [spec]
       qa:
         type: agent
         label: QA
-        task_template: "verify"
+        prompt: "verify"
         inputs: [developer]
 `;
   // Should not throw — body node inputs referencing external top-level nodes are valid
@@ -180,7 +180,7 @@ nodes:
   spec:
     type: agent
     label: Spec
-    task_template: "write spec"
+    prompt: "write spec"
   my-loop:
     type: loop
     label: Loop
@@ -192,7 +192,7 @@ nodes:
       worker:
         type: agent
         label: Worker
-        task_template: "work"
+        prompt: "work"
         inputs: [spec]
 `;
     const config = parseConfig(yaml);
@@ -210,7 +210,7 @@ nodes:
   spec:
     type: agent
     label: Spec
-    task_template: "write spec"
+    prompt: "write spec"
   my-loop:
     type: loop
     label: Loop
@@ -221,7 +221,7 @@ nodes:
       worker:
         type: agent
         label: Worker
-        task_template: "work"
+        prompt: "work"
         inputs: [spec]
 `;
     assertThrows(
@@ -249,11 +249,11 @@ nodes:
       developer:
         type: agent
         label: Developer
-        task_template: "implement"
+        prompt: "implement"
       qa:
         type: agent
         label: QA
-        task_template: "verify"
+        prompt: "verify"
         inputs: [developer]
 `;
     const config = parseConfig(yaml);
@@ -271,7 +271,7 @@ nodes:
   spec:
     type: agent
     label: Spec
-    task_template: "write spec"
+    prompt: "write spec"
   my-loop:
     type: loop
     label: Loop
@@ -283,7 +283,7 @@ nodes:
       worker:
         type: agent
         label: Worker
-        task_template: "work"
+        prompt: "work"
 `;
     const config = parseConfig(yaml);
     assertEquals(config.nodes["my-loop"].nodes!.worker.inputs, undefined);
@@ -305,11 +305,11 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do A"
+    prompt: "do A"
   b:
     type: agent
     label: B
-    task_template: "do B"
+    prompt: "do B"
   combined:
     type: merge
     label: Combine results
@@ -329,7 +329,7 @@ nodes:
   spec:
     type: agent
     label: Spec
-    task_template: "write spec"
+    prompt: "write spec"
     validate:
       - type: file_exists
         path: "{{node_dir}}/01-spec.md"
@@ -351,7 +351,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "use {{env.API_KEY}}"
+    prompt: "use {{env.API_KEY}}"
 `;
   const config = parseConfig(yaml);
   assertEquals(config.env!.API_KEY, "test-key");
@@ -365,7 +365,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do something"
+    prompt: "do something"
     before: "git pull"
     after: "deno task check"
 `;
@@ -385,7 +385,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do something"
+    prompt: "do something"
 `;
   const config = parseConfig(yaml);
   assertEquals(config.pre_run, "./scripts/reset.sh");
@@ -405,7 +405,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do something"
+    prompt: "do something"
 `;
   assertEquals(extractPreRun(yaml), "./scripts/reset.sh");
 });
@@ -420,7 +420,7 @@ Deno.test("parseConfig — missing name throws", () => {
   assertThrows(
     () =>
       parseConfig(
-        `version: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    task_template: x`,
+        `version: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    prompt: x`,
       ),
     Error,
     "non-empty 'name'",
@@ -431,7 +431,7 @@ Deno.test("parseConfig — wrong version throws", () => {
   assertThrows(
     () =>
       parseConfig(
-        `name: test\nversion: "2"\nnodes:\n  a:\n    type: agent\n    label: A\n    task_template: x`,
+        `name: test\nversion: "2"\nnodes:\n  a:\n    type: agent\n    label: A\n    prompt: x`,
       ),
     Error,
     "Unsupported pipeline config version",
@@ -469,21 +469,21 @@ Deno.test("parseConfig — missing label throws", () => {
   assertThrows(
     () =>
       parseConfig(
-        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    task_template: x`,
+        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    prompt: x`,
       ),
     Error,
     "non-empty 'label'",
   );
 });
 
-Deno.test("parseConfig — agent without prompt or task_template throws", () => {
+Deno.test("parseConfig — agent without prompt throws", () => {
   assertThrows(
     () =>
       parseConfig(
         `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A`,
       ),
     Error,
-    "requires at least 'prompt' or 'task_template'",
+    "requires a 'prompt' field",
   );
 });
 
@@ -491,7 +491,7 @@ Deno.test("parseConfig — input referencing unknown node throws", () => {
   assertThrows(
     () =>
       parseConfig(
-        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    task_template: x\n    inputs: [nonexistent]`,
+        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    prompt: x\n    inputs: [nonexistent]`,
       ),
     Error,
     "unknown input node 'nonexistent'",
@@ -502,7 +502,7 @@ Deno.test("parseConfig — self-referencing input throws", () => {
   assertThrows(
     () =>
       parseConfig(
-        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    task_template: x\n    inputs: [a]`,
+        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    prompt: x\n    inputs: [a]`,
       ),
     Error,
     "cannot reference itself",
@@ -535,7 +535,7 @@ nodes:
       developer:
         type: agent
         label: E
-        task_template: x
+        prompt: x
 `;
   assertThrows(
     () => parseConfig(yaml),
@@ -559,11 +559,11 @@ nodes:
       developer:
         type: agent
         label: E
-        task_template: x
+        prompt: x
       qa:
         type: agent
         label: Q
-        task_template: x
+        prompt: x
 `;
   assertThrows(
     () => parseConfig(yaml),
@@ -587,7 +587,7 @@ Deno.test("parseConfig — invalid validation rule type throws", () => {
   assertThrows(
     () =>
       parseConfig(
-        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    task_template: x\n    validate:\n      - type: invalid\n        path: foo`,
+        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    prompt: x\n    validate:\n      - type: invalid\n        path: foo`,
       ),
     Error,
     "invalid type 'invalid'",
@@ -598,7 +598,7 @@ Deno.test("parseConfig — invalid on_error throws", () => {
   assertThrows(
     () =>
       parseConfig(
-        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    task_template: x\n    settings:\n      on_error: maybe`,
+        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    prompt: x\n    settings:\n      on_error: maybe`,
       ),
     Error,
     'on_error must be "fail" or "continue"',
@@ -615,7 +615,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do something"
+    prompt: "do something"
     run_on: always
 `;
   const config = parseConfig(yaml);
@@ -630,7 +630,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do something"
+    prompt: "do something"
     run_on: success
 `;
   const config = parseConfig(yaml);
@@ -645,7 +645,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do something"
+    prompt: "do something"
     run_on: failure
 `;
   const config = parseConfig(yaml);
@@ -656,7 +656,7 @@ Deno.test("parseConfig — invalid run_on value throws", () => {
   assertThrows(
     () =>
       parseConfig(
-        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    task_template: x\n    run_on: sometimes`,
+        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    prompt: x\n    run_on: sometimes`,
       ),
     Error,
     "invalid run_on value 'sometimes'. Must be one of: always, success, failure",
@@ -678,7 +678,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do something"
+    prompt: "do something"
     run_always: true
 `;
   const config = parseConfig(yaml);
@@ -694,7 +694,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do something"
+    prompt: "do something"
     run_always: false
 `;
   const config = parseConfig(yaml);
@@ -710,7 +710,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do something"
+    prompt: "do something"
     run_always: true
     run_on: success
 `;
@@ -738,11 +738,11 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do A"
+    prompt: "do A"
   b:
     type: agent
     label: B
-    task_template: "do B"
+    prompt: "do B"
     inputs: [a]
 `;
   const config = parseConfig(yaml);
@@ -759,7 +759,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do A"
+    prompt: "do A"
 `;
   assertThrows(
     () => parseConfig(yaml),
@@ -779,7 +779,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do A"
+    prompt: "do A"
 `;
   assertThrows(
     () => parseConfig(yaml),
@@ -802,7 +802,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do A"
+    prompt: "do A"
     phase: wrong-phase
 `;
     assertThrows(
@@ -823,7 +823,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do A"
+    prompt: "do A"
 `;
   const config = parseConfig(yaml);
   assertEquals(config.phases!.plan, ["a"]);
@@ -839,7 +839,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do A"
+    prompt: "do A"
     phase: plan
 `;
     const config = parseConfig(yaml);
@@ -853,132 +853,9 @@ Deno.test("parseConfig — neither phases mechanism → accepted", () => {
   assertEquals(config.nodes.spec.phase, undefined);
 });
 
-// --- validatePromptPaths tests (FR-31) ---
-
-Deno.test("parseConfig — missing prompt file throws with file path", () => {
-  const yaml = `
-name: test
-version: "1"
-nodes:
-  a:
-    type: agent
-    label: A
-    prompt: nonexistent/SKILL.md
-`;
-  assertThrows(
-    () => parseConfig(yaml),
-    Error,
-    "nonexistent/SKILL.md",
-  );
-});
-
-Deno.test("parseConfig — existing prompt file passes without error", () => {
-  const config = parseConfig(MINIMAL_AGENT);
-  assertEquals(
-    config.nodes.spec.prompt,
-    ".flowai-pipelines/agents/agent-pm/SKILL.md",
-  );
-});
-
-Deno.test("parseConfig — existing prompt file has prompt_content populated", () => {
-  const config = parseConfig(MINIMAL_AGENT);
-  const content = Deno.readTextFileSync(
-    ".flowai-pipelines/agents/agent-pm/SKILL.md",
-  );
-  assertEquals(config.nodes.spec.prompt_content, content);
-});
-
-Deno.test("parseConfig — template prompt path has no prompt_content", () => {
-  const yaml = `
-name: test
-version: "1"
-nodes:
-  a:
-    type: agent
-    label: A
-    prompt: "{{env.AGENTS_DIR}}/SKILL.md"
-`;
-  const config = parseConfig(yaml);
-  assertEquals(config.nodes.a.prompt_content, undefined);
-});
-
-Deno.test("parseConfig — loop body node prompt_content populated", () => {
-  const yaml = `
-name: test
-version: "1"
-nodes:
-  impl-loop:
-    type: loop
-    label: Implementation loop
-    condition_node: qa
-    condition_field: verdict
-    exit_value: PASS
-    nodes:
-      developer:
-        type: agent
-        label: Developer
-        prompt: .flowai-pipelines/agents/agent-pm/SKILL.md
-      qa:
-        type: agent
-        label: QA
-        task_template: "verify"
-        inputs: [developer]
-`;
-  const config = parseConfig(yaml);
-  const content = Deno.readTextFileSync(
-    ".flowai-pipelines/agents/agent-pm/SKILL.md",
-  );
-  assertEquals(
-    config.nodes["impl-loop"].nodes!.developer.prompt_content,
-    content,
-  );
-  assertEquals(config.nodes["impl-loop"].nodes!.qa.prompt_content, undefined);
-});
-
-Deno.test("parseConfig — template prompt path skipped (no filesystem check)", () => {
-  const yaml = `
-name: test
-version: "1"
-nodes:
-  a:
-    type: agent
-    label: A
-    prompt: "{{env.AGENTS_DIR}}/SKILL.md"
-`;
-  // Must not throw — template paths are unresolvable at load time, skipped
-  const config = parseConfig(yaml);
-  assertEquals(config.nodes.a.prompt, "{{env.AGENTS_DIR}}/SKILL.md");
-});
-
-Deno.test("parseConfig — multiple missing prompt files → single error listing all paths", () => {
-  const yaml = `
-name: test
-version: "1"
-nodes:
-  a:
-    type: agent
-    label: A
-    prompt: missing/a/SKILL.md
-  b:
-    type: agent
-    label: B
-    inputs: [a]
-    prompt: missing/b/SKILL.md
-`;
-  let caught: Error | undefined;
-  try {
-    parseConfig(yaml);
-  } catch (e) {
-    caught = e as Error;
-  }
-  assertEquals(caught !== undefined, true);
-  assertEquals(caught!.message.includes("missing/a/SKILL.md"), true);
-  assertEquals(caught!.message.includes("missing/b/SKILL.md"), true);
-});
-
 // --- validateFileReferences tests (FR-E32) ---
 
-Deno.test("parseConfig — task_template with valid file() reference passes", () => {
+Deno.test("parseConfig — prompt with valid file() reference passes", () => {
   const tmpDir = Deno.makeTempDirSync();
   const filePath = `${tmpDir}/context.md`;
   Deno.writeTextFileSync(filePath, "# Context");
@@ -989,13 +866,13 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: '{{file("${filePath}")}}'
+    prompt: '{{file("${filePath}")}}'
 `;
   const config = parseConfig(yaml);
-  assertEquals(config.nodes.a.task_template, `{{file("${filePath}")}}`);
+  assertEquals(config.nodes.a.prompt, `{{file("${filePath}")}}`);
 });
 
-Deno.test("parseConfig — task_template with missing file() path throws", () => {
+Deno.test("parseConfig — prompt with missing file() path throws", () => {
   const yaml = `
 name: test
 version: "1"
@@ -1003,7 +880,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: '{{file("/nonexistent/missing.md")}}'
+    prompt: '{{file("/nonexistent/missing.md")}}'
 `;
   assertThrows(
     () => parseConfig(yaml),
@@ -1020,16 +897,16 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: '{{file("{{input.x}}/context.md")}}'
+    prompt: '{{file("{{input.x}}/context.md")}}'
 `;
   const config = parseConfig(yaml);
   assertEquals(
-    config.nodes.a.task_template,
+    config.nodes.a.prompt,
     '{{file("{{input.x}}/context.md")}}',
   );
 });
 
-Deno.test("parseConfig — loop body node task_template with missing file() throws", () => {
+Deno.test("parseConfig — loop body node prompt with missing file() throws", () => {
   const yaml = `
 name: test
 version: "1"
@@ -1044,11 +921,11 @@ nodes:
       developer:
         type: agent
         label: Developer
-        task_template: '{{file("/nonexistent/prompt.md")}}'
+        prompt: '{{file("/nonexistent/prompt.md")}}'
       qa:
         type: agent
         label: QA
-        task_template: verify
+        prompt: verify
         inputs: [developer]
 `;
   assertThrows(
@@ -1058,33 +935,40 @@ nodes:
   );
 });
 
-Deno.test("parseConfig — loop body node with missing prompt throws", () => {
+Deno.test("parseConfig — system_prompt with missing file() path throws", () => {
   const yaml = `
 name: test
 version: "1"
 nodes:
-  impl-loop:
-    type: loop
-    label: Implementation loop
-    condition_node: qa
-    condition_field: verdict
-    exit_value: PASS
-    nodes:
-      developer:
-        type: agent
-        label: Developer
-        prompt: nonexistent/developer/SKILL.md
-      qa:
-        type: agent
-        label: QA
-        task_template: "verify"
-        inputs: [developer]
+  a:
+    type: agent
+    label: A
+    prompt: "do work"
+    system_prompt: '{{file("/nonexistent/rules.md")}}'
 `;
   assertThrows(
     () => parseConfig(yaml),
     Error,
-    "nonexistent/developer/SKILL.md",
+    "file not found",
   );
+});
+
+Deno.test("parseConfig — system_prompt with valid file() reference passes", () => {
+  const tmpDir = Deno.makeTempDirSync();
+  const filePath = `${tmpDir}/rules.md`;
+  Deno.writeTextFileSync(filePath, "# Rules");
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  a:
+    type: agent
+    label: A
+    prompt: "do work"
+    system_prompt: '{{file("${filePath}")}}'
+`;
+  const config = parseConfig(yaml);
+  assertEquals(config.nodes.a.system_prompt, `{{file("${filePath}")}}`);
 });
 
 // --- artifact validation rule schema tests ---
@@ -1093,7 +977,7 @@ Deno.test("parseConfig — artifact rule without sections or fields throws", () 
   assertThrows(
     () =>
       parseConfig(
-        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    task_template: x\n    validate:\n      - type: artifact\n        path: foo`,
+        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    prompt: x\n    validate:\n      - type: artifact\n        path: foo`,
       ),
     Error,
     "requires at least one of 'sections' or 'fields'",
@@ -1104,7 +988,7 @@ Deno.test("parseConfig — artifact rule with empty sections array and no fields
   assertThrows(
     () =>
       parseConfig(
-        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    task_template: x\n    validate:\n      - type: artifact\n        path: foo\n        sections: []`,
+        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    prompt: x\n    validate:\n      - type: artifact\n        path: foo\n        sections: []`,
       ),
     Error,
     "requires at least one of 'sections' or 'fields'",
@@ -1115,7 +999,7 @@ Deno.test("parseConfig — artifact rule with non-string sections throws", () =>
   assertThrows(
     () =>
       parseConfig(
-        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    task_template: x\n    validate:\n      - type: artifact\n        path: foo\n        sections: [123, 456]`,
+        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    prompt: x\n    validate:\n      - type: artifact\n        path: foo\n        sections: [123, 456]`,
       ),
     Error,
     "array of strings",
@@ -1130,7 +1014,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: x
+    prompt: x
     validate:
       - type: artifact
         path: "{{node_dir}}/output.md"
@@ -1145,7 +1029,7 @@ Deno.test("parseConfig — artifact rule with non-string field entry throws", ()
   assertThrows(
     () =>
       parseConfig(
-        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    task_template: x\n    validate:\n      - type: artifact\n        path: foo\n        fields: [123]`,
+        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    prompt: x\n    validate:\n      - type: artifact\n        path: foo\n        fields: [123]`,
       ),
     Error,
     "non-empty strings",
@@ -1156,7 +1040,7 @@ Deno.test("parseConfig — artifact rule with empty-string field entry throws", 
   assertThrows(
     () =>
       parseConfig(
-        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    task_template: x\n    validate:\n      - type: artifact\n        path: foo\n        fields: [""]`,
+        `name: test\nversion: "1"\nnodes:\n  a:\n    type: agent\n    label: A\n    prompt: x\n    validate:\n      - type: artifact\n        path: foo\n        fields: [""]`,
       ),
     Error,
     "non-empty strings",
@@ -1171,7 +1055,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: x
+    prompt: x
     validate:
       - type: artifact
         path: "{{node_dir}}/output.md"
@@ -1201,11 +1085,11 @@ nodes:
       developer:
         type: agent
         label: Developer
-        task_template: implement
+        prompt: implement
       qa:
         type: agent
         label: QA
-        task_template: verify
+        prompt: verify
         inputs: [developer]
         validate:
           - type: frontmatter_field
@@ -1237,11 +1121,11 @@ nodes:
       developer:
         type: agent
         label: Developer
-        task_template: implement
+        prompt: implement
       qa:
         type: agent
         label: QA
-        task_template: verify
+        prompt: verify
         inputs: [developer]
         validate:
           - type: frontmatter_field
@@ -1263,7 +1147,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do something"
+    prompt: "do something"
     before: "echo {{node_dir}} {{run_id}}"
 `;
   const config = parseConfig(yaml);
@@ -1278,7 +1162,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do something"
+    prompt: "do something"
     after: "deno task check {{env.SOME_VAR}}"
 `;
   const config = parseConfig(yaml);
@@ -1295,7 +1179,7 @@ nodes:
   my-node:
     type: agent
     label: A
-    task_template: "do something"
+    prompt: "do something"
     before: "echo {{bad.var}}"
 `;
     assertThrows(
@@ -1316,7 +1200,7 @@ nodes:
   my-node:
     type: agent
     label: A
-    task_template: "do something"
+    prompt: "do something"
     after: "echo {{bad.var}}"
 `;
     assertThrows(
@@ -1337,7 +1221,7 @@ nodes:
   my-node:
     type: agent
     label: A
-    task_template: "do something"
+    prompt: "do something"
     before: "echo {{unknown_key}}"
 `;
     assertThrows(
@@ -1358,11 +1242,11 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do A"
+    prompt: "do A"
   b:
     type: agent
     label: B
-    task_template: "do B"
+    prompt: "do B"
     inputs: [a]
     after: "cat {{input.a}}/output.md"
 `;
@@ -1381,7 +1265,7 @@ nodes:
   a:
     type: agent
     label: A
-    task_template: "do A"
+    prompt: "do A"
     after: "cat {{input.nonexistent}}/output.md"
 `;
     assertThrows(
@@ -1409,11 +1293,11 @@ nodes:
       developer:
         type: agent
         label: Developer
-        task_template: implement
+        prompt: implement
       qa:
         type: agent
         label: QA
-        task_template: verify
+        prompt: verify
         inputs: [developer]
         after: "echo {{input.developer}}"
 `;

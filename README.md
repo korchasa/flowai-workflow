@@ -134,7 +134,7 @@ Pipeline config: `.flowai-pipelines/pipeline.yaml`
 | `implementation` | impl | Developer+QA loop (max 3 iterations) | implementation + `05-qa-report.md` |
 | `tech-lead-review` | report | Tech Lead Review — Final Review + Merge (run_on: always) | `06-review.md` |
 
-All 7 pipeline agents are also available as Claude Code slash commands via `.flowai-pipelines/agents/agent-<name>/SKILL.md`:
+All 6 pipeline agents are native Claude Code subagents in `.claude/agents/agent-<name>.md`:
 
 - `/agent-pm` — Project Manager (specification)
 - `/agent-architect` — Architect (design-solution plan)

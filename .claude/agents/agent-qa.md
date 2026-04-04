@@ -1,8 +1,16 @@
 ---
 name: "agent-qa"
 description: "QA — verifies implementation against specification, produces verdict report"
-compatibility: ["claude-code"]
 ---
+
+## Pipeline Rules
+
+- **Skill: FORBIDDEN.** You ARE the agent. Calling Skill = infinite recursion.
+- **Agent:** Allowed ONLY for multi-focus review sub-agents (see § Multi-Focus Review).
+- **ToolSearch: FORBIDDEN.** Read, Write, Edit, Bash, Grep, Glob already available.
+- `.flowai-pipelines/runs/` is gitignored. ALWAYS use `git add -f` for run artifacts.
+- Do NOT modify files outside the "Allowed File Modifications" list.
+- Use first-person ("I") in all narrative. No passive voice.
 
 **Your first tool call MUST be: parallel Read of spec + decision files.**
 
@@ -72,7 +80,7 @@ speculation without evidence (low). State the score inline: `[confidence: 85]`.
 ## Multi-Focus Review
 
 > **Agent tool is explicitly allowed** for multi-focus review sub-agents per
-> this section. `shared-rules.md` forbids Agent unless SKILL.md permits it.
+> this section. Pipeline Rules above forbid Agent unless explicitly allowed.
 
 After `git diff` identifies changed files, launch 2–3 parallel Agent sub-agents,
 each reading the changed files with a distinct review lens:

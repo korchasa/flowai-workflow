@@ -34,7 +34,7 @@ type: feedback
 - For nested multi-arg calls, count indentation level carefully
 - For extraction refactors (no behavioral change): existing tests are the acceptance gate — no new tests needed
 - When removing imports: trace each symbol to confirm it is truly unused after extraction before deleting
-- **Self-referential safety for prompt deletions:** Don't delete `.flowai-pipelines/agents/agent-*/SKILL.md` files
+- **Self-referential safety for prompt deletions:** Don't delete `.claude/agents/agent-*.md` files
   during a pipeline run — the engine may still need them for later nodes in the current run
 
 ## Environment Quirks
