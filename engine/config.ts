@@ -8,6 +8,7 @@
 
 import { parse as parseYaml } from "@std/yaml";
 import { validateTemplateVars } from "./template.ts";
+import { VALID_PERMISSION_MODES } from "./types.ts";
 import type {
   NodeConfig,
   NodeSettings,
@@ -24,8 +25,10 @@ export const DEFAULT_SETTINGS: Required<NodeSettings> = {
   retry_delay_seconds: 5,
 };
 
-/** Default workflow-level settings. */
-export const DEFAULT_WORKFLOW_DEFAULTS: Required<WorkflowDefaults> = {
+/** Default workflow-level settings (permission_mode intentionally excluded — undefined means "not set"). */
+export const DEFAULT_WORKFLOW_DEFAULTS: Required<
+  Omit<WorkflowDefaults, "permission_mode">
+> = {
   ...DEFAULT_SETTINGS,
   max_parallel: 0,
   claude_args: [],
@@ -127,6 +130,35 @@ function validateSchema(config: Record<string, unknown>): void {
           );
         }
         seenNodes.set(nodeId as string, phaseName);
+      }
+    }
+  }
+
+  // Validate defaults.permission_mode if present
+  if (config.defaults && typeof config.defaults === "object") {
+    const defaults = config.defaults as Record<string, unknown>;
+    if (defaults.permission_mode !== undefined) {
+      if (
+        !VALID_PERMISSION_MODES.includes(defaults.permission_mode as string)
+      ) {
+        throw new Error(
+          `defaults.permission_mode has invalid value '${defaults.permission_mode}'. Must be one of: ${
+            VALID_PERMISSION_MODES.join(", ")
+          }`,
+        );
+      }
+      // Conflict detection: permission_mode vs permission-related claude_args
+      if (Array.isArray(defaults.claude_args)) {
+        const args = defaults.claude_args as string[];
+        if (
+          args.includes("--dangerously-skip-permissions") ||
+          args.includes("--permission-mode")
+        ) {
+          throw new Error(
+            "Conflict: defaults.permission_mode and permission-related flags in defaults.claude_args cannot coexist. " +
+              "Remove --dangerously-skip-permissions or --permission-mode from claude_args.",
+          );
+        }
       }
     }
   }
@@ -365,6 +397,17 @@ function validateNode(
     }
     for (const rule of node.validate) {
       validateValidationRule(id, rule as Record<string, unknown>);
+    }
+  }
+
+  // Validate permission_mode if present
+  if (node.permission_mode !== undefined) {
+    if (!VALID_PERMISSION_MODES.includes(node.permission_mode as string)) {
+      throw new Error(
+        `Node '${id}' has invalid permission_mode '${node.permission_mode}'. Must be one of: ${
+          VALID_PERMISSION_MODES.join(", ")
+        }`,
+      );
     }
   }
 
@@ -630,7 +673,12 @@ export function collectAllNodeIds(config: WorkflowConfig): string[] {
 
 /** Extract NodeSettings fields from WorkflowDefaults (exclude workflow-only fields). */
 function extractNodeSettings(defaults: WorkflowDefaults): NodeSettings {
-  const { max_parallel: _, claude_args: _ca, hitl: _hitl, ...settings } =
-    defaults;
+  const {
+    max_parallel: _,
+    claude_args: _ca,
+    hitl: _hitl,
+    permission_mode: _pm,
+    ...settings
+  } = defaults;
   return settings;
 }

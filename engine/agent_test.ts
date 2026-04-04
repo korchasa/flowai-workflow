@@ -1109,3 +1109,43 @@ Deno.test("ValidationResult — scope_check failure structure", () => {
   assertEquals(result.passed, false);
   assertEquals(result.message.includes(".github/workflow.yaml"), true);
 });
+
+// --- permission_mode tests ---
+
+Deno.test("buildClaudeArgs — permissionMode emits --permission-mode", () => {
+  const args = buildClaudeArgs(
+    makeInvokeOpts({ permissionMode: "bypassPermissions" }),
+  );
+  const idx = args.indexOf("--permission-mode");
+  assertEquals(idx >= 0, true, "should contain --permission-mode");
+  assertEquals(args[idx + 1], "bypassPermissions");
+});
+
+Deno.test("buildClaudeArgs — permissionMode placed before -p", () => {
+  const args = buildClaudeArgs(
+    makeInvokeOpts({ permissionMode: "plan" }),
+  );
+  const pmIdx = args.indexOf("--permission-mode");
+  const pIdx = args.indexOf("-p");
+  assertEquals(
+    pmIdx < pIdx,
+    true,
+    "--permission-mode should appear before -p",
+  );
+});
+
+Deno.test("buildClaudeArgs — no permissionMode by default", () => {
+  const args = buildClaudeArgs(makeInvokeOpts());
+  assertEquals(args.includes("--permission-mode"), false);
+});
+
+Deno.test("buildClaudeArgs — permissionMode + claudeArgs both present", () => {
+  const args = buildClaudeArgs(
+    makeInvokeOpts({
+      permissionMode: "bypassPermissions",
+      claudeArgs: ["--verbose"],
+    }),
+  );
+  assertEquals(args.includes("--permission-mode"), true);
+  assertEquals(args.includes("--verbose"), true);
+});

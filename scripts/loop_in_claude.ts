@@ -56,7 +56,8 @@ async function runWorkflowViaClaude(): Promise<boolean> {
   console.log(`> claude -p "${prompt}" --output-format stream-json`);
   const cmd = new Deno.Command("claude", {
     args: [
-      "--dangerously-skip-permissions",
+      "--permission-mode",
+      "bypassPermissions",
       "-p",
       prompt,
       "--output-format",

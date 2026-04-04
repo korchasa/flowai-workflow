@@ -22,6 +22,7 @@ interface HitlBaseParams {
   ctx: TemplateContext;
   settings: Required<NodeSettings>;
   claudeArgs?: string[];
+  permissionMode?: string;
   model?: string;
   output: OutputManager;
 }
@@ -58,6 +59,7 @@ export async function handleAgentHitl(
     ctx,
     settings,
     claudeArgs,
+    permissionMode,
     model,
     output,
   } = params;
@@ -89,6 +91,7 @@ export async function handleAgentHitl(
         ctx,
         settings,
         claudeArgs,
+        permissionMode,
         model,
         output,
       },
@@ -134,6 +137,7 @@ export async function handleAgentHitl(
       ctx,
       settings,
       claudeArgs,
+      permissionMode,
       model,
       output,
     },

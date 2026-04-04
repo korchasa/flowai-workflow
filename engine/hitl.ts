@@ -57,6 +57,8 @@ export interface HitlRunOptions {
   settings: Required<NodeSettings>;
   /** Extra CLI flags forwarded to Claude on resume. */
   claudeArgs?: string[];
+  /** Permission mode forwarded to Claude on resume. */
+  permissionMode?: string;
   /** Claude model override. Forwarded to invokeClaudeCli on resume. */
   model?: string;
   /** Output manager for status/progress messages. */
@@ -200,6 +202,7 @@ export async function runHitlLoop(
         resumeSessionId: sessionId,
         taskPrompt: reply,
         claudeArgs,
+        permissionMode: opts.permissionMode,
         model: opts.model,
         timeoutSeconds: settings.timeout_seconds,
         maxRetries: settings.max_retries,

@@ -18,6 +18,8 @@ export interface InvokeOptions {
   resumeSessionId?: string;
   /** Extra CLI arguments passed to claude command. */
   claudeArgs?: string[];
+  /** Permission mode (maps to --permission-mode CLI flag). */
+  permissionMode?: string;
   /** Claude model override. Skipped on resume (session inherits model). */
   model?: string;
   /** Max seconds before SIGTERM kills the claude process. */
@@ -84,7 +86,12 @@ export async function invokeClaudeCli(
 export function buildClaudeArgs(opts: InvokeOptions): string[] {
   const args: string[] = [];
 
-  // Extra CLI args (e.g. --dangerously-skip-permissions) go first
+  // Permission mode (first-class field, maps to --permission-mode)
+  if (opts.permissionMode) {
+    args.push("--permission-mode", opts.permissionMode);
+  }
+
+  // Extra CLI args go next
   if (opts.claudeArgs && opts.claudeArgs.length > 0) {
     args.push(...opts.claudeArgs);
   }

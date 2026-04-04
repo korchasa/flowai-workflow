@@ -91,6 +91,8 @@ export async function runLoop(opts: LoopRunOptions): Promise<LoopResult> {
       const ctx = opts.buildCtx(bodyNodeId, iteration);
       const effectiveModel = bodyNode.model ?? loopNode.model ??
         config.defaults?.model;
+      const effectivePermissionMode = bodyNode.permission_mode ??
+        loopNode.permission_mode ?? config.defaults?.permission_mode;
 
       opts.onNodeStart?.(bodyNodeId, iteration);
       markNodeStarted(state, bodyNodeId);
@@ -102,6 +104,7 @@ export async function runLoop(opts: LoopRunOptions): Promise<LoopResult> {
         ctx,
         settings,
         claudeArgs: config.defaults?.claude_args,
+        permissionMode: effectivePermissionMode,
         model: effectiveModel,
         output: opts.output,
         nodeId: bodyNodeId,

@@ -887,6 +887,33 @@
     Evidence: `scripts/compile.ts:stripVersionPrefix`; `engine/cli.ts:getVersionString`.
   - [x] `deno task check` green: 587 tests, 0 failures. Evidence: run `20260320T223114` iter 2.
 
+### 3.40 FR-E40: Permission Mode Configuration
+
+- **Description:** First-class `permission_mode` field in `WorkflowDefaults` and
+  `NodeConfig` that maps to Claude Code's `--permission-mode` CLI flag. Replaces
+  raw `--dangerously-skip-permissions` in `claude_args`. Supported values:
+  `acceptEdits`, `bypassPermissions`, `default`, `dontAsk`, `plan`, `auto`.
+  Per-node override cascades: node → defaults → omit. Config validation rejects
+  invalid values and detects conflicts with permission-related flags in
+  `claude_args`.
+- **Motivation:** Declarative, type-safe permission control. Eliminates raw CLI
+  arg strings, enables per-node granularity, validates at config load time.
+- **Acceptance criteria:**
+  - [x] AC1: `PermissionMode` type and `permission_mode` field on
+    `WorkflowDefaults` + `NodeConfig`. Evidence: `engine/types.ts:9-24,55,90`.
+  - [x] AC2: `buildClaudeArgs()` emits `--permission-mode <value>` when set.
+    Evidence: `engine/claude-process.ts:88-90`.
+  - [x] AC3: Config validation rejects invalid values. Evidence:
+    `engine/config.ts:138-149`; `engine/config_test.ts` (invalid mode tests).
+  - [x] AC4: Conflict detection: error if `claude_args` contains
+    `--dangerously-skip-permissions` or `--permission-mode` AND
+    `permission_mode` field is also set. Evidence: `engine/config.ts:150-162`;
+    `engine/config_test.ts` (conflict tests).
+  - [x] AC5: Per-node override resolution (node → defaults → omit) in
+    `node-dispatch.ts` and `loop.ts`. Evidence: `engine/node-dispatch.ts:54`,
+    `engine/loop.ts:93-94`.
+  - [x] AC6: `deno task check` green: 590 tests, 0 failures.
+
 ## 4. Non-Functional Requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one workflow at a time). Concurrent execution is not supported.

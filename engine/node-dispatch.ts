@@ -51,6 +51,8 @@ export async function executeAgentNode(
   const settings = node.settings as Required<NodeSettings>;
   const hitlConfig = eng.config.defaults?.hitl;
   const effectiveModel = node.model ?? eng.config.defaults?.model;
+  const effectivePermissionMode = node.permission_mode ??
+    eng.config.defaults?.permission_mode;
 
   // Resume path: node was waiting for human reply
   if (wasWaiting) {
@@ -73,6 +75,7 @@ export async function executeAgentNode(
       ctx,
       settings,
       claudeArgs: eng.config.defaults?.claude_args,
+      permissionMode: effectivePermissionMode,
       model: effectiveModel,
       output: eng.output,
     });
@@ -90,6 +93,7 @@ export async function executeAgentNode(
     ctx,
     settings,
     claudeArgs: eng.config.defaults?.claude_args,
+    permissionMode: effectivePermissionMode,
     model: effectiveModel,
     output: eng.output,
     nodeId,
@@ -132,6 +136,7 @@ export async function executeAgentNode(
         ctx,
         settings,
         claudeArgs: eng.config.defaults?.claude_args,
+        permissionMode: effectivePermissionMode,
         model: effectiveModel,
         output: eng.output,
       });

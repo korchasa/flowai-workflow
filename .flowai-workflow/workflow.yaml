@@ -14,8 +14,7 @@ defaults:
   max_retries: 3
   retry_delay_seconds: 5
   model: claude-sonnet-4-6
-  claude_args:
-    - "--dangerously-skip-permissions"
+  permission_mode: bypassPermissions
   on_failure_script: .flowai-workflow/scripts/rollback-uncommitted.sh
   hitl:
     ask_script: .flowai-workflow/scripts/hitl-ask.sh

@@ -1308,3 +1308,136 @@ nodes:
     );
   },
 );
+
+// --- permission_mode validation tests ---
+
+Deno.test("parseConfig — valid permission_mode in defaults", () => {
+  const yaml = `
+name: test
+version: "1"
+defaults:
+  permission_mode: bypassPermissions
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    prompt: do it
+`;
+  const config = parseConfig(yaml);
+  assertEquals(config.defaults?.permission_mode, "bypassPermissions");
+});
+
+Deno.test("parseConfig — valid permission_mode per node", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    prompt: do it
+    permission_mode: plan
+`;
+  const config = parseConfig(yaml);
+  assertEquals(config.nodes.spec.permission_mode, "plan");
+});
+
+Deno.test("parseConfig — invalid permission_mode in defaults throws", () => {
+  const yaml = `
+name: test
+version: "1"
+defaults:
+  permission_mode: invalidMode
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    prompt: do it
+`;
+  assertThrows(
+    () => parseConfig(yaml),
+    Error,
+    "defaults.permission_mode has invalid value 'invalidMode'",
+  );
+});
+
+Deno.test("parseConfig — invalid permission_mode per node throws", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    prompt: do it
+    permission_mode: wrongValue
+`;
+  assertThrows(
+    () => parseConfig(yaml),
+    Error,
+    "invalid permission_mode 'wrongValue'",
+  );
+});
+
+Deno.test("parseConfig — conflict: permission_mode + --dangerously-skip-permissions in claude_args throws", () => {
+  const yaml = `
+name: test
+version: "1"
+defaults:
+  permission_mode: bypassPermissions
+  claude_args:
+    - "--dangerously-skip-permissions"
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    prompt: do it
+`;
+  assertThrows(
+    () => parseConfig(yaml),
+    Error,
+    "Conflict: defaults.permission_mode and permission-related flags",
+  );
+});
+
+Deno.test("parseConfig — conflict: permission_mode + --permission-mode in claude_args throws", () => {
+  const yaml = `
+name: test
+version: "1"
+defaults:
+  permission_mode: bypassPermissions
+  claude_args:
+    - "--permission-mode"
+    - "plan"
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    prompt: do it
+`;
+  assertThrows(
+    () => parseConfig(yaml),
+    Error,
+    "Conflict: defaults.permission_mode and permission-related flags",
+  );
+});
+
+Deno.test("parseConfig — claude_args with --dangerously-skip-permissions without permission_mode is allowed", () => {
+  const yaml = `
+name: test
+version: "1"
+defaults:
+  claude_args:
+    - "--dangerously-skip-permissions"
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    prompt: do it
+`;
+  const config = parseConfig(yaml);
+  assertEquals(config.defaults?.claude_args, [
+    "--dangerously-skip-permissions",
+  ]);
+  assertEquals(config.defaults?.permission_mode, undefined);
+});

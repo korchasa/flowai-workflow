@@ -81,8 +81,10 @@ export interface AgentRunOptions {
   ctx: TemplateContext;
   /** Resolved node settings (timeouts, retries, continuations). */
   settings: Required<NodeSettings>;
-  /** Extra CLI arguments passed to claude command (e.g. --dangerously-skip-permissions). */
+  /** Extra CLI arguments passed to claude command. */
   claudeArgs?: string[];
+  /** Permission mode for this agent (maps to --permission-mode CLI flag). */
+  permissionMode?: string;
   /** Claude model override (e.g. "claude-sonnet-4-6"). Omit = CLI default. */
   model?: string;
   /** OutputManager for verbose diagnostics. */
@@ -124,6 +126,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
     ctx,
     settings,
     claudeArgs,
+    permissionMode,
     model,
     output,
     nodeId,
@@ -164,6 +167,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
       : undefined,
     taskPrompt,
     claudeArgs,
+    permissionMode,
     model,
     timeoutSeconds: settings.timeout_seconds,
     maxRetries: settings.max_retries,
@@ -267,6 +271,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
       resumeSessionId: result.output.session_id,
       taskPrompt: resumePrompt,
       claudeArgs,
+      permissionMode,
       model,
       timeoutSeconds: settings.timeout_seconds,
       maxRetries: settings.max_retries,

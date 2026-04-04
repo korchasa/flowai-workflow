@@ -183,6 +183,19 @@ graph TD
     `opts.model` is set AND `opts.resumeSessionId` is NOT set (resume inherits
     original model from session). Resolution: `node.model ?? defaults.model ??
     undefined` (computed in engine.ts/loop.ts, passed as field).
+    **Permission mode (FR-E40):** `PermissionMode` union type in `types.ts`
+    with 6 values matching Claude CLI `--permission-mode` flag. Optional field
+    on `WorkflowDefaults` and `NodeConfig`. Resolution cascade:
+    `node.permission_mode → config.defaults.permission_mode → omit`.
+    `buildClaudeArgs()` emits `--permission-mode <value>` when set.
+    `DEFAULT_WORKFLOW_DEFAULTS` uses `Omit<WorkflowDefaults, "permission_mode">`
+    to keep field absent by default (no empty-string sentinel).
+    Config validation in `validateSchema()`: rejects invalid values via
+    `VALID_PERMISSION_MODES` constant; conflict detection throws if
+    `claude_args` contains `--dangerously-skip-permissions` or
+    `--permission-mode` while `permission_mode` field is also set.
+    Threaded through: `AgentRunOptions`, `InvokeOptions`, `HitlBaseParams`,
+    `HitlRunOptions` — all accept optional `permissionMode?: string`.
     `executeClaudeProcess()` uses `--output-format stream-json` and reads
     stdout line-by-line. Each JSON line appended to `streamLogPath` file
     (crash-resilient incremental write via `Deno.writeFile({ append: true })`).

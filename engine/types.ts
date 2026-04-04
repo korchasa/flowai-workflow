@@ -3,6 +3,27 @@
  * No logic — pure type definitions.
  */
 
+// --- Permission Mode ---
+
+/** Claude Code permission mode values (maps to --permission-mode CLI flag). */
+export type PermissionMode =
+  | "acceptEdits"
+  | "bypassPermissions"
+  | "default"
+  | "dontAsk"
+  | "plan"
+  | "auto";
+
+/** All valid permission mode values, used for config validation. */
+export const VALID_PERMISSION_MODES: readonly string[] = [
+  "acceptEdits",
+  "bypassPermissions",
+  "default",
+  "dontAsk",
+  "plan",
+  "auto",
+];
+
 // --- Workflow Configuration (parsed from YAML) ---
 
 /** Top-level workflow configuration. */
@@ -30,8 +51,11 @@ export interface WorkflowConfig {
 export interface WorkflowDefaults extends NodeSettings {
   /** Maximum parallel node executions; 0 means unlimited (default). */
   max_parallel?: number;
-  /** Extra CLI args forwarded to every claude invocation (e.g. ["--dangerously-skip-permissions"]). */
+  /** Extra CLI args forwarded to every claude invocation. */
   claude_args?: string[];
+  /** Permission mode for all agent nodes (maps to --permission-mode CLI flag).
+   * Overridable per-node via NodeConfig.permission_mode. */
+  permission_mode?: PermissionMode;
   /** Default Claude model for all agent nodes (e.g. "claude-sonnet-4-6"). */
   model?: string;
   /** Human-in-the-loop config: ask/check scripts, poll interval, timeout. */
@@ -65,6 +89,8 @@ export interface NodeConfig {
   system_prompt?: string;
   /** Claude model override for this node (e.g. "claude-opus-4-6"). */
   model?: string;
+  /** Permission mode override for this node (maps to --permission-mode CLI flag). */
+  permission_mode?: PermissionMode;
 
   // common
   /** Per-node execution settings (timeouts, retries, error handling). */

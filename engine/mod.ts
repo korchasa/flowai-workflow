@@ -10,6 +10,7 @@ export type {
   NodeState,
   NodeStatus,
   PermissionDenial,
+  PermissionMode,
   RunState,
   TemplateContext,
   ValidationRule,
