@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run -A
 /**
- * Cross-platform compile script for flowai-pipelines.
+ * Cross-platform compile script for flowai-workflow.
  * Produces standalone binaries via `deno compile` for each supported target.
  *
  * Usage:
@@ -8,10 +8,10 @@
  *   deno task compile --target <triple>  # Build a single target
  *
  * Supported targets:
- *   x86_64-unknown-linux-gnu   → flowai-pipelines-linux-x86_64
- *   aarch64-unknown-linux-gnu  → flowai-pipelines-linux-arm64
- *   x86_64-apple-darwin        → flowai-pipelines-darwin-x86_64
- *   aarch64-apple-darwin       → flowai-pipelines-darwin-arm64
+ *   x86_64-unknown-linux-gnu   → flowai-workflow-linux-x86_64
+ *   aarch64-unknown-linux-gnu  → flowai-workflow-linux-arm64
+ *   x86_64-apple-darwin        → flowai-workflow-darwin-x86_64
+ *   aarch64-apple-darwin       → flowai-workflow-darwin-arm64
  *
  * The VERSION env var is embedded at compile time (defaults to "dev").
  * Leading "v" prefix is stripped (e.g., tag "v1.2.3" embeds as "1.2.3").
@@ -23,10 +23,10 @@ export interface Target {
 }
 
 export const TARGETS: Target[] = [
-  { triple: "x86_64-unknown-linux-gnu", name: "flowai-pipelines-linux-x86_64" },
-  { triple: "aarch64-unknown-linux-gnu", name: "flowai-pipelines-linux-arm64" },
-  { triple: "x86_64-apple-darwin", name: "flowai-pipelines-darwin-x86_64" },
-  { triple: "aarch64-apple-darwin", name: "flowai-pipelines-darwin-arm64" },
+  { triple: "x86_64-unknown-linux-gnu", name: "flowai-workflow-linux-x86_64" },
+  { triple: "aarch64-unknown-linux-gnu", name: "flowai-workflow-linux-arm64" },
+  { triple: "x86_64-apple-darwin", name: "flowai-workflow-darwin-x86_64" },
+  { triple: "aarch64-apple-darwin", name: "flowai-workflow-darwin-arm64" },
 ];
 
 /** Strip leading "v" prefix from a version tag (e.g., "v1.2.3" → "1.2.3"). */

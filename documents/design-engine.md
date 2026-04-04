@@ -15,7 +15,7 @@
 ```mermaid
 graph TD
     CLI["CLI<br/>deno task run"] --> Engine
-    Engine --> Config["Config Loader<br/>.flowai-pipelines/pipeline.yaml"]
+    Engine --> Config["Config Loader<br/>.flowai-workflow/pipeline.yaml"]
     Engine --> DAG["DAG Builder<br/>toposort → levels"]
     Engine --> State["State Manager<br/>state.json"]
 
@@ -42,7 +42,7 @@ graph TD
   - **Pipeline Engine** (`engine/`): Deno/TypeScript DAG-based executor
     with YAML config, template interpolation, sequential levels, loop nodes,
     human nodes, resume support
-  - **Artifact Store**: Git-tracked files in `.flowai-pipelines/runs/<run-id>/[<phase>/]<node-id>/`
+  - **Artifact Store**: Git-tracked files in `.flowai-workflow/runs/<run-id>/[<phase>/]<node-id>/`
     (phase subdir present when node has `phase` field in config)
   - **Validation Engine**: Rule-based checks (file_exists, file_not_empty,
     contains_section, custom_script, frontmatter_field)
@@ -282,7 +282,7 @@ graph TD
     Pre-existing uncommitted changes excluded by before/after diff (AC #5).
     Sub-second latency for ≤1000 tracked files (AC #6) — git index-based.
   - ~~`git.ts`~~ — **deleted** (FR-29: domain-specific git code removed from
-    engine). Functions relocated to `.flowai-pipelines/scripts/rollback-uncommitted.sh`.
+    engine). Functions relocated to `.flowai-workflow/scripts/rollback-uncommitted.sh`.
     Failure handling replaced by configurable `on_failure_script` hook
   - `output.ts` — terminal output manager (quiet/normal/semi-verbose/verbose),
     verbose methods for detailed agent-node diagnostics.
@@ -348,7 +348,7 @@ graph TD
   - `cli.ts` — CLI entry point: argument parsing, .env loading.
     `VERSION` constant: `Deno.env.get("VERSION") ?? "dev"` — injected at
     compile time via `deno compile --env VERSION=<tag>`. `--version` / `-V`
-    flag: prints `flowai-pipelines <VERSION>` and exits (FR-E39). Added to
+    flag: prints `flowai-workflow <VERSION>` and exits (FR-E39). Added to
     `parseArgs()` alongside existing `--help`
   - `mod.ts` — barrel re-export serving as `deno doc --lint` entry point
     (not a runtime public API; sole non-redundant consumer is
@@ -363,8 +363,8 @@ graph TD
   cascade order and legacy normalization; (4) `checkFrontmatterField()` in
   `validate.ts` — regex-over-YAML-parser for partial-document handling.
 - **Legacy Test Task Removal (FR-E29):** Verified complete. No `test:*` tasks
-  referencing `.flowai-pipelines/scripts/stage-*_test.ts` remain in `deno.json`. No "Stage
-  Scripts" section in SDS (§3.2 is Phase Registry). No `.flowai-pipelines/scripts/stage-*`
+  referencing `.flowai-workflow/scripts/stage-*_test.ts` remain in `deno.json`. No "Stage
+  Scripts" section in SDS (§3.2 is Phase Registry). No `.flowai-workflow/scripts/stage-*`
   references in this document. Current valid test tasks: `test`, `test:lib`,
   `test:engine`.
 - **Test Suite Integrity (FR-E27):** Every `engine/` test function must
@@ -382,8 +382,8 @@ graph TD
   - CLI: `deno task run [--prompt <text>] [--config <path>] [--resume <run-id>]
     [--dry-run] [-v|-s|-q] [--env KEY=VAL] [--skip nodes] [--only nodes]
     [--version|-V]`
-  - Config: `.flowai-pipelines/pipeline.yaml` (YAML, version "1")
-  - State: `.flowai-pipelines/runs/<run-id>/state.json` (JSON)
+  - Config: `.flowai-workflow/pipeline.yaml` (YAML, version "1")
+  - State: `.flowai-workflow/runs/<run-id>/state.json` (JSON)
 - **Node types:** `agent`, `merge`, `loop` (with inline `nodes` sub-object
     for body node definitions), `human`
 - **Node flags:**
@@ -506,7 +506,7 @@ graph TD
   - Accepts `--target <triple>` for single-target or no args for all 4 targets.
   - Targets: `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`,
     `x86_64-apple-darwin`, `aarch64-apple-darwin`.
-  - Output naming: `flowai-pipelines-<os>-<arch>` (e.g., `flowai-pipelines-linux-x86_64`).
+  - Output naming: `flowai-workflow-<os>-<arch>` (e.g., `flowai-workflow-linux-x86_64`).
   - Invokes: `deno compile --target <t> --env VERSION=<v> --output <name>
     engine/cli.ts` per target.
   - `--version` flag value: reads `VERSION` env var, falls back to `"dev"`.
@@ -554,7 +554,7 @@ graph TD
    {os: "linux", arch: "arm64", denoTarget: "aarch64-unknown-linux-gnu"},
    {os: "darwin", arch: "x86_64", denoTarget: "x86_64-apple-darwin"},
    {os: "darwin", arch: "arm64", denoTarget: "aarch64-apple-darwin"}]`
-- **Output:** `dist/flowai-pipelines-<os>-<arch>` per target.
+- **Output:** `dist/flowai-workflow-<os>-<arch>` per target.
 - **Flags:** `--allow-all` (engine needs Deno.Command, env, file I/O).
   Entry: `engine/cli.ts`.
 - **CLI:** `--dry-run` prints commands without executing.
@@ -571,13 +571,13 @@ graph TD
   native runner needed).
 - **Steps:** checkout → setup-deno → `deno task compile` → `gh release create
   $TAG dist/* --generate-notes`.
-- **Assets:** 4 binaries named `flowai-pipelines-<os>-<arch>`.
+- **Assets:** 4 binaries named `flowai-workflow-<os>-<arch>`.
 
 ## 4. Data
 
 - **Entities:**
-  - Run State: JSON (`.flowai-pipelines/runs/<run-id>/state.json`)
-  - Pipeline Config: YAML (`.flowai-pipelines/pipeline.yaml`). Top-level keys: `name`,
+  - Run State: JSON (`.flowai-workflow/runs/<run-id>/state.json`)
+  - Pipeline Config: YAML (`.flowai-workflow/pipeline.yaml`). Top-level keys: `name`,
     `version`, `defaults`, `phases`, `nodes`. `phases` key declares
     named phase groups with member stage IDs. Engine treats `phases` as opaque
     config data. `defaults.prepare_command` (FR-E30): optional string, shell
@@ -618,7 +618,7 @@ graph TD
 
 - **Mechanism:** Filesystem-based. Each node reads input via `{{input.<node-id>}}`
   template variable pointing to predecessor's output directory. No manifest.
-- **Directory structure:** `.flowai-pipelines/runs/<run-id>/[<phase>/]<node-id>/` per node
+- **Directory structure:** `.flowai-workflow/runs/<run-id>/[<phase>/]<node-id>/` per node
   output. Phase subdir present when node's `phase` field is set in config.
 - **Validation:** Engine validates output via configurable rules (file_exists,
   file_not_empty, contains_section, custom_script, frontmatter_field) after
@@ -786,10 +786,10 @@ graph TD
     Pipeline config example:
     ```yaml
     defaults:
-      on_failure_script: .flowai-pipelines/scripts/rollback-uncommitted.sh
+      on_failure_script: .flowai-workflow/scripts/rollback-uncommitted.sh
       hitl:
-        ask_script: .flowai-pipelines/scripts/hitl-ask.sh
-        check_script: .flowai-pipelines/scripts/hitl-check.sh
+        ask_script: .flowai-workflow/scripts/hitl-ask.sh
+        check_script: .flowai-workflow/scripts/hitl-check.sh
         artifact_source: plan/pm/01-spec.md
         poll_interval: 60
         timeout: 7200
@@ -841,7 +841,7 @@ graph TD
     `AgentRunOptions` so terminal output is filtered at source.
   - **Binary Compile Flow (FR-E39):** `scripts/compile.ts` iterates
     `TARGETS` array. Per target: construct `deno compile --allow-all --target
-    <denoTarget> --output dist/flowai-pipelines-<os>-<arch> engine/cli.ts`. If
+    <denoTarget> --output dist/flowai-workflow-<os>-<arch> engine/cli.ts`. If
     `--dry-run`: print command string, skip execution. Otherwise:
     `new Deno.Command("deno", { args })` → `output()` → check
     `success`; on failure: throw with target + stderr. `dist/` dir created
@@ -859,7 +859,7 @@ graph TD
   reported via state.json. `on_error: continue` emits info log per suppressed
   node (FR-E34). Configurable `on_failure_script` hook runs before post-pipeline
   nodes only when `pipelineSuccess === false` (not when all failures suppressed).
-- **Logs:** Full transcripts per node in `.flowai-pipelines/runs/<run-id>/logs/`.
+- **Logs:** Full transcripts per node in `.flowai-workflow/runs/<run-id>/logs/`.
 
 ## 7. Constraints
 

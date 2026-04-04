@@ -1,4 +1,4 @@
-# flowai-pipelines
+# flowai-workflow
 
 Universal DAG-based engine for orchestrating AI agents. Define agent workflows as YAML configs — the engine handles execution, inter-agent communication, validation, loops, and resume.
 
@@ -76,7 +76,7 @@ Options:
   --prompt <text>     Additional context passed to first agent
   --resume <run-id>   Resume a previous run (skip completed nodes)
   --dry-run           Validate config and show DAG without executing
-  --config <path>     Custom pipeline config (default: .flowai-pipelines/pipeline.yaml)
+  --config <path>     Custom pipeline config (default: .flowai-workflow/pipeline.yaml)
   --skip <nodes>      Comma-separated node IDs to skip
   --only <nodes>      Run only specified nodes
   --env KEY=VAL       Set environment variable for the run
@@ -124,7 +124,7 @@ graph TD
     verify -- "verdict: PASS" --> review
 ```
 
-Pipeline config: `.flowai-pipelines/pipeline.yaml`
+Pipeline config: `.flowai-workflow/pipeline.yaml`
 
 | Node | Phase | Role | Output |
 |------|-------|------|--------|
@@ -148,7 +148,7 @@ All 6 pipeline agents are native Claude Code subagents in `.claude/agents/agent-
 
 ```
 engine/                          # DAG executor engine (Deno/TypeScript)
-.flowai-pipelines/
+.flowai-workflow/
   pipeline.yaml                  # SDLC pipeline config (example)
   agents/                        # Agent prompts (symlinked from .claude/skills/)
     agent-pm/SKILL.md
@@ -175,18 +175,18 @@ Download a pre-built binary from the [latest release](../../releases/latest) —
 
 ```bash
 # Linux x86_64
-gh release download --repo <owner>/flowai-pipelines --pattern flowai-pipelines-linux-x86_64
-chmod +x flowai-pipelines-linux-x86_64 && mv flowai-pipelines-linux-x86_64 flowai-pipelines
+gh release download --repo <owner>/flowai-workflow --pattern flowai-workflow-linux-x86_64
+chmod +x flowai-workflow-linux-x86_64 && mv flowai-workflow-linux-x86_64 flowai-workflow
 
 # macOS Apple Silicon
-gh release download --repo <owner>/flowai-pipelines --pattern flowai-pipelines-darwin-arm64
-chmod +x flowai-pipelines-darwin-arm64 && mv flowai-pipelines-darwin-arm64 flowai-pipelines
+gh release download --repo <owner>/flowai-workflow --pattern flowai-workflow-darwin-arm64
+chmod +x flowai-workflow-darwin-arm64 && mv flowai-workflow-darwin-arm64 flowai-workflow
 
 # Verify
-./flowai-pipelines --version
+./flowai-workflow --version
 
 # Run a pipeline
-./flowai-pipelines --config .flowai-pipelines/pipeline.yaml
+./flowai-workflow --config .flowai-workflow/pipeline.yaml
 ```
 
 Alternatively, run directly with Deno (see Prerequisites below).

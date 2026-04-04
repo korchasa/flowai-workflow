@@ -137,9 +137,9 @@ inline both shared-rules and SKILL.md into the user message (`-p`).
 
 ```yaml
 task_template: |
-  {{file(".flowai-pipelines/agents/shared-rules.md")}}
+  {{file(".flowai-workflow/agents/shared-rules.md")}}
   ---
-  {{file(".flowai-pipelines/agents/agent-pm/SKILL.md")}}
+  {{file(".flowai-workflow/agents/agent-pm/SKILL.md")}}
   ---
   <existing task content>
 ```
@@ -193,7 +193,7 @@ tools before CLI invocation. Maps to `--disallowedTools` CLI flag.
 - **R13: `git add -f` for runs/** (2/6, ~8 lines).
 
 Implementation: add `{{include "rules/fragment.md"}}` template support in
-engine. Create 4-5 shared rule files in `.flowai-pipelines/agents/rules/`. Each
+engine. Create 4-5 shared rule files in `.flowai-workflow/agents/rules/`. Each
 SKILL.md replaces 10-20 lines with one include.
 
 #### Tier 3 — Pipeline config + injection (R7, R9, R11): ~110 lines saved

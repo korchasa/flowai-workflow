@@ -1,4 +1,4 @@
-# Claude Code CLI — Feature Analysis for flowai-pipelines
+# Claude Code CLI — Feature Analysis for flowai-workflow
 
 ## CLI Reference (claude --help)
 
@@ -130,7 +130,7 @@ Commands:
 
 - **`--agents` / `--agent`** — Claude Code's built-in custom agents.
   Use case: delegate sub-orchestration to Claude's own agent system.
-  Consideration: overlap with flowai-pipelines's own orchestration.
+  Consideration: overlap with flowai-workflow's own orchestration.
 
 - **`--add-dir`** — grant access to additional directories.
   Use case: artifacts stored outside working directory.

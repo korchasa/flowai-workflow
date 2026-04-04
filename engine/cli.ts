@@ -6,7 +6,7 @@
  * Usage: deno task run [options]
  *
  * Options:
- *   --config <path>       Pipeline config file (default: .flowai-pipelines/pipeline.yaml)
+ *   --config <path>       Pipeline config file (default: .flowai-workflow/pipeline.yaml)
  *   --prompt <text>       Additional context for PM agent (sets args.prompt)
  *   --resume <run-id>     Resume a previous run from its state
  *   --dry-run             Print execution plan without running
@@ -28,7 +28,7 @@ export const VERSION = Deno.env.get("VERSION") ?? "dev";
 
 /** Returns the formatted version string for `--version` output. */
 export function getVersionString(): string {
-  return `flowai-pipelines v${VERSION}`;
+  return `flowai-workflow v${VERSION}`;
 }
 
 /**
@@ -37,7 +37,7 @@ export function getVersionString(): string {
  * set dedicated fields. Generic `--key value` pairs populate `args`.
  */
 export function parseArgs(args: string[]): EngineOptions {
-  let configPath = ".flowai-pipelines/pipeline.yaml";
+  let configPath = ".flowai-workflow/pipeline.yaml";
   let runId: string | undefined;
   let resume = false;
   let dryRun = false;
@@ -133,7 +133,7 @@ Usage:
   deno task run [options]
 
 Options:
-  --config <path>       Pipeline config file (default: .flowai-pipelines/pipeline.yaml)
+  --config <path>       Pipeline config file (default: .flowai-workflow/pipeline.yaml)
   --prompt <text>       Additional context for PM agent (optional)
   --resume <run-id>     Resume a previous run
   --dry-run             Print execution plan without running

@@ -1,13 +1,13 @@
-title = "flowai-pipelines gitleaks config"
+title = "flowai-workflow gitleaks config"
 
 [allowlist]
   description = "Allow documentation files that reference secret patterns"
   paths = [
     '''documents/requirements\.md''',
     '''documents/design\.md''',
-    '''\.flowai-pipelines/agents/agent-.*/SKILL\.md''',
-    '''\.flowai-pipelines/tasks/.*\.md''',
-    '''\.flowai-pipelines/runs/.*''',
+    '''\.flowai-workflow/agents/agent-.*/SKILL\.md''',
+    '''\.flowai-workflow/tasks/.*\.md''',
+    '''\.flowai-workflow/runs/.*''',
     '''CLAUDE\.md''',
     '''AGENTS\.md''',
   ]

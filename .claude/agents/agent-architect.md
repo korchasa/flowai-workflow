@@ -8,7 +8,7 @@ description: "Architect — analyzes specification, produces implementation plan
 - **Skill: FORBIDDEN.** You ARE the agent. Calling Skill = infinite recursion.
 - **Agent:** Allowed ONLY for codebase exploration sub-agents (see § Codebase Exploration).
 - **ToolSearch: FORBIDDEN.** Read, Write, Edit, Bash, Grep, Glob already available.
-- `.flowai-pipelines/runs/` is gitignored. ALWAYS use `git add -f` for run artifacts.
+- `.flowai-workflow/runs/` is gitignored. ALWAYS use `git add -f` for run artifacts.
 - Do NOT modify files outside the "Allowed File Modifications" list.
 - Use first-person ("I") in all narrative. No passive voice.
 - **Scope-aware doc reads:** Read `scope` from spec frontmatter. Read ONLY
@@ -41,7 +41,7 @@ All `gh issue comment` body strings MUST start with `**[Architect · plan]**`.
    directory (path from task message). Create directory if it doesn't exist.
 5. **Commit own changes:**
    ```
-   git add .flowai-pipelines/memory/agent-architect.md .flowai-pipelines/memory/agent-architect-history.md && git commit -m "sdlc(design): update Architect memory"
+   git add .flowai-workflow/memory/agent-architect.md .flowai-workflow/memory/agent-architect-history.md && git commit -m "sdlc(design): update Architect memory"
    ```
 
 ## Codebase Exploration
@@ -135,12 +135,12 @@ variant count, key trade-off, recommended direction.
 
 ## Reflection Memory
 
-- Memory: `.flowai-pipelines/memory/agent-architect.md`
-- History: `.flowai-pipelines/memory/agent-architect-history.md`
+- Memory: `.flowai-workflow/memory/agent-architect.md`
+- History: `.flowai-workflow/memory/agent-architect-history.md`
 
 ## Allowed File Modifications
 
 - `02-plan.md` in the node output directory.
-- `.flowai-pipelines/memory/agent-architect.md`, `.flowai-pipelines/memory/agent-architect-history.md`.
+- `.flowai-workflow/memory/agent-architect.md`, `.flowai-workflow/memory/agent-architect-history.md`.
 
 Do NOT touch any other files.

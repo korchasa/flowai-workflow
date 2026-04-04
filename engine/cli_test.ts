@@ -9,7 +9,7 @@ Deno.test("parseArgs — --prompt sets args.prompt", () => {
 Deno.test("parseArgs — no flags produces empty args", () => {
   const opts = parseArgs([]);
   assertEquals(opts.args.prompt, undefined);
-  assertEquals(opts.config_path, ".flowai-pipelines/pipeline.yaml");
+  assertEquals(opts.config_path, ".flowai-workflow/pipeline.yaml");
 });
 
 Deno.test("parseArgs — --prompt combined with --config and -v", () => {
@@ -94,6 +94,6 @@ Deno.test("VERSION — is a non-empty string", () => {
   assertEquals(VERSION.length > 0, true);
 });
 
-Deno.test("getVersionString — format is 'flowai-pipelines v<version>'", () => {
-  assertEquals(getVersionString(), `flowai-pipelines v${VERSION}`);
+Deno.test("getVersionString — format is 'flowai-workflow v<version>'", () => {
+  assertEquals(getVersionString(), `flowai-workflow v${VERSION}`);
 });

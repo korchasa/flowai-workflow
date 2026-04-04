@@ -2,21 +2,21 @@
 
 ## Goal
 
-Eliminate custom agent and memory conventions (`.flowai-pipelines/agents/`,
-`.flowai-pipelines/memory/`) in favor of standard Claude Code primitives.
+Eliminate custom agent and memory conventions (`.flowai-workflow/agents/`,
+`.flowai-workflow/memory/`) in favor of standard Claude Code primitives.
 Pipeline becomes a thin YAML wiring layer over native `.claude/agents/` and
-`.claude/flowai-pipelines-memory/`. Scripts stay in `.flowai-pipelines/scripts/`.
+`.claude/flowai-workflow-memory/`. Scripts stay in `.flowai-workflow/scripts/`.
 Reduces cognitive overhead; agents reusable outside pipeline context.
 
 ## Overview
 
 ### Context
 
-Current SDLC pipeline stores all assets under `.flowai-pipelines/`:
-- 6 agent SKILL.md files in `.flowai-pipelines/agents/agent-*/SKILL.md`
+Current SDLC pipeline stores all assets under `.flowai-workflow/`:
+- 6 agent SKILL.md files in `.flowai-workflow/agents/agent-*/SKILL.md`
 - shared-rules.md + reflection-protocol.md
-- 6 shell scripts in `.flowai-pipelines/scripts/`
-- 12 memory files in `.flowai-pipelines/memory/`
+- 6 shell scripts in `.flowai-workflow/scripts/`
+- 12 memory files in `.flowai-workflow/memory/`
 
 These are custom conventions understood only by the engine. Claude Code has
 native primitives: `.claude/agents/*.md` (subagents with YAML frontmatter),
@@ -53,27 +53,27 @@ Engine (`engine/claude-process.ts:buildClaudeArgs()`) currently:
 Pipeline nodes reference custom paths:
 ```yaml
 task_template: |
-  {{file(".flowai-pipelines/agents/shared-rules.md")}}
+  {{file(".flowai-workflow/agents/shared-rules.md")}}
   ---
-  {{file(".flowai-pipelines/agents/agent-pm/SKILL.md")}}
+  {{file(".flowai-workflow/agents/agent-pm/SKILL.md")}}
 ```
 
 Scripts referenced via `pre_run`, `on_failure_script`, `after`, HITL config.
 
 Existing `scripts/` directory contains engine-level scripts (check.ts,
 compile.ts, generate-dashboard.ts, etc.). Pipeline (SDLC) scripts are in
-`.flowai-pipelines/scripts/`.
+`.flowai-workflow/scripts/`.
 
 ### Constraints
 
 - Engine MUST remain domain-agnostic — no SDLC logic in engine code
 - No backward compatibility needed
-- Memory files → `.claude/flowai-pipelines-memory/`
-- Scripts stay in `.flowai-pipelines/scripts/` (tightly coupled to pipeline.yaml)
+- Memory files → `.claude/flowai-workflow-memory/`
+- Scripts stay in `.flowai-workflow/scripts/` (tightly coupled to pipeline.yaml)
 - Agent files → `.claude/agents/*.md` with YAML frontmatter
 - shared-rules.md: universal rules → `.claude/rules/`, pipeline-only rules →
   agent bodies (C1b decision)
-- Pipeline.yaml stays in `.flowai-pipelines/`
+- Pipeline.yaml stays in `.flowai-workflow/`
 
 ## Definition of Done
 
@@ -85,7 +85,7 @@ compile.ts, generate-dashboard.ts, etc.). Pipeline (SDLC) scripts are in
 - [ ] Engine: tests cover `--agent`, `--append-system-prompt`, `prompt` interpolation, validation
 - [ ] SDLC: 6 agents migrated to `.claude/agents/*.md`
 - [ ] SDLC: shared-rules split — universal → `.claude/rules/`, pipeline-only → agent bodies
-- [ ] SDLC: memory files moved to `.claude/flowai-pipelines-memory/`
+- [ ] SDLC: memory files moved to `.claude/flowai-workflow-memory/`
 - [ ] SDLC: pipeline.yaml updated to use `agent`/`prompt` fields
 - [ ] SDLC: `.claude/settings.json` cleaned up (stale paths removed)
 - [ ] Docs: ADR-001 updated with superseding decision
@@ -166,12 +166,12 @@ Three fields for agent nodes:
 **Step 2.1: Convert 6 SKILL.md → `.claude/agents/*.md`**
 
 ```
-.flowai-pipelines/agents/agent-pm/SKILL.md         → .claude/agents/agent-pm.md
-.flowai-pipelines/agents/agent-architect/SKILL.md   → .claude/agents/agent-architect.md
-.flowai-pipelines/agents/agent-tech-lead/SKILL.md   → .claude/agents/agent-tech-lead.md
-.flowai-pipelines/agents/agent-developer/SKILL.md   → .claude/agents/agent-developer.md
-.flowai-pipelines/agents/agent-qa/SKILL.md          → .claude/agents/agent-qa.md
-.flowai-pipelines/agents/agent-tech-lead-review/SKILL.md → .claude/agents/agent-tech-lead-review.md
+.flowai-workflow/agents/agent-pm/SKILL.md         → .claude/agents/agent-pm.md
+.flowai-workflow/agents/agent-architect/SKILL.md   → .claude/agents/agent-architect.md
+.flowai-workflow/agents/agent-tech-lead/SKILL.md   → .claude/agents/agent-tech-lead.md
+.flowai-workflow/agents/agent-developer/SKILL.md   → .claude/agents/agent-developer.md
+.flowai-workflow/agents/agent-qa/SKILL.md          → .claude/agents/agent-qa.md
+.flowai-workflow/agents/agent-tech-lead-review/SKILL.md → .claude/agents/agent-tech-lead-review.md
 ```
 
 Frontmatter:
@@ -180,7 +180,7 @@ Frontmatter:
 - Do NOT add: `model`, `tools`, `permissionMode` (pipeline concerns)
 
 Body changes per agent:
-- Update memory paths: `.flowai-pipelines/memory/` → `.claude/flowai-pipelines-memory/`
+- Update memory paths: `.flowai-workflow/memory/` → `.claude/flowai-workflow-memory/`
 - Update script paths if referenced
 - Add pipeline-only rules from shared-rules.md to each agent body (see 2.2)
 
@@ -202,7 +202,7 @@ Body changes per agent:
 ### Phase 3: Migrate memory (scope: sdlc)
 
 ```
-.flowai-pipelines/memory/*.md → .claude/flowai-pipelines-memory/*.md
+.flowai-workflow/memory/*.md → .claude/flowai-workflow-memory/*.md
 ```
 
 12 files (6 memory + 6 history).
@@ -217,11 +217,11 @@ specification:
   type: agent
   label: "Project Manager — Specification"
   task_template: |
-    {{file(".flowai-pipelines/agents/shared-rules.md")}}
+    {{file(".flowai-workflow/agents/shared-rules.md")}}
     ---
-    {{file(".flowai-pipelines/agents/agent-pm/SKILL.md")}}
+    {{file(".flowai-workflow/agents/agent-pm/SKILL.md")}}
     ---
-    Read reflection memory at .flowai-pipelines/memory/agent-pm.md...
+    Read reflection memory at .flowai-workflow/memory/agent-pm.md...
     Output: {{node_dir}}/01-spec.md
 ```
 
@@ -232,8 +232,8 @@ specification:
   label: "Project Manager — Specification"
   agent: agent-pm
   prompt: |
-    Read reflection memory at .claude/flowai-pipelines-memory/agent-pm.md
-    and history at .claude/flowai-pipelines-memory/agent-pm-history.md
+    Read reflection memory at .claude/flowai-workflow-memory/agent-pm.md
+    and history at .claude/flowai-workflow-memory/agent-pm-history.md
     before starting. Update both when done.
     Triage open GitHub issues...
     Output: {{node_dir}}/01-spec.md
@@ -241,20 +241,20 @@ specification:
 
 Apply to all 6 agent nodes (4 top-level + 2 loop body).
 Script paths in `pre_run`, `on_failure_script`, `after`, HITL — unchanged
-(scripts stay in `.flowai-pipelines/scripts/`).
+(scripts stay in `.flowai-workflow/scripts/`).
 
 **Step 4.2: Update `.claude/settings.json`**
 
 Remove stale entries:
-- `/workspaces/flowai-pipelines/` paths (old devcontainer)
+- `/workspaces/flowai-workflow/` paths (old devcontainer)
 - `auto-sdlc` references (old project name)
-- Any `.flowai-pipelines/scripts/` or `.flowai-pipelines/agents/` refs
+- Any `.flowai-workflow/scripts/` or `.flowai-workflow/agents/` refs
 
 ### Phase 5: Cleanup (scope: engine+sdlc)
 
 **Step 5.1: Remove old directories**
-- `.flowai-pipelines/agents/` — all content migrated to `.claude/agents/`
-- `.flowai-pipelines/memory/` — all content migrated to `.claude/flowai-pipelines-memory/`
+- `.flowai-workflow/agents/` — all content migrated to `.claude/agents/`
+- `.flowai-workflow/memory/` — all content migrated to `.claude/flowai-workflow-memory/`
 
 **Step 5.2: Update ADR-001**
 - Status: "Superseded (2026-04)"

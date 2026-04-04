@@ -98,7 +98,7 @@ export function createRunState(
 
 /** Get the run directory path for a given run ID. */
 export function getRunDir(runId: string): string {
-  return `.flowai-pipelines/runs/${runId}`;
+  return `.flowai-workflow/runs/${runId}`;
 }
 
 /** Get the node output directory path.

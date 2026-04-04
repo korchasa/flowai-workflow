@@ -33,7 +33,7 @@
 
 ## Project Information
 
-- Project Name: flowai-pipelines
+- Project Name: flowai-workflow
 
 ## Project Vision
 
@@ -73,9 +73,9 @@ example of engine usage.
   completed nodes skipped based on `state.json`
 - **Observability:** 3 verbosity levels (`-q`/default/`-v`); status lines with
   timestamps; final summary
-- **SDLC pipeline (example):** `.flowai-pipelines/pipeline.yaml` — 6 agents automating
+- **SDLC pipeline (example):** `.flowai-workflow/pipeline.yaml` — 6 agents automating
   full development lifecycle. Agents in `.claude/agents/agent-*.md` (native Claude Code
-  subagents). Memory in `.flowai-pipelines/memory/`
+  subagents). Memory in `.flowai-workflow/memory/`
 - **Docker image:** Single image with claude CLI, deno, git, gh
 
 ## Scope Separation

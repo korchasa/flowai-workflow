@@ -1,5 +1,5 @@
 {
-  "name": "flowai-pipelines",
+  "name": "flowai-workflow",
   "build": {
     "dockerfile": "Dockerfile"
   },

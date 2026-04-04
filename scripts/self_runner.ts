@@ -73,7 +73,7 @@ function loadEnvFile(envOverrides: Record<string, string>): void {
 async function runPipeline(): Promise<boolean> {
   console.log("> Engine.run()");
   try {
-    const options = parseArgs(["--config", ".flowai-pipelines/pipeline.yaml"]);
+    const options = parseArgs(["--config", ".flowai-workflow/pipeline.yaml"]);
     loadEnvFile(options.env_overrides);
     const engine = new Engine(options);
     const state = await engine.run();
@@ -137,7 +137,7 @@ if (import.meta.main) {
     else console.error(argCheck.text);
     Deno.exit(argCheck.code);
   }
-  console.log("=== flowai-pipelines: self-runner started ===");
+  console.log("=== flowai-workflow: self-runner started ===");
   let pause = MIN_PAUSE_SEC;
 
   while (true) {

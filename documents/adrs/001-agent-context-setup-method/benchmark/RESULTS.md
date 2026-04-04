@@ -56,7 +56,7 @@ instruction wins** regardless of placement level.
 Method C used ~3x fewer tokens by stopping early. For completed tasks, A and B are comparable.
 B used slightly more output tokens (richer analysis).
 
-## Implications for flowai-pipelines
+## Implications for flowai-workflow
 
 ### Method C (`--agent`) advantages
 - **Strongest rule adherence** — agent body is treated as identity, not just instructions

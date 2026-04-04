@@ -36,7 +36,7 @@ function createCapture(): { lines: string[]; writer: (text: string) => void } {
 
 function makeOptions(overrides?: Partial<EngineOptions>): EngineOptions {
   return {
-    config_path: ".flowai-pipelines/pipeline.yaml",
+    config_path: ".flowai-workflow/pipeline.yaml",
     verbosity: "quiet",
     args: {},
     env_overrides: {},
@@ -46,7 +46,7 @@ function makeOptions(overrides?: Partial<EngineOptions>): EngineOptions {
 
 Deno.test("EngineOptions — default structure", () => {
   const opts = makeOptions();
-  assertEquals(opts.config_path, ".flowai-pipelines/pipeline.yaml");
+  assertEquals(opts.config_path, ".flowai-workflow/pipeline.yaml");
   assertEquals(opts.verbosity, "quiet");
   assertEquals(opts.resume, undefined);
   assertEquals(opts.dry_run, undefined);

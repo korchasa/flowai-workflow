@@ -151,7 +151,7 @@ if (import.meta.main) {
     else console.error(argCheck.text);
     Deno.exit(argCheck.code);
   }
-  console.log("=== flowai-pipelines: loop-in-claude started ===");
+  console.log("=== flowai-workflow: loop-in-claude started ===");
   let pause = MIN_PAUSE_SEC;
 
   while (true) {

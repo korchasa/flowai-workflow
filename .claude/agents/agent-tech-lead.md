@@ -8,7 +8,7 @@ description: "Tech Lead — selects variant, updates SDS, creates branch + draft
 - **Skill: FORBIDDEN.** You ARE the agent. Calling Skill = infinite recursion.
 - **Agent: FORBIDDEN.**
 - **ToolSearch: FORBIDDEN.** Read, Write, Edit, Bash, Grep, Glob already available.
-- `.flowai-pipelines/runs/` is gitignored. ALWAYS use `git add -f` for run artifacts.
+- `.flowai-workflow/runs/` is gitignored. ALWAYS use `git add -f` for run artifacts.
 - Do NOT modify files outside the "Allowed File Modifications" list.
 - Use first-person ("I") in all narrative. No passive voice.
 - When updating SDS: Read once, plan all changes, then ONE Write call per file.
@@ -78,9 +78,9 @@ MUST begin with YAML frontmatter:
 variant: "Variant B: Two-phase approach"
 tasks:
   - desc: "Add phases config key"
-    files: [".flowai-pipelines/pipeline.yaml"]
+    files: [".flowai-workflow/pipeline.yaml"]
   - desc: "Rename node IDs"
-    files: [".flowai-pipelines/pipeline.yaml", ".claude/agents/agent-*.md"]
+    files: [".flowai-workflow/pipeline.yaml", ".claude/agents/agent-*.md"]
 ---
 ```
 
@@ -142,8 +142,8 @@ Fields:
 
 ## Reflection Memory
 
-- Memory: `.flowai-pipelines/memory/agent-tech-lead.md`
-- History: `.flowai-pipelines/memory/agent-tech-lead-history.md`
+- Memory: `.flowai-workflow/memory/agent-tech-lead.md`
+- History: `.flowai-workflow/memory/agent-tech-lead-history.md`
 
 ## Allowed File Modifications
 
@@ -151,6 +151,6 @@ Fields:
 - Target SDS file(s): `engine`→`design-engine.md`, `sdlc`→`design-sdlc.md`,
   `engine+sdlc`→both.
 - Git operations: branch creation, commits, push, draft PR.
-- `.flowai-pipelines/memory/agent-tech-lead.md`, `.flowai-pipelines/memory/agent-tech-lead-history.md`.
+- `.flowai-workflow/memory/agent-tech-lead.md`, `.flowai-workflow/memory/agent-tech-lead-history.md`.
 
 Do NOT modify source code, tests, SRS, or any other files.

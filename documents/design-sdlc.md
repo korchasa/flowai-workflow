@@ -3,7 +3,7 @@
 ## 1. Intro
 
 - **Purpose:** Implementation details for the SDLC pipeline (example use case
-  of flowai-pipelines engine).
+  of flowai-workflow engine).
 - **Rel to SRS:** Implements FRs from `documents/requirements-sdlc.md`.
 
 ## 2. Architecture
@@ -38,11 +38,11 @@ graph LR
 
 - **Subsystems:**
   - **Agent Runtime**: Claude Code CLI invocations with role-specific prompts
-    from `.flowai-pipelines/agents/agent-<name>/SKILL.md` (canonical location per
+    from `.flowai-workflow/agents/agent-<name>/SKILL.md` (canonical location per
     FR-S26; legacy `.claude/skills/` symlinks removed per FR-S33)
-  - **Artifact Store**: Git-tracked files in `.flowai-pipelines/runs/<run-id>/[<phase>/]<node-id>/`
+  - **Artifact Store**: Git-tracked files in `.flowai-workflow/runs/<run-id>/[<phase>/]<node-id>/`
     (phase subdir present when node has `phase` field in config). Note: runs
-    directory remains at `.flowai-pipelines/runs/` — engine-controlled hardcoded path;
+    directory remains at `.flowai-workflow/runs/` — engine-controlled hardcoded path;
     configurable `runs_dir` deferred to separate engine FR.
     - **Artifact File Numbering (FR-S32):** Gapless sequential prefixes
       `01`–`06` reflecting pipeline execution order. Convention:
@@ -55,13 +55,13 @@ graph LR
       - `06-review.md` (tech-lead-review)
       All pipeline YAML, agent prompts, SRS, and SDS references MUST use these
       canonical filenames. Alphabetical sorting = execution order.
-  - **Legacy Shell Scripts** (`.flowai-pipelines/scripts/`): Deprecated stage scripts
+  - **Legacy Shell Scripts** (`.flowai-workflow/scripts/`): Deprecated stage scripts
     deleted per FR-S26. HITL, rollback, and dashboard wrapper scripts retained.
     `run-dashboard.sh` wraps `deno task dashboard` with warning logging on
     failure (FR-S36). `reset-to-main.sh` is the `pre_run:` script — resets
     working tree to `origin/main`. **Auto-stash (FR-S41):** before destructive
     ops, checks `git status --porcelain`; if dirty, displays branch + diff stat,
-    runs `git stash push --include-untracked -m "flowai-pipelines pre_run: <timestamp>"`,
+    runs `git stash push --include-untracked -m "flowai-workflow pre_run: <timestamp>"`,
     displays stash ref + restore command. Clean tree → silent proceed. Stash
     failure aborts pipeline (`set -euo pipefail`).
 
@@ -82,7 +82,7 @@ graph LR
   compatibility retention needed — engine execution via `deno task run` is the
   sole pipeline entry point.
 
-### 3.3 Shared Library (`.flowai-pipelines/scripts/lib.sh`)
+### 3.3 Shared Library (`.flowai-workflow/scripts/lib.sh`)
 
 - **Purpose:** Common functions for all stage scripts.
 - **Interfaces:** Functions: `log()`, `run_agent()`, `validate_artifact()`,
@@ -94,10 +94,10 @@ graph LR
     failures.
 - **Deps:** `claude` CLI, `git`, `gh`.
 
-### 3.4 Agent Skills (`.flowai-pipelines/agents/agent-*`) (FR-36, FR-S26)
+### 3.4 Agent Skills (`.flowai-workflow/agents/agent-*`) (FR-36, FR-S26)
 
 - **Purpose:** Versioned system prompts defining each agent's role and behavior.
-  Each agent lives in `.flowai-pipelines/agents/agent-<name>/SKILL.md` (canonical
+  Each agent lives in `.flowai-workflow/agents/agent-<name>/SKILL.md` (canonical
   location per FR-S26). Pipeline-driven only: prompts injected via
   `{{file(...)}}` in `task_template` (FR-S38); legacy `prompt:` field removed.
   Redundant `# BEFORE YOU DO ANYTHING` / "Read shared-rules.md" block removed
@@ -107,7 +107,7 @@ graph LR
   Legacy `.claude/skills/` symlinks removed per FR-S33 — interactive
   `/agent-<name>` slash commands no longer supported (pipeline-only agents
   should not be exposed as interactive skills).
-- **Directory structure:** `.flowai-pipelines/agents/agent-<name>/SKILL.md` — 6 agents:
+- **Directory structure:** `.flowai-workflow/agents/agent-<name>/SKILL.md` — 6 agents:
   - `agent-pm` — triages open GitHub issues, selects highest-priority, produces
     spec. **Issue Author Filter (FR-S31):** PM filters candidates by author at
     two points: (1) `gh issue list --author korchasa` in STEP 2a (triage path),
@@ -155,7 +155,7 @@ graph LR
   optimization removed due to unreviewed SKILL.md edit risk and marginal value.
   Superseded by two-layer per-agent reflection (FR-S32).
 - **Shared Reflection Protocol (FR-S32):**
-  `.flowai-pipelines/agents/reflection-protocol.md` — single source of truth for
+  `.flowai-workflow/agents/reflection-protocol.md` — single source of truth for
   two-layer reflection protocol (MEMORY + HISTORY). Referenced by each agent's
   `## Reflection Memory` section in SKILL.md and reinforced via `task_template`
   in `pipeline.yaml`. See §3.4.1 for details.
@@ -177,9 +177,9 @@ graph LR
     `task_template`. Template structure per node:
     ```yaml
     task_template: |
-      {{file(".flowai-pipelines/agents/shared-rules.md")}}
+      {{file(".flowai-workflow/agents/shared-rules.md")}}
       ---
-      {{file(".flowai-pipelines/agents/agent-<name>/SKILL.md")}}
+      {{file(".flowai-workflow/agents/agent-<name>/SKILL.md")}}
       ---
       <task-specific content>
     ```
@@ -214,13 +214,13 @@ graph LR
   were verified"). Hardcoded `gh issue comment --body` templates in SKILL.md
   files must also use first-person (FR-43).
 - **Migration (FR-36, FR-S26, FR-S33):** Three migrations completed:
-  1. FR-36: `agents/<name>/` → `.flowai-pipelines/agents/agent-<name>/` (symlinks
+  1. FR-36: `agents/<name>/` → `.flowai-workflow/agents/agent-<name>/` (symlinks
      eliminated, `.claude/skills/` became canonical).
-  2. FR-S26: `.flowai-pipelines/agents/agent-<name>/` → `.flowai-pipelines/agents/agent-<name>/`
+  2. FR-S26: `.flowai-workflow/agents/agent-<name>/` → `.flowai-workflow/agents/agent-<name>/`
      (consolidated into pipeline directory; `.claude/skills/agent-<name>`
      symlinks created for Claude Code discovery).
   3. FR-S33: `.claude/skills/agent-<name>` symlinks removed. Canonical path
-     `.flowai-pipelines/agents/agent-<name>/SKILL.md` is sole discovery mechanism.
+     `.flowai-workflow/agents/agent-<name>/SKILL.md` is sole discovery mechanism.
      `scripts/check.ts` symlink validation block removed (engine `loadConfig()`
      covers prompt file existence).
 - **Voice directive (FR-40):** Each SKILL.md contains `## Voice` section
@@ -248,7 +248,7 @@ graph LR
 - **Purpose:** Cross-run learning via per-agent memory and history files.
   Replaces single-layer reflection (FR-S28) with two-layer design (FR-S32).
   Eliminates meta-agent dependency — each agent manages its own learning.
-- **Shared Protocol:** `.flowai-pipelines/agents/reflection-protocol.md` — single
+- **Shared Protocol:** `.flowai-workflow/agents/reflection-protocol.md` — single
   source of truth for the two-layer reflection protocol. Referenced by each
   agent's `## Reflection Memory` section in SKILL.md (~3-5 line reference
   block) and reinforced via `task_template` in `pipeline.yaml`. Contains:
@@ -257,7 +257,7 @@ graph LR
   - Lifecycle instructions
   - Size constraints
 - **Layer 1 — MEMORY** (edit-in-place operative knowledge):
-  - **Directory:** `.flowai-pipelines/memory/` — 6 files, one per agent:
+  - **Directory:** `.flowai-workflow/memory/` — 6 files, one per agent:
     `agent-pm.md`, `agent-architect.md`, `agent-tech-lead.md`,
     `agent-developer.md`, `agent-qa.md`, `agent-tech-lead-review.md`.
   - **Lifecycle:** Read at session start → execute task → full rewrite at
@@ -265,7 +265,7 @@ graph LR
   - **Content categories:** Anti-patterns encountered, effective strategies,
     environment quirks, baseline metrics.
 - **Layer 2 — HISTORY** (append-only run log):
-  - **Directory:** `.flowai-pipelines/memory/` — 6 files:
+  - **Directory:** `.flowai-workflow/memory/` — 6 files:
     `agent-pm-history.md`, `agent-architect-history.md`, etc.
   - **Lifecycle:** Read at session start → append one entry at session end.
     FIFO trim to <=20 most recent entries.
@@ -275,9 +275,9 @@ graph LR
     pattern identification across runs.
 - **SKILL.md integration:** Each agent's `## Reflection Memory` section
   replaced with ~3-5 line reference block:
-  - "Follow `.flowai-pipelines/agents/reflection-protocol.md`."
-  - Memory path: `.flowai-pipelines/memory/<agent>.md`
-  - History path: `.flowai-pipelines/memory/<agent>-history.md`
+  - "Follow `.flowai-workflow/agents/reflection-protocol.md`."
+  - Memory path: `.flowai-workflow/memory/<agent>.md`
+  - History path: `.flowai-workflow/memory/<agent>-history.md`
   - Agent-specific HISTORY format hint.
 - **Pipeline integration:** Each agent's `task_template` in `pipeline.yaml`
   includes both memory and history file paths as reinforcement.
@@ -287,7 +287,7 @@ graph LR
   concern. Agents read/write via standard file tools.
 - **Deps:** None (static files, versioned in git).
 
-### 3.5 HITL Pipeline Scripts (`.flowai-pipelines/scripts/hitl-*.sh`)
+### 3.5 HITL Pipeline Scripts (`.flowai-workflow/scripts/hitl-*.sh`)
 
 - **Purpose:** Deliver agent questions to humans and poll for replies. Pipeline-
   specific (GitHub), not engine code. Engine invokes via configurable paths.
@@ -425,7 +425,7 @@ graph LR
 
 ### 3.8 Pipeline Config Validation (FR-S24)
 
-- **Purpose:** Validate `.flowai-pipelines/pipeline.yaml` against engine schema as part
+- **Purpose:** Validate `.flowai-workflow/pipeline.yaml` against engine schema as part
   of `deno task check`. Prevents config drift causing runtime failures.
 - **Implementation:** `pipelineIntegrity()` in `scripts/check.ts` delegates to
   engine's `loadConfig()` (`engine/config.ts`). The engine validation covers:
@@ -552,7 +552,7 @@ graph LR
   Flow: `git status --porcelain` → if non-empty: display branch name
   (`git branch --show-current`), diff stat (`git diff --stat HEAD`,
   `git diff --stat --cached`, untracked list), stash
-  (`git stash push --include-untracked -m "flowai-pipelines pre_run: <ISO timestamp>"`),
+  (`git stash push --include-untracked -m "flowai-workflow pre_run: <ISO timestamp>"`),
   display stash ref + restore command (`git stash pop`). If clean: silent
   proceed. Post-stash: existing fetch/checkout/reset/clean unchanged. Stash
   failure → pipeline abort (script uses `set -euo pipefail`).
@@ -563,7 +563,7 @@ graph LR
   final code review, checks CI gates, merges PR if all pass. Handles
   missing-PR case gracefully (no-op with clear message when pipeline failed
   before tech-lead created PR). **After-hook observability (FR-S36):**
-  `after:` field invokes `.flowai-pipelines/scripts/run-dashboard.sh {{run_dir}}`
+  `after:` field invokes `.flowai-workflow/scripts/run-dashboard.sh {{run_dir}}`
   (replaces `deno task dashboard ... || true`). Wrapper runs dashboard
   command, emits `[WARN] dashboard generation failed (exit $code)` to stderr
   on non-zero exit, always exits 0. Warning captured in `stream.log`, visible
@@ -589,10 +589,10 @@ graph LR
   Pipeline config:
   ```yaml
   defaults:
-    on_failure_script: .flowai-pipelines/scripts/rollback-uncommitted.sh
+    on_failure_script: .flowai-workflow/scripts/rollback-uncommitted.sh
     hitl:
-      ask_script: .flowai-pipelines/scripts/hitl-ask.sh
-      check_script: .flowai-pipelines/scripts/hitl-check.sh
+      ask_script: .flowai-workflow/scripts/hitl-ask.sh
+      check_script: .flowai-workflow/scripts/hitl-check.sh
       artifact_source: "{{input.specification}}/01-spec.md"
       poll_interval: 60
       timeout: 7200
@@ -608,8 +608,8 @@ graph LR
 - **Sec:** Secret detection via `gitleaks detect --no-git` in `deno task check`
   (`scripts/check.ts`). Engine-level scope checks removed. Agents run with
   local user's permissions.
-- **Logs:** Full transcripts per stage in `.flowai-pipelines/runs/<run-id>/logs/`. Note:
-  logs path remains engine-controlled (`.flowai-pipelines/runs/`); configurable `runs_dir`
+- **Logs:** Full transcripts per stage in `.flowai-workflow/runs/<run-id>/logs/`. Note:
+  logs path remains engine-controlled (`.flowai-workflow/runs/`); configurable `runs_dir`
   deferred to separate engine FR.
 
 ## 7. Constraints
@@ -641,18 +641,18 @@ All FR evidence for issue #15 is complete:
   `contains_section: Summary` on 5 agent nodes (`specification`, `design`,
   `decision`, `verify`, `tech-lead-review`); Developer (`build`) enforced via
   `custom_script: deno task check`. Evidence:
-  `.flowai-pipelines/agents/agent-*/SKILL.md` (6 files), `.flowai-pipelines/pipeline.yaml`.
+  `.flowai-workflow/agents/agent-*/SKILL.md` (6 files), `.flowai-workflow/pipeline.yaml`.
 - **FR-43 (Agent First-Person Voice — GitHub Interactions):** Voice sections
   strengthened with explicit GitHub interaction scope + third example pair per
   agent. Hardcoded `gh issue comment --body` templates in PM, Architect, Tech
   Lead SKILL.md files updated to first-person. Evidence:
-  `.flowai-pipelines/agents/agent-*/SKILL.md` (6 files, `## Voice` sections).
+  `.flowai-workflow/agents/agent-*/SKILL.md` (6 files, `## Voice` sections).
 
 FR-S1 evidence (issue #100):
 
 - **FR-S1 (Pipeline Trigger):** All 4 acceptance criteria marked `[x]` with
   evidence. `engine/cli.ts:36-76` (CLI entry point, flags),
-  `.flowai-pipelines/agents/agent-pm/SKILL.md` (issue frontmatter mandate).
+  `.flowai-workflow/agents/agent-pm/SKILL.md` (issue frontmatter mandate).
 
 Engine FR evidence (issue #99):
 
@@ -670,12 +670,12 @@ FR-S24 evidence (issue #96):
   `engine/config.ts:105-249` (node validation — types, inputs, run_on).
   No new code required — Variant A (evidence-only) selected.
 - **FR-S11 (Inter-Stage Data Flow):** SRS text updated by PM to reflect
-  phase-aware artifact path `.flowai-pipelines/runs/<run-id>/[<phase>/]<node-id>/`.
+  phase-aware artifact path `.flowai-workflow/runs/<run-id>/[<phase>/]<node-id>/`.
   SDS §2.2 already documents phase-aware layout. Engine FR-E9 implementation
   deferred (separate issue).
 - **FR-S25 (Phase-Organized SDLC Artifact Directories):** FR-E9 phase registry
   implemented (`engine/state.ts:20-36`, `engine/engine.ts:129-130`). Artifact
-  paths resolve to `.flowai-pipelines/runs/<run-id>/<phase>/<node-id>/` for nodes with
+  paths resolve to `.flowai-workflow/runs/<run-id>/<phase>/<node-id>/` for nodes with
   `phase:` field. SDLC pipeline nodes have `phase:` fields in `pipeline.yaml`
   (`plan`, `impl`, `report`). ACs #1-3 marked with evidence. ACs #4-5 pending
   verification (end-to-end run + `deno task check`). Selected Variant A
@@ -699,7 +699,7 @@ FR-S42 pipeline validate migration (issue #174):
   composite `type: artifact` rule per node. `build` node gains implicit
   `file_not_empty` check (no-op tightening — file with `## Summary` cannot
   be empty). `frontmatter_field` and `custom_script` rules unchanged.
-  Variant C selected. Evidence: `.flowai-pipelines/pipeline.yaml` validate blocks.
+  Variant C selected. Evidence: `.flowai-workflow/pipeline.yaml` validate blocks.
 
 Engine refactoring (issue #92):
 

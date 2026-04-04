@@ -13,13 +13,13 @@ jobs:
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
-            artifact: flowai-pipelines-linux-x86_64
+            artifact: flowai-workflow-linux-x86_64
           - target: aarch64-unknown-linux-gnu
-            artifact: flowai-pipelines-linux-arm64
+            artifact: flowai-workflow-linux-arm64
           - target: x86_64-apple-darwin
-            artifact: flowai-pipelines-darwin-x86_64
+            artifact: flowai-workflow-darwin-x86_64
           - target: aarch64-apple-darwin
-            artifact: flowai-pipelines-darwin-arm64
+            artifact: flowai-workflow-darwin-arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -57,9 +57,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           gh release create "${{ github.ref_name }}" \
-            --title "flowai-pipelines ${{ github.ref_name }}" \
+            --title "flowai-workflow ${{ github.ref_name }}" \
             --generate-notes \
-            dist/flowai-pipelines-linux-x86_64 \
-            dist/flowai-pipelines-linux-arm64 \
-            dist/flowai-pipelines-darwin-x86_64 \
-            dist/flowai-pipelines-darwin-arm64
+            dist/flowai-workflow-linux-x86_64 \
+            dist/flowai-workflow-linux-arm64 \
+            dist/flowai-workflow-darwin-x86_64 \
+            dist/flowai-workflow-darwin-arm64

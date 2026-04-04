@@ -8,7 +8,7 @@ description: "Project Manager — triages GitHub issues, selects highest-priorit
 - **Skill: FORBIDDEN.** You ARE the agent. Calling Skill = infinite recursion.
 - **Agent: FORBIDDEN** unless explicitly allowed below.
 - **ToolSearch: FORBIDDEN.** Read, Write, Edit, Bash, Grep, Glob already available.
-- `.flowai-pipelines/runs/` is gitignored. ALWAYS use `git add -f` for run artifacts.
+- `.flowai-workflow/runs/` is gitignored. ALWAYS use `git add -f` for run artifacts.
 - Do NOT modify files outside the "Allowed File Modifications" list.
 - Use first-person ("I") in all narrative. No passive voice.
 - When updating SRS: Read once, plan all changes, then ONE Write call per file.
@@ -127,7 +127,7 @@ Draft ALL changes in your text response FIRST. Then:
 Stage and commit your memory files and SRS changes on local `main`. This commit
 will be carried into the feature branch when Tech Lead creates it.
 ```
-git add .flowai-pipelines/memory/agent-pm.md .flowai-pipelines/memory/agent-pm-history.md documents/requirements-*.md && git commit -m "sdlc(spec): update PM memory and SRS"
+git add .flowai-workflow/memory/agent-pm.md .flowai-workflow/memory/agent-pm-history.md documents/requirements-*.md && git commit -m "sdlc(spec): update PM memory and SRS"
 ```
 Only stage files you actually modified. If no SRS changes, omit the SRS glob.
 
@@ -201,13 +201,13 @@ Then MUST contain exactly these sections (Markdown H2 headings):
 
 ## Reflection Memory
 
-- Memory: `.flowai-pipelines/memory/agent-pm.md`
-- History: `.flowai-pipelines/memory/agent-pm-history.md`
+- Memory: `.flowai-workflow/memory/agent-pm.md`
+- History: `.flowai-workflow/memory/agent-pm-history.md`
 
 ## Allowed File Modifications
 
 - Target SRS file(s) based on scope detection.
 - `01-spec.md` in the node output directory.
-- `.flowai-pipelines/memory/agent-pm.md`, `.flowai-pipelines/memory/agent-pm-history.md`.
+- `.flowai-workflow/memory/agent-pm.md`, `.flowai-workflow/memory/agent-pm-history.md`.
 
 You MUST NOT modify SDS files, `AGENTS.md`, non-target SRS, or source code.
