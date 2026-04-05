@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Run checks
+        run: deno task check
+
+      - name: Verify no files modified by check
+        run: |
+          if ! git diff --exit-code; then
+            echo "::error::Check modified files — commit these changes"
+            git diff --stat
+            exit 1
+          fi
+
+      - name: Create release and push tags
+        id: create-release
+        if: |
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          !contains(github.event.head_commit.message, 'chore(release):')
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LATEST_TAG" ]; then
+            RELEASABLE=true
+          else
+            COMMITS=$(git log --oneline ${LATEST_TAG}..HEAD --grep="^feat\|^fix\|^perf\|^break\|^refactor\|^build" | wc -l)
+            if [ "$COMMITS" -gt 0 ]; then RELEASABLE=true; else RELEASABLE=false; fi
+          fi
+
+          if [ "$RELEASABLE" = "true" ]; then
+            deno task release
+            NEW_VERSION=$(deno eval "console.log(JSON.parse(Deno.readTextFileSync('deno.json')).version)")
+            NEW_TAG="v${NEW_VERSION}"
+            git tag "$NEW_TAG"
+            git push --follow-tags origin main
+
+            echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+            echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
+            echo "released=true" >> $GITHUB_OUTPUT
+          else
+            echo "Nothing to release"
+            echo "released=false" >> $GITHUB_OUTPUT
+          fi

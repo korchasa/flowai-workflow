@@ -17,11 +17,14 @@
  *   --skip <node-ids>     Comma-separated node IDs to skip
  *   --only <node-ids>     Comma-separated node IDs to run exclusively
  *   --version / -V        Print version and exit
+ *   --update              Download and install latest version
+ *   --skip-update-check   Skip update check on --version (for CI)
  */
 
 import type { EngineOptions, Verbosity } from "./types.ts";
 import { Engine } from "./engine.ts";
 import { installSignalHandlers } from "./process-registry.ts";
+import { checkForUpdate, runUpdate } from "./update.ts";
 
 /** Version string embedded at compile time via VERSION env var. Defaults to "dev". */
 export const VERSION = Deno.env.get("VERSION") ?? "dev";
@@ -36,7 +39,7 @@ export function getVersionString(): string {
  * Known flags (--config, --resume, --dry-run, verbosity, --env, --skip, --only)
  * set dedicated fields. Generic `--key value` pairs populate `args`.
  */
-export function parseArgs(args: string[]): EngineOptions {
+export async function parseArgs(args: string[]): Promise<EngineOptions> {
   let configPath = ".flowai-workflow/workflow.yaml";
   let runId: string | undefined;
   let resume = false;
@@ -93,8 +96,13 @@ export function parseArgs(args: string[]): EngineOptions {
         break;
       case "--version":
       case "-V":
-        console.log(getVersionString());
-        Deno.exit(0);
+        await handleVersion();
+        break;
+      case "--update":
+        await handleUpdate();
+        break;
+      case "--skip-update-check":
+        // Consumed by handleVersion; no-op here
         break;
       case "--help":
       case "-h":
@@ -125,6 +133,40 @@ export function parseArgs(args: string[]): EngineOptions {
   };
 }
 
+async function handleVersion(): Promise<never> {
+  console.log(getVersionString());
+  if (VERSION !== "dev" && !Deno.args.includes("--skip-update-check")) {
+    const result = await checkForUpdate(VERSION);
+    if (result?.updateAvailable) {
+      console.log(
+        `\nUpdate available: ${result.currentVersion} → ${result.latestVersion}`,
+      );
+      console.log("Run: flowai-workflow --update");
+    }
+  }
+  Deno.exit(0);
+}
+
+async function handleUpdate(): Promise<never> {
+  if (VERSION === "dev") {
+    console.error("Cannot update a dev build. Install a release binary first.");
+    Deno.exit(1);
+  }
+  console.log(`Current version: ${VERSION}`);
+  const result = await checkForUpdate(VERSION);
+  if (!result) {
+    console.log("Could not check for updates.");
+    Deno.exit(1);
+  }
+  if (!result.updateAvailable) {
+    console.log("Already up to date.");
+    Deno.exit(0);
+  }
+  console.log(`Updating to ${result.latestVersion}...`);
+  const success = await runUpdate(result.downloadUrl);
+  Deno.exit(success ? 0 : 1);
+}
+
 function printUsage(): void {
   console.log(`
 Workflow Engine — Configurable multi-agent workflow runner
@@ -143,7 +185,9 @@ Options:
   --env <KEY=VAL>       Set environment variable (repeatable)
   --skip <node-ids>     Comma-separated node IDs to skip
   --only <node-ids>     Comma-separated node IDs to run exclusively
-  -V, --version         Print version and exit
+  -V, --version         Print version and exit (checks for updates)
+  --update              Download and install latest version
+  --skip-update-check   Skip update check on --version (for CI)
   -h, --help            Show this help
 
 Examples:
@@ -162,7 +206,7 @@ if (import.meta.main) {
   installSignalHandlers();
 
   try {
-    const options = parseArgs(Deno.args);
+    const options = await parseArgs(Deno.args);
 
     // Load .env file if it exists
     try {

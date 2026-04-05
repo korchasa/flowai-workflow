@@ -1,4 +1,5 @@
 {
+  "version": "0.1.0",
   "imports": {
     "@std/assert": "./vendor/assert.ts",
     "@std/yaml": "./vendor/yaml.ts"
@@ -15,7 +16,8 @@
     "dev": "echo 'No dev server for workflow project'",
     "prod": "echo 'No prod mode for workflow project'",
     "dashboard": "deno run --allow-read --allow-write scripts/generate-dashboard.ts",
-    "compile": "deno run -A scripts/compile.ts"
+    "compile": "deno run -A scripts/compile.ts",
+    "release": "deno run -A npm:standard-version --skip.tag"
   },
   "fmt": {
     "proseWrap": "preserve",

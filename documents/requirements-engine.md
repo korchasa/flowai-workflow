@@ -914,6 +914,39 @@
     `engine/loop.ts:93-94`.
   - [x] AC6: `deno task check` green: 590 tests, 0 failures.
 
+### 3.41 FR-E41: CLI Auto-Update and Automated Release Pipeline
+
+- **Description:** CLI binary checks GitHub Releases API for newer versions and
+  can self-update by downloading the matching platform binary. Automated CI
+  pipeline on `main` push detects releasable conventional commits, bumps version
+  via `standard-version`, tags, and triggers the release workflow. Version source
+  of truth: `deno.json` `version` field. Update check is fail-open (network
+  errors never block CLI). `GITHUB_TOKEN` env var used for authenticated API
+  requests when available.
+- **Motivation:** Eliminates manual version management and release process.
+  Users get update notifications and one-command self-update.
+- **Acceptance criteria:**
+  - [x] AC1: `deno.json` has `version` field. Evidence: `deno.json:2`.
+  - [x] AC2: `engine/update.ts` — `checkForUpdate()` queries GitHub Releases
+    API, compares semver, returns update info or null. Evidence:
+    `engine/update.ts:77-123`.
+  - [x] AC3: `engine/update.ts` — `runUpdate()` downloads binary to same dir,
+    chmod +x, atomic rename. Permission check with sudo hint. Evidence:
+    `engine/update.ts:133-180`.
+  - [x] AC4: `--version` flag checks for updates (unless `--skip-update-check`).
+    Evidence: `engine/cli.ts:136-148`.
+  - [x] AC5: `--update` flag performs self-update. Evidence:
+    `engine/cli.ts:150-166`.
+  - [x] AC6: `.versionrc.json` configures `standard-version` for conventional
+    commit bumping. Evidence: `.versionrc.json`.
+  - [x] AC7: `.github/workflows/ci.yml` auto-detects releasable commits on
+    `main` push, bumps version, tags. Evidence: `.github/workflows/ci.yml:37-68`.
+  - [x] AC8: `.github/workflows/release.yml` generates release notes via
+    `scripts/generate-release-notes.ts`. Evidence:
+    `.github/workflows/release.yml:62-73`.
+  - [x] AC9: 22 tests for update module. Evidence: `engine/update_test.ts`.
+  - [x] AC10: `deno task check` green: 612 tests, 0 failures.
+
 ## 4. Non-Functional Requirements
 
 - **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one workflow at a time). Concurrent execution is not supported.
@@ -925,7 +958,7 @@
 
 ## 5. Interfaces
 
-- **CLI entry:** `deno task run [--prompt "..."]`. Flags: `--resume <run-id>`, `--dry-run`, `-v` (verbose), `-q` (quiet), `-s` (semi-verbose), `--config <path>`, `--skip <node>`, `--only <node>`, `--env <K=V>`.
+- **CLI entry:** `deno task run [--prompt "..."]`. Flags: `--resume <run-id>`, `--dry-run`, `-v` (verbose), `-q` (quiet), `-s` (semi-verbose), `--config <path>`, `--skip <node>`, `--only <node>`, `--env <K=V>`, `--update`, `--skip-update-check`.
 - **Agent runtime:** `claude` CLI invoked by engine. Key flags:
   - `--system-prompt` — role-specific instructions inline (content cached from prompt file at startup). Replaces Claude Code base system prompt. Fallback: `--system-prompt-file` for template-path prompts.
   - `--output-format stream-json` — streams JSON events; `result` event contains `result`, `session_id`, `total_cost_usd`, `duration_ms`, `num_turns`, `is_error`.
@@ -979,3 +1012,5 @@
 | —      | FR-E37 | Scope-Based File Modification Detection |
 | —      | FR-E38 | Artifact Rule Frontmatter Field Presence Checks |
 | —      | FR-E39 | Standalone Binary Distribution |
+| —      | FR-E40 | Permission Mode Configuration |
+| —      | FR-E41 | CLI Auto-Update and Automated Release Pipeline |

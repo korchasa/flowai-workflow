@@ -52,6 +52,11 @@ graph TD
     `scripts/compile.ts` generates self-contained executables for 4 platform
     targets. `.github/workflows/release.yml` publishes GitHub Release assets
     on version tag push
+  - **Auto-Update & Release Pipeline** (FR-E41): CLI self-update via GitHub
+    Releases API. Two-workflow CI: `ci.yml` (check + auto-bump + tag on main)
+    → `release.yml` (compile + publish on tag). Version bumping via
+    `standard-version` + conventional commits. `deno.json` version field as
+    source of truth
 
 ## 3. Components
 
@@ -361,8 +366,17 @@ graph TD
   - `cli.ts` — CLI entry point: argument parsing, .env loading.
     `VERSION` constant: `Deno.env.get("VERSION") ?? "dev"` — injected at
     compile time via `deno compile --env VERSION=<tag>`. `--version` / `-V`
-    flag: prints `flowai-workflow <VERSION>` and exits (FR-E39). Added to
-    `parseArgs()` alongside existing `--help`
+    flag: prints version and checks GitHub Releases for updates (FR-E41).
+    `--update` flag: self-updates binary from GitHub Releases.
+    `--skip-update-check` flag: suppresses update check (for CI).
+    `parseArgs()` is async (handles `--version`/`--update` network calls)
+  - `update.ts` — Auto-update module (FR-E41). `compareSemver()`: minimal
+    3-part numeric comparison (no `@std/semver` dependency). `detectPlatform()`:
+    maps `Deno.build` to binary name suffix. `checkForUpdate()`: queries
+    GitHub Releases API with timeout and optional `GITHUB_TOKEN` auth. Fail-open
+    design — returns `null` on any error. `runUpdate()`: downloads binary to
+    same dir as current executable, chmod +x, atomic rename. Permission check
+    with `sudo` hint on EPERM
   - `mod.ts` — barrel re-export serving as `deno doc --lint` entry point
     (not a runtime public API; sole non-redundant consumer is
     `scripts/check.ts` JSDoc validation)
@@ -575,15 +589,22 @@ graph TD
   dry-run behavior.
 - **Deps:** Deno std only (no external).
 
-### 3.6 Release CI Workflow (`.github/workflows/release.yml`) — FR-E39
+### 3.6 Release CI Workflow — FR-E39, FR-E41
 
-- **Status:** Pending.
-- **Purpose:** Automated GitHub Release asset publishing on version tags.
-- **Trigger:** `on: push: tags: ["v*"]`.
-- **Runner:** `ubuntu-latest` (cross-compilation via `--target` flag, no
-  native runner needed).
-- **Steps:** checkout → setup-deno → `deno task compile` → `gh release create
-  $TAG dist/* --generate-notes`.
+- **Purpose:** Automated release pipeline: check, version bump, compile, publish.
+- **Two-workflow design:**
+  - `ci.yml` (on push to `main` + PRs): `deno task check` → detect releasable
+    conventional commits since last tag → `standard-version` bumps
+    `deno.json` version + CHANGELOG.md → git tag `v<ver>` → push
+  - `release.yml` (on tag `v*`): matrix compile (4 targets) → generate
+    release notes via `scripts/generate-release-notes.ts` → `gh release create`
+    with binary assets
+- **Version bumping:** `.versionrc.json` configures `standard-version` (npm
+  package). Reads conventional commits, updates `deno.json` version field,
+  generates `CHANGELOG.md`. Task: `deno task release`.
+- **Release notes:** `scripts/generate-release-notes.ts` — parses conventional
+  commit subjects between tags, categorizes (feat/fix/refactor/perf/docs/build),
+  generates markdown with GitHub compare link.
 - **Assets:** 4 binaries named `flowai-workflow-<os>-<arch>`.
 
 ## 4. Data

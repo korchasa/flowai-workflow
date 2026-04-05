@@ -2,6 +2,38 @@
 
 Universal DAG-based engine for orchestrating AI agents. Define agent workflows as YAML configs — the engine handles execution, inter-agent communication, validation, loops, and resume.
 
+## Install
+
+Download the latest binary for your platform:
+
+```bash
+# macOS (Apple Silicon)
+curl -fsSL https://github.com/korchasa/flowai-pipelines/releases/latest/download/flowai-workflow-darwin-arm64 -o flowai-workflow
+chmod +x flowai-workflow
+sudo mv flowai-workflow /usr/local/bin/
+
+# macOS (Intel)
+curl -fsSL https://github.com/korchasa/flowai-pipelines/releases/latest/download/flowai-workflow-darwin-x86_64 -o flowai-workflow
+chmod +x flowai-workflow
+sudo mv flowai-workflow /usr/local/bin/
+
+# Linux (x86_64)
+curl -fsSL https://github.com/korchasa/flowai-pipelines/releases/latest/download/flowai-workflow-linux-x86_64 -o flowai-workflow
+chmod +x flowai-workflow
+sudo mv flowai-workflow /usr/local/bin/
+
+# Linux (ARM64)
+curl -fsSL https://github.com/korchasa/flowai-pipelines/releases/latest/download/flowai-workflow-linux-arm64 -o flowai-workflow
+chmod +x flowai-workflow
+sudo mv flowai-workflow /usr/local/bin/
+```
+
+Update to the latest version:
+
+```bash
+flowai-workflow --update
+```
+
 ## Engine Architecture
 
 ```mermaid

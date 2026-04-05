@@ -1,19 +1,19 @@
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals } from "@std/assert";
 import { getVersionString, parseArgs, VERSION } from "./cli.ts";
 
-Deno.test("parseArgs — --prompt sets args.prompt", () => {
-  const opts = parseArgs(["--prompt", "Fix the login bug"]);
+Deno.test("parseArgs — --prompt sets args.prompt", async () => {
+  const opts = await parseArgs(["--prompt", "Fix the login bug"]);
   assertEquals(opts.args.prompt, "Fix the login bug");
 });
 
-Deno.test("parseArgs — no flags produces empty args", () => {
-  const opts = parseArgs([]);
+Deno.test("parseArgs — no flags produces empty args", async () => {
+  const opts = await parseArgs([]);
   assertEquals(opts.args.prompt, undefined);
   assertEquals(opts.config_path, ".flowai-workflow/workflow.yaml");
 });
 
-Deno.test("parseArgs — --prompt combined with --config and -v", () => {
-  const opts = parseArgs([
+Deno.test("parseArgs — --prompt combined with --config and -v", async () => {
+  const opts = await parseArgs([
     "--config",
     "custom.yaml",
     "--prompt",
@@ -25,67 +25,74 @@ Deno.test("parseArgs — --prompt combined with --config and -v", () => {
   assertEquals(opts.verbosity, "verbose");
 });
 
-Deno.test("parseArgs — --resume sets resume and run_id", () => {
-  const opts = parseArgs(["--resume", "20260308T143022"]);
+Deno.test("parseArgs — --resume sets resume and run_id", async () => {
+  const opts = await parseArgs(["--resume", "20260308T143022"]);
   assertEquals(opts.resume, true);
   assertEquals(opts.run_id, "20260308T143022");
 });
 
-Deno.test("parseArgs — --dry-run", () => {
-  const opts = parseArgs(["--dry-run"]);
+Deno.test("parseArgs — --dry-run", async () => {
+  const opts = await parseArgs(["--dry-run"]);
   assertEquals(opts.dry_run, true);
 });
 
-Deno.test("parseArgs — --skip and --only", () => {
-  const opts = parseArgs(["--skip", "meta-agent", "--only", "pm,tech-lead"]);
+Deno.test("parseArgs — --skip and --only", async () => {
+  const opts = await parseArgs([
+    "--skip",
+    "meta-agent",
+    "--only",
+    "pm,tech-lead",
+  ]);
   assertEquals(opts.skip_nodes, ["meta-agent"]);
   assertEquals(opts.only_nodes, ["pm", "tech-lead"]);
 });
 
-Deno.test("parseArgs — --env sets env_overrides", () => {
-  const opts = parseArgs(["--env", "DEBUG=true"]);
+Deno.test("parseArgs — --env sets env_overrides", async () => {
+  const opts = await parseArgs(["--env", "DEBUG=true"]);
   assertEquals(opts.env_overrides.DEBUG, "true");
 });
 
-Deno.test("parseArgs — --env without = throws", () => {
-  assertThrows(
-    () => parseArgs(["--env", "INVALID"]),
-    Error,
-    "Invalid --env format",
-  );
+Deno.test("parseArgs — --env without = rejects", async () => {
+  try {
+    await parseArgs(["--env", "INVALID"]);
+    throw new Error("should have thrown");
+  } catch (e) {
+    assertEquals((e as Error).message.includes("Invalid --env format"), true);
+  }
 });
 
-Deno.test("parseArgs — unknown flag throws", () => {
-  assertThrows(
-    () => parseArgs(["badarg"]),
-    Error,
-    "Unknown argument",
-  );
+Deno.test("parseArgs — unknown flag rejects", async () => {
+  try {
+    await parseArgs(["badarg"]);
+    throw new Error("should have thrown");
+  } catch (e) {
+    assertEquals((e as Error).message.includes("Unknown argument"), true);
+  }
 });
 
-Deno.test("parseArgs — generic --key value arg", () => {
-  const opts = parseArgs(["--foo", "bar"]);
+Deno.test("parseArgs — generic --key value arg", async () => {
+  const opts = await parseArgs(["--foo", "bar"]);
   assertEquals(opts.args.foo, "bar");
 });
 
-Deno.test("parseArgs — -s sets semi-verbose", () => {
-  const opts = parseArgs(["-s"]);
+Deno.test("parseArgs — -s sets semi-verbose", async () => {
+  const opts = await parseArgs(["-s"]);
   assertEquals(opts.verbosity, "semi-verbose");
 });
 
-Deno.test("parseArgs — --semi-verbose sets semi-verbose", () => {
-  const opts = parseArgs(["--semi-verbose"]);
+Deno.test("parseArgs — --semi-verbose sets semi-verbose", async () => {
+  const opts = await parseArgs(["--semi-verbose"]);
   assertEquals(opts.verbosity, "semi-verbose");
 });
 
-Deno.test("parseArgs — -s combined with other flags", () => {
-  const opts = parseArgs(["-s", "--prompt", "Do something"]);
+Deno.test("parseArgs — -s combined with other flags", async () => {
+  const opts = await parseArgs(["-s", "--prompt", "Do something"]);
   assertEquals(opts.verbosity, "semi-verbose");
   assertEquals(opts.args.prompt, "Do something");
 });
 
-Deno.test("parseArgs — default verbosity is normal", () => {
-  const opts = parseArgs([]);
+Deno.test("parseArgs — default verbosity is normal", async () => {
+  const opts = await parseArgs([]);
   assertEquals(opts.verbosity, "normal");
 });
 
