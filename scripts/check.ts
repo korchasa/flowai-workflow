@@ -14,12 +14,25 @@ async function run(
 ): Promise<boolean> {
   console.log(`\n--- ${label} ---`);
   console.log(`> ${cmd} ${args.join(" ")}`);
-  const process = new Deno.Command(cmd, {
-    args,
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  const { success } = await process.output();
+  let success: boolean;
+  try {
+    const process = new Deno.Command(cmd, {
+      args,
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+    ({ success } = await process.output());
+  } catch (e) {
+    if (e instanceof Deno.errors.NotFound) {
+      if (allowFailure) {
+        console.warn(`SKIPPED (${cmd} not found): ${label}`);
+        return false;
+      }
+      console.error(`FAILED: ${label} — '${cmd}' not found`);
+      Deno.exit(1);
+    }
+    throw e;
+  }
   if (!success) {
     if (allowFailure) {
       console.warn(`SKIPPED (no modules): ${label}`);
