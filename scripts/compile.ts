@@ -56,9 +56,14 @@ async function run(): Promise<void> {
     Deno.exit(1);
   }
 
-  const tmpEnvFile = await Deno.makeTempFile({ suffix: ".env" });
+  // Write .env in CWD for deno compile --env-file (must be unnamed .env,
+  // explicit paths trigger a Deno bug that parses the file as a JS module).
+  const envFile = ".env";
+  const hadEnvFile = await fileExists(envFile);
+  const prevContent = hadEnvFile ? await Deno.readTextFile(envFile) : undefined;
+
   try {
-    await Deno.writeTextFile(tmpEnvFile, `VERSION=${version}\n`);
+    await Deno.writeTextFile(envFile, `VERSION=${version}\n`);
 
     for (const { triple, name } of targets) {
       console.log(`Compiling ${name} (${triple})...`);
@@ -70,7 +75,6 @@ async function run(): Promise<void> {
           "--target",
           triple,
           "--env-file",
-          tmpEnvFile,
           "--output",
           name,
           "engine/cli.ts",
@@ -86,8 +90,22 @@ async function run(): Promise<void> {
       console.log(`  → ${name}`);
     }
   } finally {
-    await Deno.remove(tmpEnvFile);
+    // Restore or remove .env
+    if (prevContent !== undefined) {
+      await Deno.writeTextFile(envFile, prevContent);
+    } else {
+      await Deno.remove(envFile).catch(() => {});
+    }
   }
 
   console.log("Done.");
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await Deno.stat(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
