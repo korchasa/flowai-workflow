@@ -3,8 +3,10 @@ import type {
   NodeConfig,
   NodeSettings,
   RunState,
+  RuntimeId,
   TemplateContext,
 } from "./types.ts";
+import type { RuntimeAdapter } from "./runtime/types.ts";
 import type { AgentResult } from "./agent.ts";
 import type { HitlQuestion } from "./hitl.ts";
 import { runHitlLoop } from "./hitl.ts";
@@ -21,9 +23,11 @@ interface HitlBaseParams {
   node: NodeConfig;
   ctx: TemplateContext;
   settings: Required<NodeSettings>;
-  claudeArgs?: string[];
+  runtime?: RuntimeId;
+  runtimeArgs?: string[];
   permissionMode?: string;
   model?: string;
+  runtimeAdapter?: RuntimeAdapter;
   output: OutputManager;
   /** Working directory for subprocesses (worktree path or undefined for CWD). */
   cwd?: string;
@@ -60,9 +64,11 @@ export async function handleAgentHitl(
     node,
     ctx,
     settings,
-    claudeArgs,
+    runtime,
+    runtimeArgs,
     permissionMode,
     model,
+    runtimeAdapter,
     output,
     cwd,
   } = params;
@@ -94,9 +100,11 @@ export async function handleAgentHitl(
         node,
         ctx,
         settings,
-        claudeArgs,
+        runtime,
+        runtimeArgs,
         permissionMode,
         model,
+        runtimeAdapter,
         output,
         cwd,
       },
@@ -141,9 +149,11 @@ export async function handleAgentHitl(
       node,
       ctx,
       settings,
-      claudeArgs,
+      runtime,
+      runtimeArgs,
       permissionMode,
       model,
+      runtimeAdapter,
       output,
       cwd,
     },

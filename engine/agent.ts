@@ -10,14 +10,18 @@
 import type {
   ClaudeCliOutput,
   ErrorCategory,
+  HitlConfig,
   NodeConfig,
   NodeSettings,
   PermissionDenial,
+  RuntimeId,
   TemplateContext,
   ValidationRule,
   Verbosity,
 } from "./types.ts";
+import type { RuntimeAdapter } from "./runtime/types.ts";
 import { interpolate } from "./template.ts";
+import { getRuntimeAdapter } from "./runtime/index.ts";
 import {
   allPassed,
   formatFailures,
@@ -25,7 +29,6 @@ import {
   type ValidationResult,
 } from "./validate.ts";
 import type { OutputManager, VerboseInput } from "./output.ts";
-import { invokeClaudeCli } from "./claude-process.ts";
 import { findViolations, snapshotModifiedFiles } from "./scope-check.ts";
 
 /**
@@ -81,12 +84,18 @@ export interface AgentRunOptions {
   ctx: TemplateContext;
   /** Resolved node settings (timeouts, retries, continuations). */
   settings: Required<NodeSettings>;
-  /** Extra CLI arguments passed to claude command. */
-  claudeArgs?: string[];
+  /** Runtime used for this invocation. Defaults to claude for backward compatibility. */
+  runtime?: RuntimeId;
+  /** Extra CLI arguments passed to the selected runtime. */
+  runtimeArgs?: string[];
   /** Permission mode for this agent (maps to --permission-mode CLI flag). */
   permissionMode?: string;
   /** Claude model override (e.g. "claude-sonnet-4-6"). Omit = CLI default. */
   model?: string;
+  /** Workflow HITL config forwarded to runtimes that need explicit tool wiring. */
+  hitlConfig?: HitlConfig;
+  /** Injected runtime adapter for unit testing. */
+  runtimeAdapter?: RuntimeAdapter;
   /** OutputManager for verbose diagnostics. */
   output?: OutputManager;
   /** Node ID for verbose output tagging. */
@@ -127,15 +136,19 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
     node,
     ctx,
     settings,
-    claudeArgs,
+    runtime = "claude",
+    runtimeArgs,
     permissionMode,
     model,
+    hitlConfig,
+    runtimeAdapter,
     output,
     nodeId,
     streamLogPath,
     verbosity,
     cwd,
   } = opts;
+  const adapter = runtimeAdapter ?? getRuntimeAdapter(runtime);
 
   // Derive onOutput callback from OutputManager
   const onOutput = output && nodeId
@@ -163,15 +176,16 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
   }
 
   // Initial invocation
-  let result = await invokeClaudeCli({
+  let result = await adapter.invoke({
     agent: node.agent,
     systemPrompt: node.system_prompt
       ? interpolate(node.system_prompt, ctx, cwd)
       : undefined,
     taskPrompt,
-    claudeArgs,
+    extraArgs: runtimeArgs,
     permissionMode,
     model,
+    hitlConfig,
     timeoutSeconds: settings.timeout_seconds,
     maxRetries: settings.max_retries,
     retryDelaySeconds: settings.retry_delay_seconds,
@@ -271,12 +285,13 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
       };
     }
 
-    result = await invokeClaudeCli({
+    result = await adapter.invoke({
       resumeSessionId: result.output.session_id,
       taskPrompt: resumePrompt,
-      claudeArgs,
+      extraArgs: runtimeArgs,
       permissionMode,
       model,
+      hitlConfig,
       timeoutSeconds: settings.timeout_seconds,
       maxRetries: settings.max_retries,
       retryDelaySeconds: settings.retry_delay_seconds,

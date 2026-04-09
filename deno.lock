@@ -3,6 +3,7 @@
   "specifiers": {
     "jsr:@std/internal@^1.0.12": "1.0.12",
     "jsr:@std/path@*": "1.1.4",
+    "jsr:@std/path@1.1.4": "1.1.4",
     "jsr:@std/yaml@*": "1.0.12",
     "npm:yaml@2": "2.8.2"
   },
@@ -25,5 +26,10 @@
       "integrity": "sha512-mplynKqc1C2hTVYxd0PU2xQAc22TI1vShAYGksCCfxbn/dFwnHTNi1bvYsBTkhdUNtGIf5xNOg938rrSSYvS9A==",
       "bin": true
     }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@std/path@1.1.4"
+    ]
   }
 }

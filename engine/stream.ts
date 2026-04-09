@@ -109,6 +109,7 @@ export function extractClaudeOutput(
   event: Record<string, any>,
 ): ClaudeCliOutput {
   return {
+    runtime: "claude",
     result: event.result ?? "",
     session_id: event.session_id ?? "",
     total_cost_usd: event.total_cost_usd ?? 0,

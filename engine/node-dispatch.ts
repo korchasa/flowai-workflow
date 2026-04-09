@@ -6,12 +6,13 @@
 import type { AgentResult } from "./agent.ts";
 import { resolveInputArtifacts, runAgent } from "./agent.ts";
 import { handleAgentHitl } from "./hitl-handler.ts";
-import { detectHitlRequest } from "./hitl.ts";
+import { detectHitlRequest, isHitlConfigured } from "./hitl.ts";
 import { runHuman } from "./human.ts";
 import type { UserInput } from "./human.ts";
 import { saveAgentLog } from "./log.ts";
 import { runLoop } from "./loop.ts";
 import type { OutputManager } from "./output.ts";
+import { resolveRuntimeConfig } from "./runtime/index.ts";
 import {
   getNodeDir,
   getRunDir,
@@ -52,10 +53,13 @@ export async function executeAgentNode(
 ): Promise<AgentResult | null> {
   const ctx = eng.buildContext(nodeId);
   const settings = node.settings as Required<NodeSettings>;
-  const hitlConfig = eng.config.defaults?.hitl;
-  const effectiveModel = node.model ?? eng.config.defaults?.model;
-  const effectivePermissionMode = node.permission_mode ??
-    eng.config.defaults?.permission_mode;
+  const hitlConfig = isHitlConfigured(eng.config.defaults?.hitl)
+    ? eng.config.defaults.hitl
+    : undefined;
+  const runtimeConfig = resolveRuntimeConfig({
+    defaults: eng.config.defaults,
+    node,
+  });
   const cwd = eng.workDir !== "." ? eng.workDir : undefined;
 
   // Resume path: node was waiting for human reply
@@ -78,9 +82,10 @@ export async function executeAgentNode(
       node,
       ctx,
       settings,
-      claudeArgs: eng.config.defaults?.claude_args,
-      permissionMode: effectivePermissionMode,
-      model: effectiveModel,
+      runtime: runtimeConfig.runtime,
+      runtimeArgs: runtimeConfig.args,
+      permissionMode: runtimeConfig.permissionMode,
+      model: runtimeConfig.model,
       output: eng.output,
       cwd,
     });
@@ -97,9 +102,11 @@ export async function executeAgentNode(
     node,
     ctx,
     settings,
-    claudeArgs: eng.config.defaults?.claude_args,
-    permissionMode: effectivePermissionMode,
-    model: effectiveModel,
+    runtime: runtimeConfig.runtime,
+    runtimeArgs: runtimeConfig.args,
+    permissionMode: runtimeConfig.permissionMode,
+    model: runtimeConfig.model,
+    hitlConfig,
     output: eng.output,
     nodeId,
     streamLogPath,
@@ -141,9 +148,10 @@ export async function executeAgentNode(
         node,
         ctx,
         settings,
-        claudeArgs: eng.config.defaults?.claude_args,
-        permissionMode: effectivePermissionMode,
-        model: effectiveModel,
+        runtime: runtimeConfig.runtime,
+        runtimeArgs: runtimeConfig.args,
+        permissionMode: runtimeConfig.permissionMode,
+        model: runtimeConfig.model,
         output: eng.output,
         cwd,
       });

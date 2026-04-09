@@ -22,9 +22,10 @@
 
 ## 2. General Description
 
-- **System context:** Operates as a local Deno engine process triggered by CLI command (`deno task run [--prompt "..."]`). Reads workflow DAG config (YAML), executes nodes sequentially via `claude` CLI, validates outputs, manages continuations and resume. Domain-agnostic: no git, GitHub, or SDLC logic in engine code.
+- **System context:** Operates as a local Deno engine process triggered by CLI command (`deno task run [--prompt "..."]`). Reads workflow DAG config (YAML), executes nodes sequentially via the selected agent runtime (`claude` by default, `opencode` also supported), validates outputs, manages continuations and resume. Domain-agnostic: no git, GitHub, or SDLC logic in engine code.
 - **Assumptions and constraints:**
   - Each agent is stateless between runs — all context comes from input artifacts and its system prompt.
+  - Runtime selection is resolved by precedence: node → enclosing loop node → workflow defaults → `claude`.
   - Engine is workflow-independent: MUST NOT depend on any specific workflow config. One engine, many workflows.
   - Engine MUST NOT contain references to concrete artifact filenames, node names, or domain-specific logic.
 
@@ -32,21 +33,21 @@
 
 ### 3.1 FR-E1 (ex FR-8): Continuation Mechanism
 
-- **Description:** Each stage script wraps the Claude Code CLI invocation and validates the agent's output before considering the stage complete. If validation fails, the script re-invokes the agent in the same session using `--resume` with a description of the problem, giving the agent a chance to fix its output without starting from scratch.
+- **Description:** Each stage script wraps the selected agent runtime invocation and validates the agent's output before considering the stage complete. If validation fails, the script re-invokes the agent in the same session using the runtime's session-resume mechanism (`claude --resume`, `opencode run --session`) with a description of the problem, giving the agent a chance to fix its output without starting from scratch.
 - **Acceptance criteria:**
   - **Stage script responsibilities (engine path — `engine/`):**
-    1. [x] Invoke `claude` CLI with the stage prompt and input artifacts. Evidence: `engine/agent.ts:208-230` (`buildClaudeArgs`), `engine/agent.ts:75-117` (invocation loop)
+    1. [x] Invoke the selected runtime CLI with the stage prompt and input artifacts. Evidence: `engine/runtime/index.ts`, `engine/runtime/claude-adapter.ts`, `engine/runtime/opencode-adapter.ts`
     2. After the agent exits, run stage-specific validation checks:
        - [x] **For Developer stage:** run `deno task check` via `custom_script` validation rule. If it fails, continuation is triggered. Evidence: `engine/validate.ts:49-50,127-162` (`checkCustomScript()`), `.flowai-workflow/workflow.yaml` (developer node `custom_script` config)
        - [x] **For QA stage:** (1) verify `05-qa-report-N.md` exists and is non-empty, (2) extract verdict via frontmatter parsing, (3) if verdict is not exactly `PASS` or `FAIL` — treat as validation failure, trigger continuation on QA agent. Evidence: `engine/validate.ts:51-52,164-228` (`checkFrontmatterField()`), `engine/validate_test.ts:225-351` (6 tests)
        - [x] **For all stages:** verify the expected output artifact exists and is non-empty. Evidence: `engine/validate.ts:60-88` (`file_exists`, `file_not_empty` rules), `.flowai-workflow/workflow.yaml` (per-node `validate` config)
-    3. [x] If validation fails: re-invoke `claude --resume <session-id>` with the validation error output appended as context. Evidence: `engine/agent.ts:94-116` (resume prompt construction + `invokeClaudeCli` with `resumeSessionId`)
+    3. [x] If validation fails: re-invoke the runtime in the same session (`claude --resume <session-id>` or `opencode run --session <session-id>`) with the validation error output appended as context. Evidence: `engine/agent.ts`, `engine/opencode-process.ts`
     4. [x] Repeat until validation passes or the continuation limit is reached. Evidence: `engine/agent.ts:75-91` (loop with `continuations < settings.max_continuations`)
   - **Continuation limits:**
     - [x] Maximum continuations per stage: configurable (default 3). Evidence: `.flowai-workflow/workflow.yaml:9` (`max_continuations: 3`), `engine/agent.ts:82-91`
     - [x] If limit reached: stage is marked as failed, workflow stops, Meta-Agent is triggered (FR-11, FR-E11). Evidence: `engine/engine.ts:96-109,613-619` (`collectRunOnNodes()`), `engine/types.ts:56-57` (`run_on` field), `engine/agent.ts:110-120` (continuation limit check)
   - **Session persistence:**
-    - [x] The `--resume` flag ensures the agent retains full conversation context from the initial invocation. Evidence: `engine/agent.ts:208-230` (`--resume` flag in `buildClaudeArgs`)
+    - [x] Runtime session resume ensures the agent retains full conversation context from the initial invocation. Evidence: `engine/claude-process.ts`, `engine/opencode-process.ts`
     - [x] Each continuation adds only the validation error to the context, not the full prompt. Evidence: `engine/agent.ts:94-97` (resume prompt = failures only)
   - **Secret detection (moved to `deno task check`):**
     - [x] `gitleaks detect --no-git` runs as part of `scripts/check.ts` (after lint, before tests). `allowFailure=true` — skips if gitleaks binary not found. Evidence: `scripts/check.ts:87`
@@ -63,6 +64,7 @@
 - **Description:** Every agent's full session transcript is stored for analysis and prompt improvement.
 - **Log sources:**
   - **JSON output:** Claude CLI with `--output-format json` returns a structured JSON object with `result`, `session_id`, `total_cost_usd`, `duration_ms`, `duration_api_ms`, `num_turns`, `is_error`. This is captured by the stage script or engine.
+  - **Normalized runtime output:** OpenCode JSON stream is normalized by the engine into the same `ClaudeCliOutput`-compatible shape (`result`, `session_id`, `total_cost_usd`, `duration_ms`, `num_turns`, `is_error`, optional `hitl_request`) so downstream state, summary, continuation, and logging logic stay runtime-agnostic.
   - **JSONL transcript:** Claude CLI automatically stores full session transcripts as JSONL files in `~/.claude/projects/`. Each line is a JSON event (messages, tool calls, responses).
 - **Acceptance criteria (legacy shell script path):**
   - Each stage script saves two log files:
@@ -71,11 +73,11 @@
   - Logs are committed to the feature branch after each stage.
   - Stage script locates the JSONL transcript by session ID extracted from the JSON output.
 - **Acceptance criteria (Deno engine path):**
-  - [x] After each non-loop agent node completes successfully, the engine saves two files to `.flowai-workflow/runs/<run-id>/logs/`:
+  - [x] After each non-loop agent node completes successfully, the engine saves a JSON log to `.flowai-workflow/runs/<run-id>/logs/` and, for Claude runtime only, copies the JSONL transcript:
     - `<node-id>.json` — full `ClaudeCliOutput` JSON object (`result`, `session_id`, `total_cost_usd`, `duration_ms`, `duration_api_ms`, `num_turns`, `is_error`).
-    - `<node-id>.jsonl` — copy of the JSONL session transcript from `~/.claude/projects/<project-hash>/`, located by matching `session_id` in filenames.
-    - Evidence: `engine/engine.ts:266-270`, `engine/log.ts:18-47`
-  - [x] If the JSONL transcript file is not found: engine logs a warning and continues — workflow does NOT fail. Evidence: `engine/log.ts:43-45`
+    - `<node-id>.jsonl` — Claude-only copy of the JSONL session transcript from `~/.claude/projects/<project-hash>/`, located by matching `session_id` in filenames.
+    - Evidence: `engine/engine.ts:266-270`, `engine/log.ts`
+  - [x] If the Claude JSONL transcript file is not found: engine logs a warning and continues — workflow does NOT fail. Evidence: `engine/log.ts`
   - [x] Loop body nodes (developer, qa) must have logs saved after each iteration. Log files use iteration-qualified names: `<node-id>-iter-<N>.json` and `<node-id>-iter-<N>.jsonl`. `runLoop()` calls `saveAgentLog()` for each body node after successful completion. Evidence: `engine/engine.ts:574-582` (onNodeComplete callback in executeLoopNode saves logs using `${id}-iter-${iteration}` node ID)
   - [x] `LoopResult` includes per-iteration `AgentResult` references (with `ClaudeCliOutput`) to enable log extraction by the engine. Evidence: `engine/loop.ts:18-26` (`LoopResult.bodyResults: AgentResult[]`), `engine/loop.ts:69,99` (initialized, pushed per body node per iteration)
   - [x] Log-saving logic has unit tests covering: successful save, JSONL-not-found warning path. Evidence: `engine/log_test.ts:29-124` (5 tests)
@@ -144,20 +146,21 @@
 
 ### 3.8 FR-E8 (ex FR-21): Human-in-the-Loop (Agent-Initiated)
 
-- **Description:** Any workflow agent can request human input mid-task by calling the built-in `AskUserQuestion` tool. The engine detects this call (denied in `-p` mode but visible in JSON output as `permission_denials`), delegates question delivery and reply polling to external workflow scripts, and resumes the agent session with the human's answer via `--resume`.
+- **Description:** Workflow agents can request human input mid-task through a runtime-specific structured signal. Claude uses the built-in `AskUserQuestion` tool (visible in headless mode as `permission_denials`). OpenCode uses a per-invocation local MCP tool injected by the engine through `OPENCODE_CONFIG_CONTENT`. In both cases the engine normalizes the request, delegates question delivery and reply polling to external workflow scripts, and resumes the agent session with the human's answer.
 - **Mechanism:**
-  1. Agent calls `AskUserQuestion` → Claude CLI denies it in `-p` mode (no terminal) → structured question visible in `permission_denials` field of JSON `result` event.
-  2. Engine extracts question (`{question, header, options[], multiSelect}`) and `session_id`.
-  3. Engine invokes configurable `ask_script` (workflow script, not engine code) to deliver question (e.g., `gh issue comment`).
-  4. Engine enters poll loop: `sleep poll_interval` → invoke `check_script` → if exit 0 (reply found), read reply from stdout.
-  5. Engine resumes agent: `claude --resume <session_id> -p "<reply>"`. Agent continues with full session context.
+  1. Claude path: agent calls `AskUserQuestion` → Claude CLI denies it in `-p` mode (no terminal) → structured question visible in `permission_denials`.
+  2. OpenCode path: engine injects a local MCP server exposing `request_human_input` via `OPENCODE_CONFIG_CONTENT` → runtime emits structured `tool_use` event for `hitl_request_human_input`.
+  3. Engine extracts question (`{question, header, options[], multiSelect}`) and `session_id`.
+  4. Engine invokes configurable `ask_script` (workflow script, not engine code) to deliver question (e.g., `gh issue comment`).
+  5. Engine enters poll loop: `sleep poll_interval` → invoke `check_script` → if exit 0 (reply found), read reply from stdout.
+  6. Engine resumes agent in the same session (`claude --resume <session_id>` or `opencode run --session <session_id>`). Agent continues with full session context.
 - **Key constraint:** Engine contains zero GitHub/Slack/email-specific code. All delivery/polling logic lives in workflow scripts (`.flowai-workflow/scripts/`).
 - **Acceptance criteria:**
-  - [x] Engine detects `AskUserQuestion` in `permission_denials` of Claude CLI JSON output after agent node completes. Evidence: `engine/hitl.ts:61-93` (`detectHitlRequest()`), `engine/engine.ts:316-319` (call in `executeAgentNode`)
+  - [x] Engine detects runtime-native HITL requests after agent node completes: Claude via `permission_denials`, OpenCode via normalized `tool_use` parsing from `opencode run --format json`. Evidence: `engine/hitl.ts` (`detectHitlRequest()`), `engine/opencode-process.ts` (`extractOpenCodeOutput()`), `engine/node-dispatch.ts` (call in `executeAgentNode`)
   - [x] Engine saves `session_id`, question JSON, and node status `waiting` to `state.json`. Evidence: `engine/state.ts:93-103` (`markNodeWaiting()`), `engine/engine.ts:324-325` (call + saveState), `engine/types.ts:104` (`question_json` field)
   - [x] Engine invokes `ask_script` (path from `workflow.yaml` `defaults.hitl`) with args: `--run-dir`, `--artifact-source`, `--run-id`, `--node-id`, `--question-json`. Evidence: `engine/hitl.ts:111-125` (`buildScriptArgs("ask")`), `engine/hitl.ts:127-134` (ask invocation)
   - [x] Engine enters poll loop calling `check_script` with args: `--run-dir`, `--artifact-source`, `--run-id`, `--node-id`, `--exclude-login`. Exit 0 = reply in stdout; exit 1 = no reply yet. Evidence: `engine/hitl.ts:137-175` (poll loop), `engine/hitl_test.ts:184-214` (poll test)
-  - [x] On reply: engine resumes agent via `claude --resume <session_id> -p "<reply>"`. Evidence: `engine/hitl.ts:158-172` (claudeRun with resumeSessionId)
+  - [x] On reply: engine resumes agent via the selected runtime's session-resume mechanism. Claude uses `--resume`; OpenCode uses `run --session`. Evidence: `engine/hitl.ts` (`adapter.invoke()` with `resumeSessionId`), `engine/agent.ts`, `engine/opencode-process.ts`
   - [x] Configurable `poll_interval` (default 60s) and `timeout` (default 7200s) per workflow. Evidence: `engine/types.ts:170-175` (`HitlConfig`), `.flowai-workflow/workflow.yaml:16-20` (defaults.hitl)
   - [x] On timeout: node fails, Meta-Agent triggered. Evidence: `engine/hitl.ts:183-188` (timeout return), `engine/engine.ts:342-347` (markNodeFailed on HITL failure), `engine/hitl_test.ts:216-230` (timeout test)
   - [x] `deno task run` on a workflow with `waiting` nodes auto-resumes polling (no manual `--resume` needed). Evidence: `engine/engine.ts:278-310` (wasWaiting resume path in executeAgentNode)
@@ -1030,7 +1033,7 @@
 
 ## 4. Non-Functional Requirements
 
-- **Isolation:** Each agent runs in its own Claude Code process with no shared state except file artifacts. Single local execution assumed (one workflow at a time). Concurrent execution is not supported.
+- **Isolation:** Each agent runs in its own runtime process with no shared state except file artifacts. Single local execution assumed (one workflow at a time). Concurrent execution is not supported.
 - **Fault tolerance:** If a node fails (agent error, timeout, continuation limit exhausted), the workflow stops. Post-workflow nodes with `run_on` config execute based on outcome. Manual restart via `--resume <run-id>`.
 - **Timeouts:** Each node has a configurable timeout (default: 30 min). Engine enforces timeout per node. On timeout, node is treated as failed.
 - **Observability:** 3 verbosity levels (`-q`/default/`-v`/`-s`); status lines with timestamps; per-node result summaries; full logs stored per node in `<run-dir>/logs/`.
@@ -1040,16 +1043,22 @@
 ## 5. Interfaces
 
 - **CLI entry:** `deno task run [--prompt "..."]`. Flags: `--resume <run-id>`, `--dry-run`, `-v` (verbose), `-q` (quiet), `-s` (semi-verbose), `--config <path>`, `--skip <node>`, `--only <node>`, `--env <K=V>`.
-- **Agent runtime:** `claude` CLI invoked by engine. Key flags:
-  - `--system-prompt` — role-specific instructions inline (content cached from prompt file at startup). Replaces Claude Code base system prompt. Fallback: `--system-prompt-file` for template-path prompts.
-  - `--output-format stream-json` — streams JSON events; `result` event contains `result`, `session_id`, `total_cost_usd`, `duration_ms`, `num_turns`, `is_error`.
-  - `--resume <session-id>` — re-invokes agent in same session for continuations (FR-E1).
-  - `-p "<prompt>"` — non-interactive mode.
-  - `--model <model>` — per-node model override (FR-E12).
-  - `--effort <level>` — reasoning depth: `low`|`medium`|`high`|`max` (FR-E42).
-  - `--fallback-model <model>` — auto-fallback on primary model overload (FR-E43, `-p` only).
-  - `--permission-mode <mode>` — permission mode override (FR-E40).
-- **Config format:** YAML workflow config with `defaults` (global settings) and `nodes` (DAG definition). Node types: `agent`, `loop`, `merge`, `human`. Fields per type: `prompt`, `inputs`, `validate`, `model`, `effort`, `run_on`, `after`/`before` hooks.
+- **Agent runtime:** runtime selected by config. Supported contracts:
+  - `claude`:
+    - `--output-format stream-json`
+    - `--resume <session-id>`
+    - `-p "<prompt>"`
+    - `--model <model>`
+    - `--permission-mode <mode>`
+    - `runtime_args` are merged with `claude_args` and forwarded as CLI flags
+  - `opencode`:
+    - `run --format json`
+    - `run --session <session-id>`
+    - `run --model <provider/model>`
+    - `run --agent <agent>`
+    - no dedicated system-prompt flag; engine prepends `system_prompt` content to `taskPrompt`
+    - generic flags via `runtime_args` (for example `--variant high`)
+- **Config format:** YAML workflow config with `defaults` (global settings) and `nodes` (DAG definition). Node types: `agent`, `loop`, `merge`, `human`. Fields per type include `runtime`, `runtime_args`, `prompt`, `inputs`, `validate`, `model`, `run_on`, `after`/`before` hooks. `claude_args` and `permission_mode` are Claude-only. Config validation rejects `runtime=opencode` combined with Claude-specific flags.
 - **State:** `<run-dir>/state.json` — node statuses (`pending`/`running`/`completed`/`failed`/`waiting`/`skipped`), session IDs, cost data, timing, HITL question JSON.
 - **Template variables:** `{{input.<node-id>}}` (node output dir), `{{node_dir}}` (current node output dir), `{{run_dir}}` (run root), `{{run_id}}`, `{{loop.iteration}}` (loop body only), `{{env.<KEY>}}`, `{{file("path")}}` (inline file content, path relative to repo root; FR-E32).
 

@@ -2,6 +2,7 @@
   "version": "0.1.4",
   "imports": {
     "@std/assert": "./vendor/assert.ts",
+    "@std/path": "jsr:@std/path@1.1.4",
     "@std/yaml": "./vendor/yaml.ts"
   },
   "tasks": {

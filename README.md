@@ -1,6 +1,6 @@
 # flowai-workflow
 
-Universal DAG-based engine for orchestrating AI agents. Define agent workflows as YAML configs — the engine handles execution, inter-agent communication, validation, loops, and resume.
+Universal DAG-based engine for orchestrating AI agents. Define agent workflows as YAML configs — the engine handles execution, inter-agent communication, validation, loops, resume, and runtime selection.
 
 ## Install
 
@@ -37,7 +37,7 @@ graph TD
     DAG --> Executor["Level Executor<br/>sequential per level"]
 
     Executor --> Dispatch{Node Type?}
-    Dispatch -->|agent| Agent["Agent Runner<br/>Claude CLI"]
+    Dispatch -->|agent| Agent["Agent Runner<br/>Claude / OpenCode"]
     Dispatch -->|loop| Loop["Loop Runner<br/>iterative body"]
     Dispatch -->|merge| Merge["Merge<br/>copy dirs"]
     Dispatch -->|human| Human["Human Input<br/>terminal / HITL"]
@@ -59,10 +59,10 @@ The engine (`engine/`, Deno/TypeScript) reads a YAML workflow config and builds 
 
 Four node types:
 
-- **agent** — invokes Claude Code CLI with a role-specific prompt
+- **agent** — invokes the configured runtime (`claude` by default, `opencode` also supported)
 - **merge** — combines outputs from multiple predecessor nodes
 - **loop** — iterative body with frontmatter-based exit condition
-- **human** — terminal prompt for manual input; supports Human-in-the-Loop (HITL) via GitHub issue comments
+- **human** — terminal prompt for manual input; agent-initiated HITL is supported on both Claude and OpenCode runtimes
 
 Inter-agent communication uses structured Markdown artifacts in `<runs-dir>/<run-id>/[<phase>/]<node-id>/`, linked via `{{input.<node-id>}}` template variables. On validation failure, the engine resumes the agent in the same session with error context (continuation mechanism).
 
@@ -71,8 +71,9 @@ Inter-agent communication uses structured Markdown artifacts in `<runs-dir>/<run
 - **YAML-driven DAG** — declarative workflow definition, no hardcoded stage order
 - **Domain-agnostic** — engine contains no git/GitHub/SDLC logic; any workflow expressible as a DAG
 - **Workflow-independent** — engine does not reference concrete node names or artifact filenames; one engine, many workflows
+- **Multi-runtime agents** — runtime selectable per workflow or per node: `claude` (default) or `opencode`
 - **Loop nodes** — iterative cycles with configurable exit conditions and max iterations
-- **HITL support** — human interaction nodes for manual decisions or approvals
+- **HITL support** — human interaction nodes for manual decisions or approvals; agent-initiated HITL works on Claude and OpenCode
 - **Validation** — rule-based checks per node (file_exists, file_not_empty, contains_section, custom_script, frontmatter_field)
 - **Resume** — failed/interrupted runs resumable via `--resume <run-id>`; completed nodes skipped
 - **Observability** — 4 verbosity levels (`-q` / default / `-s` / `-v`); status lines with timestamps; final summary
@@ -115,12 +116,31 @@ Options:
 
 Workflow behavior is defined in a YAML config file. Key settings under `defaults:`:
 
+- `runtime` — agent runtime: `claude` (default) or `opencode`
+- `runtime_args` — generic extra CLI args forwarded to the selected runtime
 - `max_continuations` — max agent re-invocations on validation failure (default: 3)
 - `max_parallel` — concurrent node execution limit (default: 2)
 - `timeout_seconds` — per-node timeout (default: 1800)
-- `hitl` — Human-in-the-Loop config: `ask_script`, `check_script`, `poll_interval`, `timeout`
+- `claude_args` — legacy extra args for Claude runtime only
+- `permission_mode` — Claude-only permission mode override
+- `hitl` — Human-in-the-Loop config: `ask_script`, `check_script`, `poll_interval`, `timeout` (used by Claude directly and by OpenCode via injected local MCP)
 
 Node-level overrides are supported for all defaults.
+
+Minimal runtime example:
+
+```yaml
+defaults:
+  runtime: opencode
+  model: anthropic/claude-sonnet-4-5
+  runtime_args: ["--variant", "high"]
+
+nodes:
+  build:
+    type: agent
+    label: Build
+    prompt: "Implement the change and summarize the result."
+```
 
 ## Example: SDLC Workflow
 
@@ -221,7 +241,8 @@ Alternatively, run directly with Deno (see Prerequisites below).
 
 - [Deno](https://deno.land/) runtime (required only if not using a pre-built binary)
 - Docker / devcontainer (runtime environment)
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (`claude`)
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (`claude`) for Claude runtime
+- [OpenCode CLI](https://opencode.ai/) (`opencode`) for OpenCode runtime
 - [`gh` CLI](https://cli.github.com/) for GitHub API interaction (SDLC workflow)
 - Git
 
@@ -239,6 +260,7 @@ deno task run:validate     # Type-check engine modules
 ## Authentication
 
 - **Claude Code CLI** — OAuth session (`claude login`) or `ANTHROPIC_API_KEY` env var
+- **OpenCode CLI** — configured providers/models in local OpenCode config
 - **`GITHUB_TOKEN`** — required for PR creation and issue comments (set manually or via `gh auth login`)
 
 ## License

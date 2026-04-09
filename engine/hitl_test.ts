@@ -91,6 +91,30 @@ Deno.test("detectHitlRequest — handles flat tool_input (no questions wrapper)"
   assertEquals(q!.question, "What is your name?");
 });
 
+Deno.test("detectHitlRequest — returns runtime-normalized hitl_request directly", () => {
+  const output: ClaudeCliOutput = {
+    runtime: "opencode",
+    result: "",
+    session_id: "sess-1",
+    total_cost_usd: 0,
+    duration_ms: 1000,
+    duration_api_ms: 0,
+    num_turns: 1,
+    is_error: false,
+    hitl_request: {
+      question: "Which target environment?",
+      header: "Deploy",
+      options: [{ label: "prod" }, { label: "staging" }],
+    },
+  };
+
+  const q = detectHitlRequest(output);
+  assertEquals(q !== null, true);
+  assertEquals(q!.question, "Which target environment?");
+  assertEquals(q!.header, "Deploy");
+  assertEquals(q!.options?.[0].label, "prod");
+});
+
 // --- runHitlLoop tests ---
 
 function makeHitlConfig(): HitlConfig {

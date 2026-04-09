@@ -21,6 +21,10 @@
 
 import type { EngineOptions, Verbosity } from "./types.ts";
 import { Engine } from "./engine.ts";
+import {
+  INTERNAL_OPENCODE_HITL_MCP_ARG,
+  runOpenCodeHitlMcpServer,
+} from "./opencode-hitl-mcp.ts";
 import { installSignalHandlers } from "./process-registry.ts";
 
 /** Version string embedded at compile time via VERSION env var. Defaults to "dev". */
@@ -163,6 +167,11 @@ Examples:
 // --- Main ---
 
 if (import.meta.main) {
+  if (Deno.args[0] === INTERNAL_OPENCODE_HITL_MCP_ARG) {
+    await runOpenCodeHitlMcpServer();
+    Deno.exit(0);
+  }
+
   installSignalHandlers();
 
   try {
