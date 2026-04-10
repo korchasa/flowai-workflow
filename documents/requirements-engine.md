@@ -31,7 +31,7 @@
 
 ## 3. Functional Requirements
 
-### 3.1 FR-E1 (ex FR-8): Continuation Mechanism
+### 3.1 FR-E1: Continuation Mechanism
 
 - **Description:** Each stage script wraps the selected agent runtime invocation and validates the agent's output before considering the stage complete. If validation fails, the script re-invokes the agent in the same session using the runtime's session-resume mechanism (`claude --resume`, `opencode run --session`) with a description of the problem, giving the agent a chance to fix its output without starting from scratch.
 - **Acceptance criteria:**
@@ -45,7 +45,7 @@
     4. [x] Repeat until validation passes or the continuation limit is reached. Evidence: `engine/agent.ts:75-91` (loop with `continuations < settings.max_continuations`)
   - **Continuation limits:**
     - [x] Maximum continuations per stage: configurable (default 3). Evidence: `.flowai-workflow/workflow.yaml:9` (`max_continuations: 3`), `engine/agent.ts:82-91`
-    - [x] If limit reached: stage is marked as failed, workflow stops, Meta-Agent is triggered (FR-11, FR-E11). Evidence: `engine/engine.ts:96-109,613-619` (`collectRunOnNodes()`), `engine/types.ts:56-57` (`run_on` field), `engine/agent.ts:110-120` (continuation limit check)
+    - [x] If limit reached: stage is marked as failed, workflow stops, Meta-Agent is triggered (FR-S9, FR-E11). Evidence: `engine/engine.ts:96-109,613-619` (`collectRunOnNodes()`), `engine/types.ts:56-57` (`run_on` field), `engine/agent.ts:110-120` (continuation limit check)
   - **Session persistence:**
     - [x] Runtime session resume ensures the agent retains full conversation context from the initial invocation. Evidence: `engine/claude-process.ts`, `engine/opencode-process.ts`
     - [x] Each continuation adds only the validation error to the context, not the full prompt. Evidence: `engine/agent.ts:94-97` (resume prompt = failures only)
@@ -59,7 +59,7 @@
   - Continuation success rate: percentage of continuations that resolve the issue (target > 70%).
   - Average continuations per stage (target < 1.0 across all runs).
 
-### 3.2 FR-E2 (ex FR-10): Agent Log Storage
+### 3.2 FR-E2: Agent Log Storage
 
 - **Description:** Every agent's full session transcript is stored for analysis and prompt improvement.
 - **Log sources:**
@@ -82,7 +82,7 @@
   - [x] `LoopResult` includes per-iteration `AgentResult` references (with `ClaudeCliOutput`) to enable log extraction by the engine. Evidence: `engine/loop.ts:18-26` (`LoopResult.bodyResults: AgentResult[]`), `engine/loop.ts:69,99` (initialized, pushed per body node per iteration)
   - [x] Log-saving logic has unit tests covering: successful save, JSONL-not-found warning path. Evidence: `engine/log_test.ts:29-124` (5 tests)
 
-### 3.3 FR-E3 (ex FR-13): Artifact Versioning
+### 3.3 FR-E3: Artifact Versioning
 
 - **Description:** Defines how workflow artifacts are managed on repeated runs for the same issue.
 - **Acceptance criteria:**
@@ -91,7 +91,7 @@
   - QA reports use iteration suffix (`05-qa-report-1.md`, `05-qa-report-2.md`) within a single run; on re-run, iteration numbering restarts from 1.
   - Log files are overwritten on re-run (previous logs preserved in git history).
 
-### 3.4 FR-E4 (ex FR-15): Configuration
+### 3.4 FR-E4: Configuration
 
 - **Description:** Workflow configuration via environment variables and `workflow.yaml`. Env vars override YAML defaults.
 - **Variables:**
@@ -102,13 +102,13 @@
   - All variables have sensible defaults in `lib.sh` (legacy) and engine config (`engine/config.ts`).
   - Engine and stage scripts read configuration from environment, falling back to defaults.
 
-### 3.5 FR-E5 (ex FR-17): Project Directory Structure
+### 3.5 FR-E5: Project Directory Structure
 
 - **Description:** Project directory layout must reflect application structure, not be buried under a single `.flowai-workflow/` prefix. Engine code, agent prompts, workflow config, and run artifacts should be organized at the top level as distinct concerns.
 - **Motivation:** Current `.flowai-workflow/` prefix conflates engine source code, configuration, runtime data, and legacy scripts. This hinders navigation, IDE support, and standard tooling (test runners, linters).
 - **Acceptance criteria:**
   - [x] Engine source code lives under a standard `src/` or dedicated top-level directory (not `.flowai-workflow/engine/`). Evidence: `engine/` (top-level directory, 30 files moved via `git mv .flowai-workflow/engine/ engine/`)
-  - ~~`[ ] Agent prompts in a top-level agents/ directory`~~ — superseded by FR-36/FR-19: canonical location is `.flowai-workflow/agents/agent-<name>/`.
+  - ~~`[ ] Agent prompts in a top-level agents/ directory`~~ — superseded by FR-S17/FR-S13: canonical location is `.flowai-workflow/agents/agent-<name>/`.
   - [x] Workflow config path configurable via `--config <path>` flag (default: `.flowai-workflow/workflow.yaml`). Engine is config-path-agnostic — no hardcoded root assumption. Evidence: `engine/cli.ts:7,37` (`--config` flag definition and handling), `engine/config.ts:37` (`loadConfig(path)` accepts any path)
   - [x] Run artifacts in gitignored `.flowai-workflow/runs/` directory; `.gitignore` updated. Evidence: `.gitignore:3` (`.flowai-workflow/runs/` entry)
   - ~~`[ ] Legacy shell scripts in a scripts/ directory (not .flowai-workflow/scripts/)`~~ — SDLC workflow convention, not engine constraint. Legacy scripts remain at `.flowai-workflow/scripts/` (SDLC scope, outside engine boundary).
@@ -116,7 +116,7 @@
   - [x] All existing engine tests pass after restructuring. Evidence: `deno task check` passes.
   - [x] SDS (`documents/design-engine.md`) updated to reflect implemented layout. Evidence: `documents/design-engine.md` §3.1 (engine modules), §3.2 (Phase Registry — IMPLEMENTED with evidence)
 
-### 3.6 FR-E6 (ex FR-18): Verbose Output (`-v`)
+### 3.6 FR-E6: Verbose Output (`-v`)
 
 - **Description:** With `-v` flag, engine output must provide full transparency into what is happening at every step — not just node start/stop, but the reasoning context: what input is being passed, what prompt is constructed, what validation is run, what the result is.
 - **Motivation:** Current verbose mode shows only lifecycle events (started/completed/failed). Debugging workflow issues or understanding agent behavior requires reading log files after the fact.
@@ -126,11 +126,11 @@
   - [x] `-v` shows validation rule execution: which rules ran, pass/fail per rule, failure details. Evidence: `engine/output.ts:126-137` (`verboseValidation()`), `engine/agent.ts:98-104`
   - [x] `-v` shows continuation context: why continuation was triggered, what error text is appended. Evidence: `engine/output.ts:140-151` (`verboseContinuation()`), `engine/agent.ts:126-135`
   - [x] `-v` streams agent stdout in real-time (not buffered until completion). Evidence: `engine/output.ts` (`nodeOutput()` method — pre-existing)
-  - ~~`-v` shows safety check results~~ — `verboseSafety()` removed (FR-56: engine domain-agnostic refactor; safety output now via agent stdout).
-  - ~~`-v` shows commit details~~ — `verboseCommit()` removed (FR-56: engine no longer commits; git operations delegated to agent nodes).
+  - ~~`-v` shows safety check results~~ — `verboseSafety()` removed (engine domain-agnostic refactor; safety output now via agent stdout).
+  - ~~`-v` shows commit details~~ — `verboseCommit()` removed (engine no longer commits; git operations delegated to agent nodes).
   - [x] Default mode (no `-v`) remains concise: node start/complete/fail + summary. Evidence: `engine/output_test.ts:175-197` (all 6 verbose methods produce zero output in default mode)
 
-### 3.7 FR-E7 (ex FR-20): Workflow Config Drift Detection
+### 3.7 FR-E7: Workflow Config Drift Detection
 
 - **Description:** Automated verification that workflow YAML configs (`workflow.yaml`, `workflow-task.yaml`) remain consistent with engine expectations and SRS requirements. Detects mismatches in node declarations, required fields, hook syntax, and validation rules.
 - **Acceptance criteria:**
@@ -144,7 +144,7 @@
   - [x] Config validation runs as part of `deno task check` via `workflowIntegrity()` → `loadConfig()`. Evidence: `scripts/check.ts:84-96` (`workflowIntegrity()`), `engine/config.ts:32,43` (`validateSchema()` called on every `parseConfig()`)
   - [x] Validation failures throw descriptive errors with node ID and field context. Evidence: `engine/config.ts:71-103` (error messages include node ID and field name)
 
-### 3.8 FR-E8 (ex FR-21): Human-in-the-Loop (Agent-Initiated)
+### 3.8 FR-E8: Human-in-the-Loop (Agent-Initiated)
 
 - **Description:** Workflow agents can request human input mid-task through a runtime-specific structured signal. Claude uses the built-in `AskUserQuestion` tool (visible in headless mode as `permission_denials`). OpenCode uses a per-invocation local MCP tool injected by the engine through `OPENCODE_CONFIG_CONTENT`. In both cases the engine normalizes the request, delegates question delivery and reply polling to external workflow scripts, and resumes the agent session with the human's answer.
 - **Mechanism:**
@@ -168,7 +168,7 @@
   - [x] `hitl-ask.sh` renders question JSON → markdown with HTML marker `<!-- hitl:<run-id>:<node-id> -->`, posts via `gh issue comment`. Evidence: `.flowai-workflow/scripts/hitl-ask.sh:52-76` (markdown render + marker + gh post)
   - [x] `hitl-check.sh` finds first non-bot comment after marker, outputs body to stdout (exit 0) or exits 1 if no reply. Evidence: `.flowai-workflow/scripts/hitl-check.sh:39-54` (jq filter + exit codes)
 
-### 3.9 FR-E9 (ex FR-23): Run Artifacts Folder Structure
+### 3.9 FR-E9: Run Artifacts Folder Structure
 
 - **Description:** Run artifacts under `.flowai-workflow/runs/<run-id>/` must follow a
   hierarchical layout that groups node output directories by workflow phase,
@@ -204,7 +204,7 @@
     grouping derived from config or convention, not hardcoded per-node paths).
   - [ ] All existing engine tests pass after restructuring.
 
-### 3.10 FR-E10 (ex FR-24): Loop Body Node Nesting
+### 3.10 FR-E10: Loop Body Node Nesting
 
 - **Description:** Loop nodes in `workflow.yaml` must define their body nodes
   inline as nested objects, not reference top-level node IDs. This makes the
@@ -260,7 +260,7 @@
   - [x] All existing engine tests pass after restructuring. Evidence: `deno task check` — 490 passed, 0 failed
   - [x] `deno task check` passes. Evidence: 490 passed, 0 failed
 
-### 3.11 FR-E11 (ex FR-25): Conditional Post-Workflow Node Execution (`run_on`)
+### 3.11 FR-E11: Conditional Post-Workflow Node Execution (`run_on`)
 
 - **Description:** Replace the binary `run_always: boolean` flag with a
   `run_on: always | success | failure` enum on `NodeConfig`. Engine collects
@@ -290,7 +290,7 @@
   - [x] All existing engine tests pass; new tests cover `run_on` filtering logic. Evidence: `engine/engine_test.ts:211-506` (collectPostWorkflowNodes and run_on tests), `engine/config_test.ts:446-564` (run_on validation + run_always normalization tests); 490 passed, 0 failed
   - [x] `deno task check` passes. Evidence: 490 passed, 0 failed
 
-### 3.12 FR-E12 (ex FR-27): Per-Node Model Configuration
+### 3.12 FR-E12: Per-Node Model Configuration
 
 - **Description:** Add `model` field to `WorkflowDefaults` and `NodeConfig` in
   workflow config. Engine emits `--model <value>` flag when invoking Claude CLI
@@ -327,7 +327,7 @@
   - [x] All existing engine tests pass; new tests cover model flag emission and resolution. Evidence: `engine/agent_test.ts:207-233` (3 model tests); 434 tests pass.
   - [x] `deno task check` passes. Evidence: validated — 434 passed, 0 failed.
 
-### 3.13 FR-E13 (ex FR-28): Accurate Dry-Run Output
+### 3.13 FR-E13: Accurate Dry-Run Output
 
 - **Description:** `--dry-run` flag displays execution plan that mirrors actual
   engine execution order: regular levels (without `run_on` post-workflow nodes)
@@ -346,7 +346,7 @@
   - [x] Engine unit tests cover dry-run output with `run_on` nodes present. Evidence: `engine/engine_test.ts:678` ("dry-run — post-workflow nodes excluded from regular levels filtering logic")
   - [x] `deno task check` passes. Evidence: 490 passed, 0 failed
 
-### 3.14 FR-E14 (ex FR-29): Engine-Workflow Separation Invariant
+### 3.14 FR-E14: Engine-Workflow Separation Invariant
 
 - **Description:** The workflow engine (`engine/`) is a domain-agnostic DAG executor. It MUST be physically separated from workflow-specific concerns (config, agents, run artifacts) by directory structure, not only by convention. This constraint is structural and must be enforced by the project layout.
 - **Rationale:** Issue #12 — collocating engine source with workflow data under `.flowai-workflow/` obscures boundaries, hinders tooling, and blocks future engine reuse.
@@ -361,7 +361,7 @@
   - [ ] `deno task run` and `deno task test:engine` reference the new engine path.
   - [ ] `deno task check` passes after restructure.
 
-### 3.15 FR-E15 (ex FR-30): Node Result Summary
+### 3.15 FR-E15: Node Result Summary
 
 - **Description:** After each agent node completes, the engine displays a
   one-line result summary in the terminal. Summary includes a multi-line
@@ -390,7 +390,7 @@
     chars, joins with ` | `, trims total to 400 chars. Unit-testable without I/O.
   - [ ] `deno task check` passes.
 
-### 3.16 FR-E16 (ex FR-31): Prompt Path Validation at Config Load
+### 3.16 FR-E16: Prompt Path Validation at Config Load
 
 - **Description:** Workflow engine validates that all `prompt` file paths declared
   in `workflow.yaml` exist on the filesystem before any node executes. Validation
@@ -415,7 +415,7 @@
     Evidence: `engine/config_test.ts:568-659`.
   - [x] `deno task check` passes.
 
-### 3.17 FR-E17 (ex FR-32): Aggregate Cost Data in state.json
+### 3.17 FR-E17: Aggregate Cost Data in state.json
 
 - **Description:** Workflow engine persists per-node cost and workflow-level total
   cost in `state.json`, eliminating the need to read N+1 separate log files to
@@ -441,7 +441,7 @@
   - [x] Unit tests cover: cost present, cost absent, mixed multi-node, all-undefined.
     Evidence: `engine/state_test.ts`.
 
-### 3.18 FR-E18 (ex FR-33): Stream Log Timestamps
+### 3.18 FR-E18: Stream Log Timestamps
 
 - **Description:** Each non-empty line written to the stream log file
   (`.flowai-workflow/runs/<run-id>/logs/<node-id>.jsonl`) is prefixed with a wall-clock
@@ -468,7 +468,7 @@
     `engine/agent_test.ts:426-442` (empty-line test).
   - [x] `deno task check` passes.
 
-### 3.19 FR-E19 (ex FR-34): Generic Workflow Failure Hook (`on_failure_script`)
+### 3.19 FR-E19: Generic Workflow Failure Hook (`on_failure_script`)
 
 - **Description:** Engine supports a configurable `on_failure_script` field in `WorkflowDefaults` (YAML: `defaults.on_failure_script`). When the workflow fails, the engine executes the specified script via `Deno.Command`. Replaces the former hard-wired `rollbackUncommitted()` git call, which violated the domain-agnostic invariant (FR-E14).
 - **Rationale:** Domain-specific failure recovery (e.g., git rollback) belongs in workflow scripts, not engine code. The engine provides a generic hook; the workflow wires it to the appropriate script.
@@ -481,7 +481,7 @@
   - [x] Unit test covers `on_failure_script` execution path. Evidence: `engine/engine_test.ts:776-822` (4 `runFailureHook` tests: no-op, success, script failure, nonexistent script)
   - [x] `deno task check` passes. Evidence: 490 passed, 0 failed
 
-### 3.20 FR-E20 (ex FR-39): Repeated File Read Warning
+### 3.20 FR-E20: Repeated File Read Warning
 
 - **Description:** Stream log emits a `[WARN]` line when the same file path is read more than 2 times within one agent session (`executeClaudeProcess()` invocation). Warning includes the file path and read count. Informational only — does not block execution. Enables meta-agent to detect and diagnose repeated-read anti-patterns from log analysis.
 - **Motivation:** Agents were silently re-reading the same file 3-4 times per session (run `20260313T025203`: PM agent read `documents/requirements-sdlc.md` 4 times consecutively), wasting tokens. The pattern was invisible to logging and prompt optimization tooling.
@@ -496,7 +496,7 @@
   - [x] `FileReadTracker` is a pure-logic class — unit-testable without I/O. Evidence: `engine/agent_test.ts:790-855` (FileReadTracker unit tests).
   - [x] `deno task check` passes. Evidence: QA PASS — all tests pass (run `20260314T060523`).
 
-### 3.21 FR-E21 (ex FR-41): Semi-Verbose Output Mode (`-s`)
+### 3.21 FR-E21: Semi-Verbose Output Mode (`-s`)
 
 - **Description:** Workflow engine must support a `semi-verbose` verbosity level
   (`-s` CLI flag) that shows agent text output but suppresses tool-call lines
@@ -516,7 +516,7 @@
     `engine/agent.ts` (log path calls `formatEventForOutput()` without verbosity).
   - [x] `nodeOutput()` gate shows in both `verbose` and `semi-verbose`. Evidence:
     `engine/output.ts` (`nodeOutput()` condition).
-  - [x] `deno task check` passes. Evidence: design.md (FR-41 referenced as implemented).
+  - [x] `deno task check` passes. Evidence: design.md (FR-E21 referenced as implemented).
 
 ### 3.22 FR-E22: Workflow Final Summary with Node Results
 
@@ -1145,51 +1145,3 @@ Design ideas captured for discussion; not committed work. Promote to FR-E only a
 - **Open questions:** Is there a profiled bottleneck that startup dominates? Cleanest way to preserve `--agent` semantics (especially tools allowlist and per-agent frontmatter)? How to handle multi-root `CLAUDE.md` override policy under explicit injection?
 - **Status:** Defer until a concrete workflow shows startup overhead as dominant cost. Complements the CLAUDE.md ancestor scan work (#195) — both revolve around making Claude's implicit loading explicit.
 - **Source:** R&D walkthrough 2026-04-10, [documents/rnd/claude-code-best-practices-for-engine.md § Topic 8](rnd/claude-code-best-practices-for-engine.md).
-
-## Appendix: FR Cross-Reference
-
-| Old ID | New ID | Title |
-|--------|--------|-------|
-| FR-8   | FR-E1  | Continuation Mechanism |
-| FR-10  | FR-E2  | Agent Log Storage |
-| FR-13  | FR-E3  | Artifact Versioning |
-| FR-15  | FR-E4  | Configuration |
-| FR-17  | FR-E5  | Project Directory Structure |
-| FR-18  | FR-E6  | Verbose Output (`-v`) |
-| FR-20  | FR-E7  | Workflow Config Drift Detection |
-| FR-21  | FR-E8  | Human-in-the-Loop (Agent-Initiated) |
-| FR-23  | FR-E9  | Run Artifacts Folder Structure |
-| FR-24  | FR-E10 | Loop Body Node Nesting |
-| FR-25  | FR-E11 | Conditional Post-Workflow Node Execution (`run_on`) |
-| FR-27  | FR-E12 | Per-Node Model Configuration |
-| FR-28  | FR-E13 | Accurate Dry-Run Output |
-| FR-29  | FR-E14 | Engine-Workflow Separation Invariant |
-| FR-30  | FR-E15 | Node Result Summary |
-| FR-31  | FR-E16 | Prompt Path Validation at Config Load |
-| FR-32  | FR-E17 | Aggregate Cost Data in state.json |
-| FR-33  | FR-E18 | Stream Log Timestamps |
-| FR-34  | FR-E19 | Generic Workflow Failure Hook (`on_failure_script`) |
-| FR-39  | FR-E20 | Repeated File Read Warning |
-| FR-41  | FR-E21 | Semi-Verbose Output Mode (`-s`) |
-| —      | FR-E22 | Workflow Final Summary with Node Results |
-| —      | FR-E23 | CLI Help for `deno task check` |
-| —      | FR-E24 | Worktree Isolation (replaces pre_run) |
-| —      | FR-E25 | Graceful Shutdown (Signal Handling) |
-| —      | FR-E26 | Engine Codebase Housekeeping |
-| —      | FR-E27 | Test Suite Integrity |
-| —      | FR-E28 | Shared Backoff Utility (`nextPause()`) |
-| —      | FR-E29 | Legacy Test Task Removal |
-| —      | FR-E30 | Workflow Prepare Command (`prepare_command`) |
-| —      | FR-E31 | Stale Path Reference Cleanup in Engine Artifacts |
-| —      | FR-E32 | `{{file()}}` Template Function |
-| —      | FR-E33 | Phase Assignment Single-Mechanism Enforcement |
-| —      | FR-E34 | Error Handling Precedence (`on_error` vs `on_failure_script`) |
-| —      | FR-E35 | Loop Input Forwarding Validation |
-| —      | FR-E36 | Loop Condition Field Validation |
-| —      | FR-E37 | Scope-Based File Modification Detection |
-| —      | FR-E38 | Artifact Rule Frontmatter Field Presence Checks |
-| —      | FR-E39 | Standalone Binary Distribution |
-| —      | FR-E40 | Permission Mode Configuration |
-| —      | FR-E41 | CLI Auto-Update and Automated Release Pipeline |
-| —      | FR-E42 | Per-Node Effort Level (`effort`) |
-| —      | FR-E43 | Fallback Model (`fallback_model`) |

@@ -128,7 +128,7 @@ Deno.test("verboseContinuation — emits continuation context in verbose mode", 
   assertEquals(cap.lines.some((l) => l.includes("output.md")), true);
 });
 
-// --- nodeResult tests (FR-30) ---
+// --- nodeResult tests (FR-E15) ---
 
 Deno.test("nodeResult — emits result line in normal mode", () => {
   const cap = createCapture();

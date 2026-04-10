@@ -286,7 +286,7 @@ Deno.test("createRunState — tracks nested body node IDs from flat list", () =>
   assertEquals(state.nodes.pm.status, "pending");
 });
 
-// --- FR-32: Cost tracking tests ---
+// --- FR-E17: Cost tracking tests ---
 
 Deno.test("markNodeCompleted — with costUsd sets node.cost_usd", () => {
   const state = createRunState("test", "cfg.yaml", ["a"], {}, {});

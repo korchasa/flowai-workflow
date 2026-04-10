@@ -64,18 +64,15 @@ Separate files per scope. Same structure in each:
 - **Assumptions/Constraints:**
 
 ## 3. Functional Reqs
-### 3.1 FR-E1 (ex FR-8): Title
+### 3.1 FR-E1: Title
 - **Desc:**
 - **Acceptance:**
 
 ## 4. Non-Functional
 ## 5. Interfaces
-
-## Appendix: FR Cross-Reference
 ```
 
-FR numbering: `FR-E<N>` for engine, `FR-S<N>` for SDLC workflow. Existing
-`FR-<N>` numbers preserved as aliases (e.g., `FR-E1 (ex FR-8)`).
+FR numbering: `FR-E<N>` for engine, `FR-S<N>` for SDLC workflow.
 
 ## SDS Format
 

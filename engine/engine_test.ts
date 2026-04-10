@@ -704,7 +704,7 @@ Deno.test("dry-run — post-workflow nodes excluded from regular levels filterin
   assertEquals(postWorkflowIds.includes("tech-lead-review"), true);
 });
 
-// --- FR-32: Cost field integration tests ---
+// --- FR-E17: Cost field integration tests ---
 
 Deno.test("NodeState — cost_usd field present after markNodeCompleted with cost", () => {
   const state = createRunState("test", "cfg.yaml", ["agent1"], {}, {});
@@ -771,7 +771,7 @@ Deno.test("RunState — total_cost_usd in state.json roundtrip", async () => {
   }
 });
 
-// --- FR-34: runFailureHook tests ---
+// --- FR-E19: runFailureHook tests ---
 
 Deno.test("runFailureHook — no-op when script undefined", async () => {
   const cap = createCapture();

@@ -79,13 +79,13 @@ graph TD
     `WorkflowDefaults.runtime`, `WorkflowDefaults.runtime_args`,
     `LoopNodeConfig.nodes` (inline body node definitions),
     `LoopResult.bodyResults`, `ErrorCategory` (structured failure enum),
-    `NodeState.error_category`, `NodeState.cost_usd` (FR-32 per-node cost),
-    `RunState.total_cost_usd` (FR-32 aggregated run cost),
-    `WorkflowDefaults.on_failure_script` (FR-34 configurable failure hook),
+    `NodeState.error_category`, `NodeState.cost_usd` (FR-E17 per-node cost),
+    `RunState.total_cost_usd` (FR-E17 aggregated run cost),
+    `WorkflowDefaults.on_failure_script` (FR-E19 configurable failure hook),
     `WorkflowDefaults.prepare_command` (FR-E30 post-config/pre-node shell hook),
     `HitlConfig.artifact_source` (renamed from `issue_source`),
     `HitlConfig.exclude_login` (renamed from `bot_login`),
-    `Verbosity` union: `"quiet"|"normal"|"semi-verbose"|"verbose"` (FR-41))
+    `Verbosity` union: `"quiet"|"normal"|"semi-verbose"|"verbose"` (FR-E21))
   - `template.ts` — `{{var}}` interpolation for prompts/paths.
     `resolve()` handles `file("path")` pattern within `{{...}}` matches
     (FR-E32): detects `/^file\("(.+)"\)$/`, reads file via
@@ -179,7 +179,7 @@ graph TD
     `clearPhaseRegistry()` — see §3.2),
     cost aggregation (`updateRunCost()` sums
     `nodes[*].cost_usd` → `total_cost_usd`; called from
-    `markNodeCompleted()` when optional `costUsd` param provided, FR-32).
+    `markNodeCompleted()` when optional `costUsd` param provided, FR-E17).
     `markNodeCompleted()` also accepts optional `result?: string` param
     (FR-E22) — persists excerpt to `NodeState.result` in `state.json`
   - `runtime/` — runtime adapters and capability metadata.
@@ -219,7 +219,7 @@ graph TD
     `executeClaudeProcess()` uses `--output-format stream-json` and reads
     stdout line-by-line. Each JSON line appended to `streamLogPath` file
     (crash-resilient incremental write via `Deno.writeFile({ append: true })`).
-    **Stream log timestamps (FR-33):** `tsPrefix()` returns `[HH:MM:SS]`
+    **Stream log timestamps (FR-E18):** `tsPrefix()` returns `[HH:MM:SS]`
     wall-clock prefix; `stampLines()` prepends it to each non-empty line (empty
     lines pass through). Applied to log file writes only — terminal output via
     `onOutput` callback receives raw text without timestamps.
@@ -243,7 +243,7 @@ graph TD
     `hitl_request_human_input`. The parsed stream is normalized into the same
     output shape consumed elsewhere by state, continuation, and log code
     (`ClaudeCliOutput` + optional `hitl_request`).
-    **Repeated file read warning (FR-39):** `FileReadTracker` class in
+    **Repeated file read warning (FR-E20):** `FileReadTracker` class in
     `agent.ts`. `track(path): string | null` — maintains `Map<string, number>`,
     returns `[WARN] repeated file read: <path> (<N> times)` when count >
     threshold (default 2), else null. Instantiated per `executeClaudeProcess()`
@@ -251,7 +251,7 @@ graph TD
     with `name === "Read"`, calls `tracker.track(block.input.file_path)`. Non-
     null result written to `logFile` via `stampLines()`. Log-file-only (terminal
     `onOutput` unchanged). Pure-logic class — unit-testable without I/O.
-    **Turn separators and summary footer (FR-40):** `executeClaudeProcess()`
+    **Turn separators and summary footer (FR-S20):** `executeClaudeProcess()`
     maintains `turnCount` counter. On each `event.type === "assistant"`:
     increments counter, writes `--- turn N ---` line to `logFile` via
     `stampLines()` (timestamped, consistent with existing log writes). After
@@ -273,7 +273,7 @@ graph TD
     in `executeClaudeProcess()` reduce to: parse JSON → `await
     processStreamEvent(parsed, state)`. Net ~40-line reduction. Pure-ish
     function — unit-testable with synthetic events, no CLI spawn.
-    **Repeated file read warning (FR-40):** `executeClaudeProcess()` maintains
+    **Repeated file read warning (FR-S20):** `executeClaudeProcess()` maintains
     `readCounts: Map<string, number>` tracking per-path `Read` tool-use events.
     On each `assistant` event: iterates `message.content` blocks, detects
     `tool_use` with `name === "Read"`, extracts `input.file_path`, increments
@@ -284,7 +284,7 @@ graph TD
     `[WARN] repeated file read: <path> (<N> times)`. Exported for unit testing.
     Warning is log-only (no `onOutput` callback). Counters reset per invocation
     (map is local to `executeClaudeProcess()` call). Execution not blocked.
-    **Semi-verbose filtering (FR-41):** `formatEventForOutput(event,
+    **Semi-verbose filtering (FR-E21):** `formatEventForOutput(event,
     verbosity?)` accepts optional `Verbosity` param. When
     `verbosity === "semi-verbose"`, skips `tool_use` content blocks in
     `assistant` events — emits only `text` blocks. Default `undefined` =
@@ -329,7 +329,7 @@ graph TD
     Skipped entirely when `allowed_paths` undefined on node (AC #1).
     Pre-existing uncommitted changes excluded by before/after diff (AC #5).
     Sub-second latency for ≤1000 tracked files (AC #6) — git index-based.
-  - ~~`git.ts`~~ — **deleted** (FR-29: domain-specific git code removed from
+  - ~~`git.ts`~~ — **deleted** (FR-E14: domain-specific git code removed from
     engine). Functions relocated to `.flowai-workflow/scripts/rollback-uncommitted.sh`.
     Failure handling replaced by configurable `on_failure_script` hook
   - `output.ts` — terminal output manager (quiet/normal/semi-verbose/verbose),
@@ -340,7 +340,7 @@ graph TD
     through whatever it receives.
     `dryRunPlan(levels, labels, postWorkflowNodeIds?, runOnMap?)`: renders
     regular DAG levels, then optional "Post-workflow" section listing `run_on`
-    nodes with their conditions (FR-28).
+    nodes with their conditions (FR-E13).
     `nodeResult(nodeId, output: ClaudeCliOutput)`: multi-line agent result
     display (FR-E15). Guarded by `verbosity !== "quiet"`. Format:
     line 1: `[HH:MM:SS] <nodeId padded>  RESULT:` (header),
@@ -387,7 +387,7 @@ graph TD
     `--internal-opencode-hitl-mcp`, it starts the stdio MCP helper server
     instead of the workflow engine. This lets the same compiled binary or
     `deno run` entrypoint serve as the per-invocation local MCP command.
-    Dry-run path (FR-28): applies `collectPostWorkflowNodes()` +
+    Dry-run path (FR-E13): applies `collectPostWorkflowNodes()` +
     `sortPostWorkflowNodes()` + level filtering before calling
     `dryRunPlan()`, passing filtered levels and post-workflow node IDs with
     `run_on` conditions — mirrors normal execution path's filtering logic.
@@ -458,7 +458,7 @@ graph TD
   - `env?: Record<string, string>` — optional node-level environment variables.
     Merged with global env (node-level overrides global defaults). Accessible
     in template context via `{{env.<key>}}`.
-  - `model?: string` — per-node Claude model override (FR-27, implemented).
+  - `model?: string` — per-node Claude model override (FR-E12, implemented).
     Overrides `defaults.model`. Absent = defaults.model or CLI default (no flag).
     Emitted as `--model <value>` on initial invocations only; `--resume` calls
     exclude `--model` (session inherits original). Resolution chain:
@@ -473,7 +473,7 @@ graph TD
     `verboseValidation(nodeId, results: {rule, passed, detail?}[])`,
     `verboseContinuation(nodeId, attempt, max, failures)`.
     `verboseSafety()` and `verboseCommit()` removed (engine no longer performs
-    safety checks or commits — FR-29 domain-agnostic cleanup).
+    safety checks or commits — FR-E14 domain-agnostic cleanup).
     All no-op when `verbosity !== "verbose"`. Output: human-readable stderr with
     section headers. Note: AC #5 (agent stdout streaming) already implemented
     via existing `nodeOutput()` method — no new work needed.
@@ -489,7 +489,7 @@ graph TD
     walking `ctx.input` directories via `Deno.stat()`; calls
     `this.output.verboseInputs()` before `runAgent()`. Passes `this.output`
     and `nodeId` to `runAgent()`. Safety check and commit verbose removed
-    (engine no longer performs these — FR-29). `runFailureHook(script?)`:
+    (engine no longer performs these — FR-E14). `runFailureHook(script?)`:
     private method (~10 lines), executes `on_failure_script` via
     `Deno.Command()` on workflow failure. Swallows errors (failure hook must
     not crash engine). Replaces hard-wired `rollbackUncommitted()`.
@@ -659,16 +659,16 @@ graph TD
   - NodeState: `{ ..., cost_usd?: number, result?: string }` — per-node cost
     from `ClaudeCliOutput.total_cost_usd` and result excerpt (≤400 chars) from
     inline excerpt logic (filter empty → take 3 → join ` | ` → truncate 400),
-    both set at completion via `markNodeCompleted()` optional params (FR-32,
+    both set at completion via `markNodeCompleted()` optional params (FR-E17,
     FR-E22)
   - RunState: `{ ..., total_cost_usd?: number }` — sum of all
     `nodes[*].cost_usd`, recomputed by `updateRunCost()` on each node
-    completion (FR-32)
+    completion (FR-E17)
   - NodeConfig: `{ ..., run_on?: "always"|"success"|"failure", phase?: string,
     env?: Record<string, string>, model?: string,
     allowed_paths?: string[] }` — `run_on` for conditional post-workflow
     execution; `phase` for artifact directory grouping; `env` for node-level
-    env vars; `model` for per-node Claude model override (FR-27);
+    env vars; `model` for per-node Claude model override (FR-E12);
     `allowed_paths` for scope-based file modification detection (FR-E37) —
     glob patterns defining permitted file modifications during agent invocation
 - **ERD:** N/A (file-based, no database).
@@ -826,7 +826,7 @@ graph TD
       `markNodeSkipped()`.
     - `run_on: "failure"` → skip if `workflowSuccess`, call
       `markNodeSkipped()`.
-  - **HITL via Runtime-Native Structured Requests** (FR-21):
+  - **HITL via Runtime-Native Structured Requests** (FR-E8):
     Engine detects agent HITL requests through runtime-specific structured
     output and normalizes them into one engine-level resume flow. Flow:
     1. Agent node completes or is intentionally interrupted after emitting a
@@ -902,7 +902,7 @@ graph TD
       `workflowSuccess === false`. Script is workflow-specific — engine treats
       as opaque invocation (domain-agnostic). Failed node IDs available via
       `state.json` (`nodes[*].status === "failed"`).
-  - **Semi-verbose filtering (FR-41):** `formatEventForOutput(event,
+  - **Semi-verbose filtering (FR-E21):** `formatEventForOutput(event,
     verbosity?)` accepts optional `Verbosity` param. When
     `verbosity === "semi-verbose"`, skips `tool_use` content blocks in
     `assistant` events — emits only `text` blocks. Default `undefined` =
@@ -936,7 +936,7 @@ graph TD
 - **Simplified:** Pipeline runs sequentially (no parallel stages in v1).
 - **Deferred:** Multi-repo support. Parallel workflows for multiple issues.
   Issue size/complexity limits. Cost budget limits and alerts (per-node cost
-  aggregation implemented in FR-32; budget enforcement deferred). Binary smoke
+  aggregation implemented in FR-E17; budget enforcement deferred). Binary smoke
   tests in CI matrix (FR-E39 Variant B — deferred until base release workflow
   proven). Package manager distribution (brew, npm). Windows binary targets.
   Auto-update mechanism. Windows

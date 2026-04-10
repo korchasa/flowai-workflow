@@ -177,7 +177,7 @@ export class OutputManager {
   }
 
   /**
-   * Show multi-line agent result after node completion (FR-30).
+   * Show multi-line agent result after node completion (FR-E15).
    * Suppressed in quiet mode. Format:
    *   [HH:MM:SS] <nodeId padded>  RESULT:
    *     <each non-empty line of output.result indented 2 spaces>

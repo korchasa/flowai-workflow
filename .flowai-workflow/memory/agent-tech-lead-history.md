@@ -12,7 +12,7 @@
 | 20260319T194808 | #149 (FR-S34) | ~7    | ✅ Variant C selected, SDS updated, PR #163 draft | 3 targeted Edit calls for SDS (add function, update renderHtml, add flow). Dashboard scope = pure SDLC, no engine. |
 | 20260319T201620 | #150 (FR-E33) | ~7    | ✅ Variant B selected, SDS updated, PR draft       | 3 targeted Edit calls for SDS (config validation, registry simplification, logic init). Engine-scope, straightforward. |
 | 20260319T204544 | #151 (FR-S35) | ~7    | ✅ Variant C selected, SDS updated, PR draft       | 2 targeted Edit calls for SDS (add §3.8.1 validation + update YAML snippet). SDLC-scope, check.ts pattern. |
-| 20260319T211036 | #152 (FR-E34) | ~7    | ✅ Variant B selected, SDS updated, PR draft       | 2 targeted Edit calls for SDS (expand FR-34 interaction rules + update §6 fault). Engine-scope, on_error precedence. |
+| 20260319T211036 | #152 (FR-E34) | ~7    | ✅ Variant B selected, SDS updated, PR draft       | 2 targeted Edit calls for SDS (expand FR-E19 interaction rules + update §6 fault). Engine-scope, on_error precedence. |
 | 20260319T213344 | #153 (FR-E35) | ~7    | ✅ Variant A selected, SDS updated, PR draft       | 2 targeted Edit calls for SDS (config.ts forwarding validation + §5 algorithm). Engine-scope, inline loop check. |
 | 20260319T215851 | #154 (FR-S36) | ~7    | ✅ Variant B selected, SDS updated, PR draft       | 3 targeted Edit calls for SDS (wrapper script refs in §2.2, §3.7, §5). SDLC-scope, after-hook observability. |
 | 20260319T221833 | #155 (FR-E36+FR-S37) | ~7 | ✅ Variant A selected, both SDS updated, PR #169 draft | 3 Edit calls engine SDS + 1 Edit SDLC SDS. engine+sdlc scope — 4 targeted edits across 2 SDS files, 0 re-reads. |

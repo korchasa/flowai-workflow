@@ -107,7 +107,7 @@ All notable changes to this project will be documented in this file. See [standa
 * **requirements:** update acceptance criteria for agent prompts and pipeline structure ([3e03fa1](https://github.com/korchasa/flowai-workflow/commit/3e03fa19d79f4d227cb625d30ce2908185f7eed1))
 * **scripts:** add self-runner for autonomous issue-driven pipeline execution ([cbcf3de](https://github.com/korchasa/flowai-workflow/commit/cbcf3de11e3a592d3822498fcb736957e90628d7))
 * **state:** add label suffix to run IDs for readability ([385b92e](https://github.com/korchasa/flowai-workflow/commit/385b92e70554f549b6e87e805bcc60d2d3aa4db5))
-* stream log timestamps — mark FR-32 complete (issue [#42](https://github.com/korchasa/flowai-workflow/issues/42)) ([#58](https://github.com/korchasa/flowai-workflow/issues/58)) ([c93fa47](https://github.com/korchasa/flowai-workflow/commit/c93fa479bc19718b9464c9404db1a178f01aae3b))
+* stream log timestamps — mark FR-E17 complete (issue [#42](https://github.com/korchasa/flowai-workflow/issues/42)) ([#58](https://github.com/korchasa/flowai-workflow/issues/58)) ([c93fa47](https://github.com/korchasa/flowai-workflow/commit/c93fa479bc19718b9464c9404db1a178f01aae3b))
 * **validate:** add frontmatter_field validation rule type ([635fdb1](https://github.com/korchasa/flowai-workflow/commit/635fdb13f5e312f58fc964d5d8f9f324edc3b18c))
 * vendor @std/assert and @std/yaml for environments where jsr.io is blocked ([9c813be](https://github.com/korchasa/flowai-workflow/commit/9c813befc71347803379eeb0e627c2f3003563c9))
 
@@ -167,8 +167,8 @@ All notable changes to this project will be documented in this file. See [standa
 * delete superseded ADR-001, preserve actionable content in SDS ([d2dc9c8](https://github.com/korchasa/flowai-workflow/commit/d2dc9c8366e56b7a5e965bb264b051b324571ee4))
 * **pm, presenter:** enhance SKILL.md with efficiency tips and clarification on artifact creation ([28d8353](https://github.com/korchasa/flowai-workflow/commit/28d8353ce946de6ee66834fba51c9855e24e4df5))
 * remove GHA/CI-CD launch method, adopt local Deno engine execution ([205456d](https://github.com/korchasa/flowai-workflow/commit/205456da743e18088ab2904573fc9b8dbcfd1f8b))
-* **requirements:** add FR-23 run artifacts folder structure ([77dde7a](https://github.com/korchasa/flowai-workflow/commit/77dde7a41f416233ea9555df360b613642594442))
-* **srs:** add FR-17 (directory structure), FR-18 (verbose output), expand FR-1 with text input mode ([d7f8070](https://github.com/korchasa/flowai-workflow/commit/d7f8070b3a392e5def6bc7e7d85d557fc38b1725))
+* **requirements:** add FR-E9 run artifacts folder structure ([77dde7a](https://github.com/korchasa/flowai-workflow/commit/77dde7a41f416233ea9555df360b613642594442))
+* **srs:** add FR-E5 (directory structure), FR-E6 (verbose output), expand FR-S1 with text input mode ([d7f8070](https://github.com/korchasa/flowai-workflow/commit/d7f8070b3a392e5def6bc7e7d85d557fc38b1725))
 
 
 ### Chores
@@ -178,7 +178,7 @@ All notable changes to this project will be documented in this file. See [standa
 * add whiteboard to gitignore, update roadmap ([bab7e4d](https://github.com/korchasa/flowai-workflow/commit/bab7e4d55ce8dbce162447b9642034374ee9a543))
 * **framework:** update flowai framework ([e555a1a](https://github.com/korchasa/flowai-workflow/commit/e555a1af7a11c20c3d855b36b779f7c39da3d822))
 * **framework:** update flowai framework ([dafa468](https://github.com/korchasa/flowai-workflow/commit/dafa468752e0a8228707c685f4b288e6660a67d0))
-* Phase 0 — SRS/SDS scope cleanup, AC markers, FR-19 ([ab74fa7](https://github.com/korchasa/flowai-workflow/commit/ab74fa718fe4496a82ce1ca5a996c031e0ed32a8))
+* Phase 0 — SRS/SDS scope cleanup, AC markers, FR-S13 ([ab74fa7](https://github.com/korchasa/flowai-workflow/commit/ab74fa718fe4496a82ce1ca5a996c031e0ed32a8))
 * **release:** 0.1.1 ([aca3dac](https://github.com/korchasa/flowai-workflow/commit/aca3dace324028d6c8d9edd099294b690c1c2d1a))
 * update claude settings with session permissions ([6a973f9](https://github.com/korchasa/flowai-workflow/commit/6a973f9148fed105cf0987a53d25bc035c007fca))
 
@@ -225,7 +225,7 @@ All notable changes to this project will be documented in this file. See [standa
 * **requirements:** update acceptance criteria for agent prompts and pipeline structure ([3e03fa1](https://github.com/korchasa/flowai-workflow/commit/3e03fa19d79f4d227cb625d30ce2908185f7eed1))
 * **scripts:** add self-runner for autonomous issue-driven pipeline execution ([cbcf3de](https://github.com/korchasa/flowai-workflow/commit/cbcf3de11e3a592d3822498fcb736957e90628d7))
 * **state:** add label suffix to run IDs for readability ([385b92e](https://github.com/korchasa/flowai-workflow/commit/385b92e70554f549b6e87e805bcc60d2d3aa4db5))
-* stream log timestamps — mark FR-32 complete (issue [#42](https://github.com/korchasa/flowai-workflow/issues/42)) ([#58](https://github.com/korchasa/flowai-workflow/issues/58)) ([c93fa47](https://github.com/korchasa/flowai-workflow/commit/c93fa479bc19718b9464c9404db1a178f01aae3b))
+* stream log timestamps — mark FR-E17 complete (issue [#42](https://github.com/korchasa/flowai-workflow/issues/42)) ([#58](https://github.com/korchasa/flowai-workflow/issues/58)) ([c93fa47](https://github.com/korchasa/flowai-workflow/commit/c93fa479bc19718b9464c9404db1a178f01aae3b))
 * **validate:** add frontmatter_field validation rule type ([635fdb1](https://github.com/korchasa/flowai-workflow/commit/635fdb13f5e312f58fc964d5d8f9f324edc3b18c))
 * vendor @std/assert and @std/yaml for environments where jsr.io is blocked ([9c813be](https://github.com/korchasa/flowai-workflow/commit/9c813befc71347803379eeb0e627c2f3003563c9))
 
@@ -267,7 +267,7 @@ All notable changes to this project will be documented in this file. See [standa
 * add task files for Phases 1-4 ([a9ab599](https://github.com/korchasa/flowai-workflow/commit/a9ab59979dee065a717b2e00986af348539cbf4f))
 * add whiteboard to gitignore, update roadmap ([bab7e4d](https://github.com/korchasa/flowai-workflow/commit/bab7e4d55ce8dbce162447b9642034374ee9a543))
 * **framework:** update flowai framework ([dafa468](https://github.com/korchasa/flowai-workflow/commit/dafa468752e0a8228707c685f4b288e6660a67d0))
-* Phase 0 — SRS/SDS scope cleanup, AC markers, FR-19 ([ab74fa7](https://github.com/korchasa/flowai-workflow/commit/ab74fa718fe4496a82ce1ca5a996c031e0ed32a8))
+* Phase 0 — SRS/SDS scope cleanup, AC markers, FR-S13 ([ab74fa7](https://github.com/korchasa/flowai-workflow/commit/ab74fa718fe4496a82ce1ca5a996c031e0ed32a8))
 * update claude settings with session permissions ([6a973f9](https://github.com/korchasa/flowai-workflow/commit/6a973f9148fed105cf0987a53d25bc035c007fca))
 
 
@@ -292,5 +292,5 @@ All notable changes to this project will be documented in this file. See [standa
 * delete superseded ADR-001, preserve actionable content in SDS ([d2dc9c8](https://github.com/korchasa/flowai-workflow/commit/d2dc9c8366e56b7a5e965bb264b051b324571ee4))
 * **pm, presenter:** enhance SKILL.md with efficiency tips and clarification on artifact creation ([28d8353](https://github.com/korchasa/flowai-workflow/commit/28d8353ce946de6ee66834fba51c9855e24e4df5))
 * remove GHA/CI-CD launch method, adopt local Deno engine execution ([205456d](https://github.com/korchasa/flowai-workflow/commit/205456da743e18088ab2904573fc9b8dbcfd1f8b))
-* **requirements:** add FR-23 run artifacts folder structure ([77dde7a](https://github.com/korchasa/flowai-workflow/commit/77dde7a41f416233ea9555df360b613642594442))
-* **srs:** add FR-17 (directory structure), FR-18 (verbose output), expand FR-1 with text input mode ([d7f8070](https://github.com/korchasa/flowai-workflow/commit/d7f8070b3a392e5def6bc7e7d85d557fc38b1725))
+* **requirements:** add FR-E9 run artifacts folder structure ([77dde7a](https://github.com/korchasa/flowai-workflow/commit/77dde7a41f416233ea9555df360b613642594442))
+* **srs:** add FR-E5 (directory structure), FR-E6 (verbose output), expand FR-S1 with text input mode ([d7f8070](https://github.com/korchasa/flowai-workflow/commit/d7f8070b3a392e5def6bc7e7d85d557fc38b1725))

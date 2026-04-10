@@ -145,7 +145,7 @@ Deno.test("LoopResult — bodyResults is array even when loop node has no runnab
   assertEquals(config.nodes["my-loop"].nodes!.worker.type, "agent");
 });
 
-// --- FR-32: Cost tracking for loop body nodes ---
+// --- FR-E17: Cost tracking for loop body nodes ---
 
 Deno.test("loop body node — markNodeCompleted with cost from AgentResult.output", () => {
   // Simulate what loop.ts does: markNodeCompleted(state, bodyNodeId, result.output?.total_cost_usd)
@@ -180,7 +180,7 @@ Deno.test("loop body node — AgentResult output exposes total_cost_usd", () => 
   assertEquals(mockOutput.total_cost_usd, 0.0055);
 });
 
-// --- FR-27: Per-node model resolution for loop body nodes ---
+// --- FR-E12: Per-node model resolution for loop body nodes ---
 
 Deno.test("loop body node — model resolution: own > loop > defaults", () => {
   // Verify three-tier model resolution chain (own > loop > defaults)

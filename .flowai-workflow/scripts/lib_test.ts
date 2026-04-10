@@ -142,7 +142,7 @@ Deno.test("retry_with_backoff: fails after max attempts", async () => {
 });
 
 // ============================================================
-// Config defaults (FR-15)
+// Config defaults (FR-E4)
 // ============================================================
 
 Deno.test("config: SDLC_MAX_CONTINUATIONS defaults to 3", async () => {

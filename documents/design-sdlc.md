@@ -14,7 +14,7 @@ Legacy 9-stage shell workflow (`Stage 1–9`) removed. Stages 3 (Reviewer),
 4 (Architect), 5 (SDS Update), 8 (Presenter) absorbed/eliminated per FR-S15.
 Current architecture: see §2.2 Pipeline DAG.
 
-### 2.2 Pipeline DAG (FR-26, FR-33)
+### 2.2 Pipeline DAG (FR-S15, FR-E18)
 
 ```mermaid
 graph LR
@@ -24,11 +24,11 @@ graph LR
     Loop -.-> Review["tech-lead-review<br/>(run_on:always)"]
 ```
 
-- **Node ID convention (FR-33):** Activity-based IDs reflect what work is done,
+- **Node ID convention (FR-E18):** Activity-based IDs reflect what work is done,
   not who does it. Mapping: `pm`→`specification`, `architect`→`design`,
   `tech-lead`→`decision`, `impl-loop`→`implementation`, `developer`→`build`,
   `qa`→`verify`, `tech-lead-review`→`tech-lead-review`.
-- **Phases (FR-33):** Top-level `phases:` key in `workflow.yaml` declares named
+- **Phases (FR-E18):** Top-level `phases:` key in `workflow.yaml` declares named
   phase groups. Each phase lists member stage IDs:
   - `plan`: [specification, design, decision]
   - `impl`: [implementation]
@@ -91,7 +91,7 @@ graph LR
     failures.
 - **Deps:** `claude` CLI, `git`, `gh`.
 
-### 3.4 Agent Skills (`.flowai-workflow/agents/agent-*`) (FR-36, FR-S26)
+### 3.4 Agent Skills (`.flowai-workflow/agents/agent-*`) (FR-S17, FR-S26)
 
 - **Purpose:** Versioned system prompts defining each agent's role and behavior.
   Each agent lives in `.flowai-workflow/agents/agent-<name>/SKILL.md` (canonical
@@ -146,7 +146,7 @@ graph LR
     `Agent` tool allowance overrides `shared-rules.md` default prohibition.
   - `agent-tech-lead-review` — post-workflow: final code review + CI gate
     check + merge. `run_on: always`. Handles missing-PR case gracefully.
-- **Removed agents (FR-26):** `tech-lead-reviewer`, `tech-lead-sds`,
+- **Removed agents (FR-S15):** `tech-lead-reviewer`, `tech-lead-sds`,
   `committer`, `code-reviewer`.
 - **Removed agents (FR-S9, issue #127):** `agent-meta-agent` — prompt
   optimization removed due to unreviewed SKILL.md edit risk and marginal value.
@@ -186,7 +186,7 @@ graph LR
   - Interactive: Removed (FR-S33). Legacy `.claude/skills/agent-<name>`
     symlinks deleted. Pipeline-only agents are no longer discoverable as
     interactive Claude Code skills.
-- **Agent Execution Summary (FR-40, FR-42, FR-S42):** All 6 agents must
+- **Agent Execution Summary (FR-S20, FR-S21, FR-S42):** All 6 agents must
   produce a `## Summary` section in their output artifacts. Content: 2-5 bullet
   points (actions taken, key decisions, artifacts produced, issues encountered).
   5 agents (PM, Architect, Tech Lead, QA, Tech Lead Review) append `## Summary`
@@ -199,19 +199,19 @@ graph LR
   sections `Problem Statement` and `Scope`. `verify` retains separate
   `frontmatter_field: verdict` rule. `specification` retains separate
   `frontmatter_field` rules for `issue` and `scope`.
-- **Voice Convention (FR-40, FR-43):** Each SKILL.md contains a `## Voice`
+- **Voice Convention (FR-S20, FR-S22):** Each SKILL.md contains a `## Voice`
   section (after `# Role:` heading, before `## Responsibilities`) mandating
   first-person narrative ("I") in all agent outputs. Scope explicitly includes
-  GitHub issue comments, PR descriptions, and status updates (FR-43). Passive/
+  GitHub issue comments, PR descriptions, and status updates (FR-S22). Passive/
   third-person prohibited in narrative text. YAML frontmatter and code blocks
   excluded. Each agent's section includes 3 role-specific correct vs incorrect
   example pairs: 2 anchored to artifacts/reports, 1 targeting GitHub
   interactions specifically (e.g., PM: "I started the specification phase" not
   "Specification phase started"; QA: "I verified all criteria" not "All criteria
   were verified"). Hardcoded `gh issue comment --body` templates in SKILL.md
-  files must also use first-person (FR-43).
-- **Migration (FR-36, FR-S26, FR-S33):** Three migrations completed:
-  1. FR-36: `agents/<name>/` → `.flowai-workflow/agents/agent-<name>/` (symlinks
+  files must also use first-person (FR-S22).
+- **Migration (FR-S17, FR-S26, FR-S33):** Three migrations completed:
+  1. FR-S17: `agents/<name>/` → `.flowai-workflow/agents/agent-<name>/` (symlinks
      eliminated, `.claude/skills/` became canonical).
   2. FR-S26: `.flowai-workflow/agents/agent-<name>/` → `.flowai-workflow/agents/agent-<name>/`
      (consolidated into workflow directory; `.claude/skills/agent-<name>`
@@ -220,7 +220,7 @@ graph LR
      `.flowai-workflow/agents/agent-<name>/SKILL.md` is sole discovery mechanism.
      `scripts/check.ts` symlink validation block removed (engine `loadConfig()`
      covers prompt file existence).
-- **Voice directive (FR-40):** Each SKILL.md contains `## Voice` section
+- **Voice directive (FR-S20):** Each SKILL.md contains `## Voice` section
   (before `## Rules`) mandating first-person ("I") narrative in all prose
   output. Shared 3-line core directive (first-person mandate, prohibited
   patterns, scope exclusions for YAML/code/tables) + 1 agent-specific
@@ -234,7 +234,7 @@ graph LR
   PM→`**[PM · specify]**`, Architect→`**[Architect · plan]**`,
   Tech Lead→`**[Tech Lead · decide]**`, Developer→`**[Developer · implement]**`,
   QA→`**[QA · verify]**`, Tech Lead Review→`**[Tech Lead Review · review]**`.
-  Section is separate from `## Voice` (FR-S22/FR-43) — Voice governs tone,
+  Section is separate from `## Voice` (FR-S22/FR-S22) — Voice governs tone,
   Comment Identification governs attribution. Covers both hardcoded templates
   and dynamically generated comment bodies. Developer has no existing templates;
   section serves as instruction for future `gh` calls.
@@ -322,7 +322,7 @@ graph LR
   highest-priority open issue via `gh`.
 - **Deps:** Devcontainer, Claude CLI auth (OAuth or API key), `GITHUB_TOKEN`.
 
-### 3.7 Dashboard Generator (`scripts/generate-dashboard.ts`) (FR-33, FR-35, FR-38, FR-40, FR-S26, issue #15, issue #93)
+### 3.7 Dashboard Generator (`scripts/generate-dashboard.ts`) (FR-E18, FR-S16, FR-S19, FR-S20, FR-S26, issue #15, issue #93)
 
 - **Purpose:** Generate self-contained HTML dashboard summarizing workflow run
   results. Reads `state.json` + per-node `logs/*.json`. Produces `index.html`
@@ -384,7 +384,7 @@ graph LR
     (sorted by `started_at`). Bottleneck bar gets `.timeline-bottleneck` CSS
     class. Labels sanitized via `escHtml()`. Timeline CSS appended to existing
     `CSS` const (inlined, no CDN deps). Integrated into `renderHtml()` between
-    header and card grid (FR-38)
+    header and card grid (FR-S19)
 - **Stream log link flow (issue #15):** CLI entry point scans each node
   directory for `stream.log` existence via `Deno.stat()`. For nodes with phases,
   computes relative path as `<phase>/<nodeId>/stream.log`; without phase:
@@ -401,13 +401,13 @@ graph LR
 - **Functions (continued):**
   - `computeCostBars(state: RunState)` — filters `state.nodes` by
     `cost_usd > 0`, computes proportional `widthPct` relative to max cost.
-    Returns `{nodeId: string, costUsd: number, widthPct: number}[]` (FR-40)
+    Returns `{nodeId: string, costUsd: number, widthPct: number}[]` (FR-S20)
   - `renderCostChart(bars, totalCost)` — inline SVG horizontal bar chart.
     Each bar: `<rect>` with proportional width, `<text>` label (node ID via
     `escHtml()`), cost value annotation. Total cost header. Empty bars →
     "No cost data" message (mirrors timeline empty-state). Cost chart CSS
     appended to `CSS` const. Integrated into `renderHtml()` between timeline
-    and `<main>` card grid (FR-40)
+    and `<main>` card grid (FR-S20)
 - **CLI help (FR-S26):** `printUsage()` static function outputs: description,
   usage line (`deno task dashboard --run-dir <path>`), options (`--run-dir`),
   examples. `--help`/`-h` → `printUsage()` + `Deno.exit(0)`. Unknown flags →
@@ -516,13 +516,13 @@ graph LR
   `origin/main` (`git rebase origin/main`) with manual conflict resolution
   (up to 2 attempts; abort on failure). Fallback for `--prompt` mode:
   `sdlc/{{run_id}}`.
-- **Commit cadence (FR-26):** Developer-owned commits. No dedicated committer
+- **Commit cadence (FR-S15):** Developer-owned commits. No dedicated committer
   agent nodes. Developer runs `git add`, `git commit`, `git push` after each
   task. Commit messages follow `sdlc(impl): <summary>` format.
 - **PR creation:** Tech-lead creates draft PR (`gh pr create --draft`) before
   impl-loop. Developer pushes to same branch. QA posts PR review verdicts.
 - **Post-workflow:** Tech-lead-review performs final review + CI gate + merge.
-- **Engine invariant:** Engine does NOT auto-commit (FR-14 preserved). All git
+- **Engine invariant:** Engine does NOT auto-commit (FR-S11 preserved). All git
   operations happen inside agent prompts.
 - **Failure behavior:** Failed nodes produce no commits. On_error: "fail" stops
   workflow; "continue" proceeds to next nodes. Each failed `NodeState` gets
@@ -560,7 +560,7 @@ graph LR
   on non-zero exit, always exits 0. Warning captured in `stream.log`, visible
   via inline log viewer (FR-S34). Node status remains "completed" — no false
   failure signal.
-- **HITL via AskUserQuestion Interception** (FR-21):
+- **HITL via AskUserQuestion Interception** (FR-E8):
   Engine detects agent HITL requests by inspecting `permission_denials` in
   Claude CLI JSON output. Flow:
   1. Agent node completes → engine parses JSON `result` event.
@@ -608,7 +608,7 @@ graph LR
 - **Simplified:** Pipeline runs sequentially (no parallel stages in v1).
 - **Deferred:** Multi-repo support. Parallel workflows for multiple issues.
   Issue size/complexity limits. Cost budget limits and alerts (per-node cost
-  aggregation implemented in FR-32; budget enforcement deferred).
+  aggregation implemented in FR-E17; budget enforcement deferred).
 - **Deferred prompt deduplication (ex ADR-001 C4):** Analysis of 6 SKILL.md
   files (~1700 lines) found ~600 lines (35%) duplicated across agents in 13
   rule groups. Automation tiers:
@@ -626,26 +626,26 @@ graph LR
 
 All FR evidence for issue #15 is complete:
 
-- **FR-35 (Dashboard Result Summary Display):** Implemented. SRS section 3.34
+- **FR-S16 (Dashboard Result Summary Display):** Implemented. SRS section 3.34
   evidence recorded — `scripts/generate-dashboard.ts` (`renderCard`,
   `escHtml`). Tests in `scripts/generate-dashboard_test.ts`.
-- **FR-38 (Timeline Visualization):** Implemented. SRS section 3.37 evidence
+- **FR-S19 (Timeline Visualization):** Implemented. SRS section 3.37 evidence
   recorded — `scripts/generate-dashboard.ts` (`computeTimeline`,
   `renderTimeline`, `.timeline-bottleneck` CSS). Tests in
   `scripts/generate-dashboard_test.ts`. Evidence committed in `e493cbb`.
-- **FR-39 (Repeated File Read Warning):** Implemented. SRS section 3.38
+- **FR-E20 (Repeated File Read Warning):** Implemented. SRS section 3.38
   evidence recorded — `engine/agent.ts` (`FileReadTracker` class). Tests in
   `engine/agent_test.ts`. Evidence committed in `e493cbb`.
-- **FR-40 (Dashboard Stream Log Links):** Implemented. SRS section 3.39
+- **FR-S20 (Dashboard Stream Log Links):** Implemented. SRS section 3.39
   evidence recorded — `scripts/generate-dashboard.ts` (`streamLogHref`,
   `.log-link` CSS). Tests in `scripts/generate-dashboard_test.ts`.
-- **FR-42 (Agent Output Summary):** Already implemented. All 6 agent SKILL.md
+- **FR-S21 (Agent Output Summary):** Already implemented. All 6 agent SKILL.md
   files document `## Summary` in output format. `workflow.yaml` enforces
   `contains_section: Summary` on 5 agent nodes (`specification`, `design`,
   `decision`, `verify`, `tech-lead-review`); Developer (`build`) enforced via
   `custom_script: deno task check`. Evidence:
   `.flowai-workflow/agents/agent-*/SKILL.md` (6 files), `.flowai-workflow/workflow.yaml`.
-- **FR-43 (Agent First-Person Voice — GitHub Interactions):** Voice sections
+- **FR-S22 (Agent First-Person Voice — GitHub Interactions):** Voice sections
   strengthened with explicit GitHub interaction scope + third example pair per
   agent. Hardcoded `gh issue comment --body` templates in PM, Architect, Tech
   Lead SKILL.md files updated to first-person. Evidence:

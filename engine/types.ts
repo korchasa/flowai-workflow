@@ -72,7 +72,7 @@ export interface WorkflowDefaults extends NodeSettings {
   model?: string;
   /** Human-in-the-loop config: ask/check scripts, poll interval, timeout. */
   hitl?: HitlConfig;
-  /** Path to script executed when the workflow fails (FR-34). */
+  /** Path to script executed when the workflow fails (FR-E19). */
   on_failure_script?: string;
   /** Shell command executed once before the node level loop on fresh runs.
    * Supports template interpolation (run_dir, run_id, env.*, args.*).
@@ -252,7 +252,7 @@ export interface NodeState {
   session_id?: string;
   /** Serialized HitlQuestion JSON; populated when status is "waiting". */
   question_json?: string;
-  /** Per-node cost from ClaudeCliOutput.total_cost_usd (FR-32). */
+  /** Per-node cost from ClaudeCliOutput.total_cost_usd (FR-E17). */
   cost_usd?: number;
   /** Excerpt of agent result text, persisted for summary display (FR-E15, FR-E22). */
   result?: string;
@@ -276,7 +276,7 @@ export interface RunState {
   env: Record<string, string>;
   /** Per-node execution state keyed by node ID. */
   nodes: Record<string, NodeState>;
-  /** Sum of all nodes[*].cost_usd, recomputed on each node completion (FR-32). */
+  /** Sum of all nodes[*].cost_usd, recomputed on each node completion (FR-E17). */
   total_cost_usd?: number;
 }
 

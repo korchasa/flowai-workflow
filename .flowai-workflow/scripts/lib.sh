@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # lib.sh — Shared functions for SDLC workflow stage scripts.
-# See: documents/design-sdlc.md §3.3, documents/requirements-sdlc.md FR-8, FR-12, FR-15.
+# See: documents/design-sdlc.md §3.3, documents/requirements-sdlc.md FR-E1, FR-S10, FR-E4.
 set -euo pipefail
 
 # ============================================================
-# Configuration defaults (FR-15)
+# Configuration defaults (FR-E4)
 # ============================================================
 : "${SDLC_MAX_CONTINUATIONS:=3}"
 : "${SDLC_MAX_QA_ITERATIONS:=3}"
