@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   check:
@@ -34,6 +35,9 @@ jobs:
 
       - name: Run checks
         run: deno task check
+
+      - name: Verify JSR publish (dry-run)
+        run: deno publish --dry-run --allow-dirty
 
       - name: Verify no files modified by check
         run: |
@@ -117,10 +121,14 @@ jobs:
     needs: [check, build]
     if: needs.check.outputs.released == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ needs.check.outputs.tag }}
           fetch-depth: 0
 
       - uses: denoland/setup-deno@v2
@@ -157,3 +165,6 @@ jobs:
             dist/flowai-workflow-linux-arm64 \
             dist/flowai-workflow-darwin-x86_64 \
             dist/flowai-workflow-darwin-arm64
+
+      - name: Publish to JSR
+        run: deno publish --allow-dirty
