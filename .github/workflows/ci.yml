@@ -6,9 +6,11 @@ on:
   pull_request:
     branches: [main]
 
+# Default permissions cover check (tag push) and publish-github
+# (release create). publish-jsr overrides with id-token: write for
+# OIDC trusted publishing and downgrades contents to read-only.
 permissions:
   contents: write
-  id-token: write
 
 jobs:
   check:
@@ -145,14 +147,15 @@ jobs:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
 
-  release:
-    name: Create GitHub Release
+  # Creates the GitHub Release with cross-compiled binaries attached.
+  # Waits for the build matrix because it needs the compiled artifacts.
+  publish-github:
+    name: Publish GitHub Release
     needs: [check, build]
     if: needs.check.outputs.released == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      id-token: write
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -196,5 +199,30 @@ jobs:
             --notes-file "${{ steps.notes.outputs.notes_file }}" \
             dist/*
 
+  # Publishes the TypeScript package to JSR. Depends only on `check`
+  # (which creates the tag), NOT on `build` — JSR ships source files,
+  # not cross-compiled binaries, so this runs in parallel with the
+  # build matrix and shaves ~15s off end-to-end release time.
+  # A JSR publish failure does not block the GitHub release.
+  publish-jsr:
+    name: Publish to JSR
+    needs: check
+    if: needs.check.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      # Only id-token is needed for OIDC trusted publishing.
+      # contents: read is for checkout.
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ needs.check.outputs.tag }}
+
+      - uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
+        with:
+          deno-version: v2.x
+
       - name: Publish to JSR
-        run: deno publish --allow-dirty
+        run: deno publish
