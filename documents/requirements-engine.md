@@ -1062,6 +1062,90 @@
 - **State:** `<run-dir>/state.json` — node statuses (`pending`/`running`/`completed`/`failed`/`waiting`/`skipped`), session IDs, cost data, timing, HITL question JSON.
 - **Template variables:** `{{input.<node-id>}}` (node output dir), `{{node_dir}}` (current node output dir), `{{run_dir}}` (run root), `{{run_id}}`, `{{loop.iteration}}` (loop body only), `{{env.<KEY>}}`, `{{file("path")}}` (inline file content, path relative to repo root; FR-E32).
 
+## 6. Proposals (Non-Binding)
+
+Design ideas captured for discussion; not committed work. Promote to FR-E only after explicit decision.
+
+### P1: Frontmatter Schema Validation Rule (`frontmatter_schema`)
+
+- **Description:** New validation rule `type: frontmatter_schema` that validates an artifact's YAML frontmatter against an inline JSON Schema. Extends existing `frontmatter_field` (FR-E38 covers presence only) with typed constraints: enums, integer/number types, min/max, array length, pattern matching.
+- **Motivation:** Today workflows can require a frontmatter field exists, but cannot constrain its type or allowed values. Example gap: `verdict` field in QA report must be `PASS` or `FAIL` — enforced today by string compare downstream, not at validation time. Similarly, `issue: <N>` could be `"N/A"` string and pass `frontmatter_field` check.
+- **Comparison with Claude CLI `--json-schema`:** `--json-schema` validates the CLI's **final `result` response**, not file artifacts. Requires rewriting agent prompts to return JSON instead of writing markdown files. Destructive to current file-based artifact chain (PM/Architect/Dev/QA all produce markdown documents consumed by downstream nodes and dashboards). Comparison on three real SDLC nodes showed current YAML validate syntax is shorter and more declarative for document nodes; parity only for gate nodes (QA verdict). `frontmatter_schema` keeps the file channel, closes the typing gap, runs locally in engine with no Claude CLI dependency.
+- **Sketch:**
+  ```yaml
+  validate:
+    - type: frontmatter_schema
+      path: "{{node_dir}}/05-qa-report.md"
+      schema:
+        type: object
+        required: [verdict, summary]
+        properties:
+          verdict: {enum: [PASS, FAIL]}
+          summary: {type: string, minLength: 50}
+  ```
+- **Open questions:** JSON Schema library choice (Deno-native vs npm bridge), error message UX, interaction with `frontmatter_field` (replace / coexist).
+- **Source:** R&D walkthrough 2026-04-10, [documents/rnd/claude-code-best-practices-for-engine.md § Topic 6](rnd/claude-code-best-practices-for-engine.md).
+
+### P2: Parallel DAG Level Execution with Per-Node Worktree Isolation
+
+- **Description:** Optional parallel execution of sibling nodes within a DAG level, gated by per-node `isolation: node_worktree` field and workflow-level `parallelism: <N>` setting. Extends existing FR-E24 (run-level worktree) with nested per-node worktrees for I/O isolation.
+- **Motivation:** Engine executes DAG levels sequentially (`engine/engine.ts:251` `for (const level of filteredLevels)`). Sibling independent nodes in the same level cannot run in parallel. Theoretical 2-3× wallclock reduction for workflows with parallelizable phases. Current SDLC workflow is mostly linear (PM → Architect → Tech Lead → loop(Dev → QA) → Review), so ROI is **speculative** until a workflow emerges that actually needs this.
+- **Sketch:**
+  ```yaml
+  defaults:
+    parallelism: 3    # default 1 = sequential (current behavior)
+  nodes:
+    explore-backend:
+      type: agent
+      isolation: node_worktree
+      # ...
+    explore-frontend:
+      type: agent
+      isolation: node_worktree
+      # ...
+  ```
+- **Breakdown (three phases):**
+  1. **Node-level worktree isolation.** `isolation: node_worktree | shared` field; engine creates nested worktree per node, merges on success, preserves on failure. Works for top-level nodes only (not loop body for start).
+  2. **Parallel level execution.** `parallelism: N` in defaults; `Promise.all` with semaphore; only `node_worktree` nodes join parallel group; `shared` nodes remain sequential.
+  3. **Parallel-safe I/O + budget.** Atomic `state.json` updates; concurrent cost aggregation; SIGTERM propagation to all child processes; integration tests for race conditions.
+- **Risks:**
+  - Nested git worktree — may or may not be supported. Fallback: temp dir + rsync instead of `git worktree add`.
+  - Merge conflicts when parallel nodes write overlapping files. Mitigation: `allowed_paths` enforcement (FR-E37) with fail-fast on overlap detection at config load.
+  - `state.json` concurrent writes require atomic replace or fine-grained locking.
+- **Open questions:** Is there a concrete SDLC workflow use case that needs this? Nested worktree vs rsync? Failure semantics — does one failed parallel node cancel siblings or let them finish?
+- **Source:** R&D walkthrough 2026-04-10, [documents/rnd/claude-code-best-practices-for-engine.md § Topic 3](rnd/claude-code-best-practices-for-engine.md).
+
+### P3: Permission Prompt Interception via `--permission-prompt-tool`
+
+- **Description:** Engine starts a dedicated HITL MCP server exposing a `handle_permission_request` tool; passes `--permission-prompt-tool <tool>` to Claude CLI spawns. When Claude needs to request a permission (e.g. running an untrusted Bash command), the request flows through the MCP server → engine HITL pipeline → operator reply → result back to Claude. Extends or reuses existing OpenCode HITL MCP infrastructure (`engine/opencode-hitl-mcp.ts`).
+- **Motivation:** Current SDLC workflow sets `permission_mode: bypassPermissions`, so all permission prompts are auto-approved. This is fine for dogfooding but blocks future workflows that want **strict interactive permission** with human approval (e.g., security-sensitive pipelines, CI gate flows). In those workflows, without `--permission-prompt-tool`, a Claude headless process hitting a permission prompt either hangs or fails silently.
+- **Current state:** `AskUserQuestion` tool is already intercepted via stream-json tool_use detection (`engine/hitl.ts`). Permission prompts are a separate channel — not tool_use events — and require the dedicated CLI flag.
+- **Sketch:**
+  ```yaml
+  defaults:
+    permission_mode: default   # prompts enabled, not bypassed
+    hitl:
+      ask_script: scripts/hitl/ask.sh
+      check_script: scripts/hitl/check.sh
+  # engine passes --permission-prompt-tool to spawn
+  ```
+- **Open questions:** Single MCP server shared across Claude + OpenCode or separate? Permission response format (allow / deny / remember)? Timeout behavior when operator does not respond?
+- **Status:** Not required for current SDLC (`bypassPermissions`). Promote to FR-E only when a concrete workflow with strict permission requirements is proposed.
+- **Source:** R&D walkthrough 2026-04-10, [documents/rnd/claude-code-best-practices-for-engine.md § Topic 10](rnd/claude-code-best-practices-for-engine.md).
+
+### P4: `--bare` Flag for Faster Claude CLI Startup
+
+- **Description:** Engine passes `--bare` to every Claude CLI spawn. Claude skips ancestor `CLAUDE.md`, `.claude/settings.json`, `.mcp.json`, and project agent discovery — up to 10× faster startup per Boris Cherny ([Boris 15 tips — Tip 12](https://github.com/shanraisshan/claude-code-best-practice/blob/main/tips/claude-boris-15-tips-30-mar-26.md)). Engine must explicitly inject anything previously auto-loaded.
+- **Motivation:** Faster per-node startup reduces wallclock time for workflows with many short agent nodes. Claude spawn currently pays discovery cost on every invocation; engine already knows exactly what it wants each node to load.
+- **Blockers:**
+  1. Engine uses `--agent <name>` which relies on Claude discovering `.claude/agents/<name>.md`. `--bare` disables that discovery. Must either (a) read agent file inline and concatenate into `--append-system-prompt`, losing Claude's frontmatter processing (`tools`, `skills`, `memory`, `mcpServers`), or (b) construct explicit `--settings <path>` and `--mcp-config <path>` per spawn.
+  2. Project `CLAUDE.md` no longer auto-appends. Engine must inject explicitly — currently engine relies on `--append-system-prompt` for per-node content but lets Claude add project CLAUDE.md on top.
+  3. MCP servers from `.mcp.json` no longer load. Must pass `--mcp-config <path>` for every node that needs MCPs.
+- **ROI analysis:** For long-running agent turns (~30s typical), saving 400-500ms on startup is ~1-2% total. For short reasoning-only nodes (~5s), savings grow to 7-8%. Current SDLC has mostly long turns — low ROI. Benefit scales with node count and turn brevity.
+- **Open questions:** Is there a profiled bottleneck that startup dominates? Cleanest way to preserve `--agent` semantics (especially tools allowlist and per-agent frontmatter)? How to handle multi-root `CLAUDE.md` override policy under explicit injection?
+- **Status:** Defer until a concrete workflow shows startup overhead as dominant cost. Complements the CLAUDE.md ancestor scan work (#195) — both revolve around making Claude's implicit loading explicit.
+- **Source:** R&D walkthrough 2026-04-10, [documents/rnd/claude-code-best-practices-for-engine.md § Topic 8](rnd/claude-code-best-practices-for-engine.md).
+
 ## Appendix: FR Cross-Reference
 
 | Old ID | New ID | Title |
