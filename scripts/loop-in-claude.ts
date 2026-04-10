@@ -1,9 +1,9 @@
-// scripts/loop_in_claude.ts
+// scripts/loop-in-claude.ts
 // Autonomous loop: check GitHub issues → run workflow via claude CLI → repeat.
 // Streams claude output as JSON and displays in readable format.
 // Exponential backoff (30s → 4h) when no actionable tickets found.
 
-import { processStream } from "./claude_stream_formatter.ts";
+import { processStream } from "./claude-stream-formatter.ts";
 import {
   installSignalHandlers,
   register,

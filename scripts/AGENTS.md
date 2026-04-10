@@ -15,8 +15,6 @@
   - static code analysis
   - runs all project tests
 - `test <path>` - Runs a single test.
-- `dev` - Runs the application in development mode with watch mode enabled.
-- `prod` - Runs the application in production mode.
 
 ## Detected Commands
 
@@ -31,7 +29,4 @@
 
 - `scripts/check.ts` - Comprehensive check: fmt --check, lint, test,
   comment-scan
-- `scripts/loop_in_claude.ts` - Autonomous loop: check issues → run workflow via claude CLI (backoff 30s→4h)
-- `scripts/test.ts` - Run single test file or all tests
-- `scripts/dev.ts` - Start dev mode (watch)
-- `scripts/prod.ts` - Start production mode
+- `scripts/loop-in-claude.ts` - Autonomous loop: check issues → run workflow via claude CLI (backoff 30s→4h)

@@ -1,3 +1,12 @@
+/**
+ * @module
+ * Loop node execution: iterates body nodes sequentially, checks an exit
+ * condition after each iteration, and repeats until the condition matches
+ * or max_iterations is reached. Condition values are extracted from YAML
+ * frontmatter in body node output artifacts.
+ * Entry points: {@link runLoop}, {@link extractConditionValue}.
+ */
+
 import { parse as parseYaml } from "@std/yaml";
 import type {
   ErrorCategory,
@@ -13,6 +22,7 @@ import { runAgent } from "./agent.ts";
 import type { AgentResult } from "./agent.ts";
 import { markNodeCompleted, markNodeFailed, markNodeStarted } from "./state.ts";
 import type { OutputManager } from "./output.ts";
+import { resolveRuntimeConfig } from "./runtime/index.ts";
 
 /** Result of a loop execution. */
 export interface LoopResult {
@@ -91,10 +101,11 @@ export async function runLoop(opts: LoopRunOptions): Promise<LoopResult> {
       const bodyNode = loopNode.nodes![bodyNodeId];
       const settings = bodyNode.settings as Required<NodeSettings>;
       const ctx = opts.buildCtx(bodyNodeId, iteration);
-      const effectiveModel = bodyNode.model ?? loopNode.model ??
-        config.defaults?.model;
-      const effectivePermissionMode = bodyNode.permission_mode ??
-        loopNode.permission_mode ?? config.defaults?.permission_mode;
+      const runtimeConfig = resolveRuntimeConfig({
+        defaults: config.defaults,
+        node: bodyNode,
+        parent: loopNode,
+      });
 
       opts.onNodeStart?.(bodyNodeId, iteration);
       markNodeStarted(state, bodyNodeId);
@@ -105,9 +116,11 @@ export async function runLoop(opts: LoopRunOptions): Promise<LoopResult> {
         node: bodyNode,
         ctx,
         settings,
-        claudeArgs: config.defaults?.claude_args,
-        permissionMode: effectivePermissionMode,
-        model: effectiveModel,
+        runtime: runtimeConfig.runtime,
+        runtimeArgs: runtimeConfig.args,
+        permissionMode: runtimeConfig.permissionMode,
+        model: runtimeConfig.model,
+        hitlConfig: config.defaults?.hitl,
         output: opts.output,
         nodeId: bodyNodeId,
         streamLogPath,

@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { checkArgs, printUsage } from "./loop_in_claude.ts";
+import { checkArgs, printUsage } from "./loop-in-claude.ts";
 
 // --- printUsage ---
 

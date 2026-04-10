@@ -461,14 +461,14 @@ graph LR
 
 ### 3.9 SDLC Utility Scripts CLI Help (FR-S26)
 
-- **Purpose:** `--help`/`-h` support for `scripts/self_runner.ts` and
-  `scripts/loop_in_claude.ts`. Each script gets inline `printUsage()` following
+- **Purpose:** `--help`/`-h` support for `scripts/self-runner.ts` and
+  `scripts/loop-in-claude.ts`. Each script gets inline `printUsage()` following
   `engine/cli.ts` format (description, usage, options, examples).
-- **`scripts/self_runner.ts`:** `printUsage()` describes workflow loop runner.
+- **`scripts/self-runner.ts`:** `printUsage()` describes workflow loop runner.
   Usage: `deno task loop [interval] [-- claude-args...]`. `--help`/`-h` →
   print + exit 0. Unknown `--`-prefixed flags → error + exit 1. Exported
   `printUsage()`/`checkArgs()` for unit testing.
-- **`scripts/loop_in_claude.ts`:** `printUsage()` describes in-Claude workflow
+- **`scripts/loop-in-claude.ts`:** `printUsage()` describes in-Claude workflow
   runner. Usage: `deno task loop-in-claude [claude-args...]`. `--help`/`-h`
   detected before passthrough to Claude CLI. Exported helpers for unit testing.
 - **Pattern:** Identical to `engine/cli.ts`: static string, `Deno.args` scan,
@@ -480,8 +480,8 @@ graph LR
 - **Purpose:** Module-level `/** @module */` JSDoc coverage for all 4 SDLC
   utility scripts. Each module gets a docstring declaring purpose,
   responsibility, and dependencies.
-- **Files:** `scripts/check.ts`, `scripts/claude_stream_formatter.ts`,
-  `scripts/generate-dashboard.ts`, `scripts/self_runner.ts`.
+- **Files:** `scripts/check.ts`, `scripts/claude-stream-formatter.ts`,
+  `scripts/generate-dashboard.ts`, `scripts/self-runner.ts`.
 - **Scope:** Module-level JSDoc only. Function-level JSDoc and why-comments
   excluded (covered by FR-E30 for engine modules only).
 - **Deps:** None (documentation-only change).

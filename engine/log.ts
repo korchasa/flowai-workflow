@@ -1,4 +1,11 @@
-import type { ClaudeCliOutput } from "./types.ts";
+/**
+ * @module
+ * Agent log persistence: saves JSON output and JSONL session transcripts
+ * to the run's logs directory after each node completes.
+ * Entry point: {@link saveAgentLog}.
+ */
+
+import type { ClaudeCliOutput, RuntimeId } from "./types.ts";
 
 /** Default path where Claude Code stores project session transcripts. */
 const DEFAULT_CLAUDE_PROJECTS_DIR = `${
@@ -19,8 +26,20 @@ export async function saveAgentLog(
   runDir: string,
   nodeId: string,
   output: ClaudeCliOutput,
+  runtimeOrProjectsDir?: RuntimeId | string,
   claudeProjectsDir: string = DEFAULT_CLAUDE_PROJECTS_DIR,
 ): Promise<void> {
+  let runtimeId: RuntimeId = output.runtime ?? "claude";
+  let projectsDir = claudeProjectsDir;
+
+  if (
+    runtimeOrProjectsDir === "claude" || runtimeOrProjectsDir === "opencode"
+  ) {
+    runtimeId = runtimeOrProjectsDir;
+  } else if (typeof runtimeOrProjectsDir === "string") {
+    projectsDir = runtimeOrProjectsDir;
+  }
+
   const logsDir = `${runDir}/logs`;
   await Deno.mkdir(logsDir, { recursive: true });
 
@@ -32,16 +51,20 @@ export async function saveAgentLog(
   );
 
   // 2. Find and copy JSONL transcript
+  if (runtimeId !== "claude") {
+    return;
+  }
+
   const sessionId = output.session_id;
   if (!sessionId) return;
 
-  const transcriptPath = await findTranscript(claudeProjectsDir, sessionId);
+  const transcriptPath = await findTranscript(projectsDir, sessionId);
   if (transcriptPath) {
     const jsonlPath = `${logsDir}/${nodeId}.jsonl`;
     await Deno.copyFile(transcriptPath, jsonlPath);
   } else {
     console.warn(
-      `[log] JSONL transcript not found for session ${sessionId} in ${claudeProjectsDir}`,
+      `[log] JSONL transcript not found for session ${sessionId} in ${projectsDir}`,
     );
   }
 }

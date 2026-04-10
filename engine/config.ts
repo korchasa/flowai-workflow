@@ -7,8 +7,9 @@
  */
 
 import { parse as parseYaml } from "@std/yaml";
+import { resolveRuntimeConfig } from "./runtime/index.ts";
 import { validateTemplateVars } from "./template.ts";
-import { VALID_PERMISSION_MODES } from "./types.ts";
+import { VALID_PERMISSION_MODES, VALID_RUNTIME_IDS } from "./types.ts";
 import type {
   NodeConfig,
   NodeSettings,
@@ -32,6 +33,8 @@ export const DEFAULT_WORKFLOW_DEFAULTS: Required<
   ...DEFAULT_SETTINGS,
   worktree_disabled: false,
   max_parallel: 0,
+  runtime: "claude",
+  runtime_args: [],
   claude_args: [],
   model: "",
   hitl: {
@@ -150,6 +153,22 @@ function validateSchema(config: Record<string, unknown>): void {
   // Validate defaults.permission_mode if present
   if (config.defaults && typeof config.defaults === "object") {
     const defaults = config.defaults as Record<string, unknown>;
+    if (
+      defaults.runtime !== undefined &&
+      !VALID_RUNTIME_IDS.includes(defaults.runtime as "claude" | "opencode")
+    ) {
+      throw new Error(
+        `defaults.runtime has invalid value '${defaults.runtime}'. Must be one of: ${
+          VALID_RUNTIME_IDS.join(", ")
+        }`,
+      );
+    }
+    if (defaults.runtime_args !== undefined) {
+      validateRuntimeArgs("defaults", defaults.runtime_args);
+    }
+    if (defaults.hitl !== undefined) {
+      validateHitlConfig(defaults.hitl);
+    }
     if (defaults.permission_mode !== undefined) {
       if (
         !VALID_PERMISSION_MODES.includes(defaults.permission_mode as string)
@@ -424,6 +443,20 @@ function validateNode(
     }
   }
 
+  if (node.runtime !== undefined) {
+    if (!VALID_RUNTIME_IDS.includes(node.runtime as "claude" | "opencode")) {
+      throw new Error(
+        `Node '${id}' has invalid runtime '${node.runtime}'. Must be one of: ${
+          VALID_RUNTIME_IDS.join(", ")
+        }`,
+      );
+    }
+  }
+
+  if (node.runtime_args !== undefined) {
+    validateRuntimeArgs(`Node '${id}'`, node.runtime_args);
+  }
+
   // Validate allowed_paths if present (FR-E37)
   if (node.allowed_paths !== undefined) {
     validateAllowedPaths(id, node.allowed_paths);
@@ -540,6 +573,39 @@ function validateAllowedPaths(
   }
 }
 
+function validateRuntimeArgs(
+  context: string,
+  runtimeArgs: unknown,
+): void {
+  if (!Array.isArray(runtimeArgs)) {
+    throw new Error(`${context}.runtime_args must be an array of strings`);
+  }
+  for (const entry of runtimeArgs) {
+    if (typeof entry !== "string" || !entry) {
+      throw new Error(
+        `${context}.runtime_args entries must be non-empty strings`,
+      );
+    }
+  }
+}
+
+function validateHitlConfig(hitl: unknown): void {
+  if (!hitl || typeof hitl !== "object" || Array.isArray(hitl)) {
+    throw new Error("defaults.hitl must be an object");
+  }
+  const config = hitl as Record<string, unknown>;
+  if (typeof config.ask_script !== "string" || !config.ask_script) {
+    throw new Error(
+      "defaults.hitl.ask_script must be a non-empty string",
+    );
+  }
+  if (typeof config.check_script !== "string" || !config.check_script) {
+    throw new Error(
+      "defaults.hitl.check_script must be a non-empty string",
+    );
+  }
+}
+
 /**
  * Merge workflow defaults into each node's settings.
  *
@@ -608,8 +674,50 @@ function mergeDefaults(
     defaults: workflowDefaults,
     nodes: mergedNodes,
   };
+  validateRuntimeCompatibility(result);
   validateFileReferences(result, workDir);
   return result;
+}
+
+function validateRuntimeCompatibility(config: WorkflowConfig): void {
+  const defaults = config.defaults;
+
+  if (
+    defaults?.runtime === "opencode" &&
+    (defaults.claude_args?.length ?? 0) > 0
+  ) {
+    throw new Error(
+      "defaults.claude_args is only supported for runtime 'claude'",
+    );
+  }
+
+  const checkNode = (nodeId: string, node: NodeConfig, parent?: NodeConfig) => {
+    if (node.type !== "agent") return;
+
+    const runtimeConfig = resolveRuntimeConfig({ defaults, node, parent });
+    if (runtimeConfig.runtime !== "opencode") return;
+
+    if (
+      runtimeConfig.permissionMode &&
+      runtimeConfig.permissionMode !== "bypassPermissions"
+    ) {
+      const source = node.permission_mode !== undefined
+        ? `nodes.${nodeId}.permission_mode`
+        : "defaults.permission_mode";
+      throw new Error(
+        `${source} '${runtimeConfig.permissionMode}' is not supported for runtime 'opencode' — only 'bypassPermissions' is supported (node '${nodeId}')`,
+      );
+    }
+  };
+
+  for (const [nodeId, node] of Object.entries(config.nodes)) {
+    checkNode(nodeId, node);
+    if (node.type === "loop" && node.nodes) {
+      for (const [bodyId, bodyNode] of Object.entries(node.nodes)) {
+        checkNode(bodyId, bodyNode, node);
+      }
+    }
+  }
 }
 
 /**
@@ -698,8 +806,11 @@ export function collectAllNodeIds(config: WorkflowConfig): string[] {
 function extractNodeSettings(defaults: WorkflowDefaults): NodeSettings {
   const {
     max_parallel: _,
+    runtime: _rt,
+    runtime_args: _ra,
     claude_args: _ca,
     hitl: _hitl,
+    model: _model,
     permission_mode: _pm,
     worktree_disabled: _wd,
     ...settings

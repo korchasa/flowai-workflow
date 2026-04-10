@@ -1,10 +1,15 @@
-/** Barrel re-export for `deno doc --lint` entry point. Not imported by runtime code. */
+/**
+ * @module
+ * Barrel re-export for `deno doc --lint` entry point. Not imported by runtime code.
+ */
 
 export type {
   ClaudeCliOutput,
   EngineOptions,
   ErrorCategory,
   HitlConfig,
+  HumanInputOption,
+  HumanInputRequest,
   NodeConfig,
   NodeSettings,
   NodeState,
@@ -12,6 +17,7 @@ export type {
   PermissionDenial,
   PermissionMode,
   RunState,
+  RuntimeId,
   TemplateContext,
   ValidationRule,
   Verbosity,
@@ -45,6 +51,14 @@ export {
 export { runAgent } from "./agent.ts";
 export type { AgentResult, AgentRunOptions } from "./agent.ts";
 export type { InvokeOptions } from "./claude-process.ts";
+export { getRuntimeAdapter, resolveRuntimeConfig } from "./runtime/index.ts";
+export type {
+  ResolvedRuntimeConfig,
+  RuntimeAdapter,
+  RuntimeCapabilities,
+  RuntimeInvokeOptions,
+  RuntimeInvokeResult,
+} from "./runtime/types.ts";
 export { detectHitlRequest, runHitlLoop } from "./hitl.ts";
 export type {
   ClaudeRunner,
@@ -56,6 +70,12 @@ export { markNodeWaiting } from "./state.ts";
 export { saveAgentLog } from "./log.ts";
 export { extractFrontmatterField, runLoop } from "./loop.ts";
 export type { LoopResult, LoopRunOptions } from "./loop.ts";
+export {
+  buildOpenCodeArgs,
+  extractOpenCodeOutput,
+  formatOpenCodeEventForOutput,
+  invokeOpenCodeCli,
+} from "./opencode-process.ts";
 export { runHuman } from "./human.ts";
 export type { HumanResult, UserInput } from "./human.ts";
 export { OutputManager } from "./output.ts";

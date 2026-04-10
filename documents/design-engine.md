@@ -41,7 +41,8 @@ graph TD
 - **Subsystems:**
   - **Workflow Engine** (`engine/`): Deno/TypeScript DAG-based executor
     with YAML config, template interpolation, sequential levels, loop nodes,
-    human nodes, resume support
+    human nodes, resume support, and runtime abstraction (`claude` default,
+    `opencode` supported)
   - **Artifact Store**: Git-tracked files in `.flowai-workflow/runs/<run-id>/[<phase>/]<node-id>/`
     (phase subdir present when node has `phase` field in config)
   - **Validation Engine**: Rule-based checks (file_exists, file_not_empty,
@@ -72,8 +73,10 @@ graph TD
     `NodeConfig.allowed_paths` (`string[]`, optional — FR-E37: glob patterns
     defining allowed file modifications for scope-based detection),
     `NodeConfig.run_on` (`"always"|"success"|"failure"`), `NodeConfig.phase`,
-    `NodeConfig.env`, `NodeConfig.model` (per-node Claude model override),
+    `NodeConfig.env`, `NodeConfig.model` (per-node runtime model override),
+    `NodeConfig.runtime`, `NodeConfig.runtime_args`,
     `WorkflowDefaults.model` (default model for all nodes),
+    `WorkflowDefaults.runtime`, `WorkflowDefaults.runtime_args`,
     `LoopNodeConfig.nodes` (inline body node definitions),
     `LoopResult.bodyResults`, `ErrorCategory` (structured failure enum),
     `NodeState.error_category`, `NodeState.cost_usd` (FR-32 per-node cost),
@@ -179,15 +182,26 @@ graph TD
     `markNodeCompleted()` when optional `costUsd` param provided, FR-32).
     `markNodeCompleted()` also accepts optional `result?: string` param
     (FR-E22) — persists excerpt to `NodeState.result` in `state.json`
-  - `agent.ts` — Claude CLI invocation, continuation loop, retry.
+  - `runtime/` — runtime adapters and capability metadata.
+    `runtime/index.ts` resolves effective runtime config with node > parent >
+    defaults precedence and returns the adapter for `claude` or `opencode`.
+    Effective args: Claude gets `claude_args + runtime_args`; OpenCode gets
+    only `runtime_args`. `runtime/claude-adapter.ts` wraps the existing Claude
+    low-level runner and advertises `permissionMode=true`, `hitl=true`,
+    `transcript=true`. `runtime/opencode-adapter.ts` wraps
+    `opencode-process.ts` and advertises `permissionMode=false`,
+    `hitl=true`, `transcript=false`.
+  - `agent.ts` — runtime-agnostic agent invocation, continuation loop, retry.
     Agent context injected via `--agent` + `--append-system-prompt` (native
     Claude Code subagents in `.claude/agents/*.md`). Pipeline-specific context
     via `task_template` `{{file(...)}}` (FR-S38). Base system prompt preserved.
-    `AgentRunOptions.model` and `InvokeOptions.model`: optional string for
-    per-node model selection. `buildClaudeArgs()` emits `--model <value>` when
-    `opts.model` is set AND `opts.resumeSessionId` is NOT set (resume inherits
-    original model from session). Resolution: `node.model ?? defaults.model ??
-    undefined` (computed in engine.ts/loop.ts, passed as field).
+    Runtime resolution is centralized in `runtime/index.ts`; `runAgent()`
+    resolves the adapter once and keeps continuation semantics unchanged across
+    runtimes. `AgentRunOptions.model`: optional string for per-node model
+    selection. For Claude, `buildClaudeArgs()` emits `--model <value>` only on
+    fresh invocations (resume inherits model from session). For OpenCode,
+    `opencode-process.ts` emits `run --model <provider/model>` on fresh
+    invocations and resumes sessions with `run --session <id>`.
     **Permission mode (FR-E40):** `PermissionMode` union type in `types.ts`
     with 6 values matching Claude CLI `--permission-mode` flag. Optional field
     on `WorkflowDefaults` and `NodeConfig`. Resolution cascade:
@@ -198,7 +212,8 @@ graph TD
     Config validation in `validateSchema()`: rejects invalid values via
     `VALID_PERMISSION_MODES` constant; conflict detection throws if
     `claude_args` contains `--dangerously-skip-permissions` or
-    `--permission-mode` while `permission_mode` field is also set.
+    `--permission-mode` while `permission_mode` field is also set. Effective
+    `opencode` agent nodes reject `permission_mode` at config-load time.
     Threaded through: `AgentRunOptions`, `InvokeOptions`, `HitlBaseParams`,
     `HitlRunOptions` — all accept optional `permissionMode?: string`.
     `executeClaudeProcess()` uses `--output-format stream-json` and reads
@@ -216,6 +231,18 @@ graph TD
     Append semantics: multiple invocations (continuation) with same path
     produce concatenated JSONL. `--verbose` flag removed from
     `buildClaudeArgs()` (unrelated to streaming, changes stderr globally).
+  - `opencode-process.ts` — low-level `opencode run --format json` runner.
+    Parses NDJSON events (`step_start`, `text`, `step_finish`, `error`),
+    normalizes them into `ClaudeCliOutput`-compatible shape, and supports
+    generic runtime extension flags via `runtime_args` (for example
+    `--variant high`). OpenCode has no dedicated system-prompt flag, so the
+    adapter prepends `system_prompt` content to the task prompt before
+    invocation. When `defaults.hitl` is configured, the runner also injects a
+    per-invocation local MCP server through `OPENCODE_CONFIG_CONTENT`; that
+    server exposes `request_human_input`, which surfaces in stream events as
+    `hitl_request_human_input`. The parsed stream is normalized into the same
+    output shape consumed elsewhere by state, continuation, and log code
+    (`ClaudeCliOutput` + optional `hitl_request`).
     **Repeated file read warning (FR-39):** `FileReadTracker` class in
     `agent.ts`. `track(path): string | null` — maintains `Map<string, number>`,
     returns `[WARN] repeated file read: <path> (<N> times)` when count >
@@ -280,7 +307,10 @@ graph TD
     through call (closure capture or param addition). Prevents silent undefined
     behavior on missing field — fail-fast at first loop iteration
   - `hitl.ts` — HITL detection (`detectHitlRequest`) and poll loop
-    (`runHitlLoop`); injectable `scriptRunner`/`claudeRunner` for testing
+    (`runHitlLoop`); injectable `scriptRunner`/runtime runner for testing.
+    The engine normalizes runtime-native HITL requests into one
+    `HumanInputRequest` shape. Claude uses `permission_denials`; OpenCode uses
+    structured `tool_use` events emitted by an injected local MCP tool.
   - `human.ts` — terminal user input, abort logic
   - `scope-check.ts` — scope-based file modification detection (FR-E37).
     Exports:
@@ -352,6 +382,11 @@ graph TD
     `executeLoopNode()`: passes result excerpt in `onNodeComplete` callback.
     `printSummary()`: builds `nodeResults` from `state.nodes[*].result`,
     passes to `summary()` for per-node result rendering.
+  - `cli.ts` — regular workflow CLI entry and hidden internal helper mode for
+    OpenCode HITL. When invoked with
+    `--internal-opencode-hitl-mcp`, it starts the stdio MCP helper server
+    instead of the workflow engine. This lets the same compiled binary or
+    `deno run` entrypoint serve as the per-invocation local MCP command.
     Dry-run path (FR-28): applies `collectPostWorkflowNodes()` +
     `sortPostWorkflowNodes()` + level filtering before calling
     `dryRunPlan()`, passing filtered levels and post-workflow node IDs with
@@ -366,17 +401,8 @@ graph TD
   - `cli.ts` — CLI entry point: argument parsing, .env loading.
     `VERSION` constant: `Deno.env.get("VERSION") ?? "dev"` — injected at
     compile time via `deno compile --env VERSION=<tag>`. `--version` / `-V`
-    flag: prints version and checks GitHub Releases for updates (FR-E41).
-    `--update` flag: self-updates binary from GitHub Releases.
-    `--skip-update-check` flag: suppresses update check (for CI).
-    `parseArgs()` is async (handles `--version`/`--update` network calls)
-  - `update.ts` — Auto-update module (FR-E41). `compareSemver()`: minimal
-    3-part numeric comparison (no `@std/semver` dependency). `detectPlatform()`:
-    maps `Deno.build` to binary name suffix. `checkForUpdate()`: queries
-    GitHub Releases API with timeout and optional `GITHUB_TOKEN` auth. Fail-open
-    design — returns `null` on any error. `runUpdate()`: downloads binary to
-    same dir as current executable, chmod +x, atomic rename. Permission check
-    with `sudo` hint on EPERM
+    flag: prints version and exits.
+    `parseArgs()` is synchronous
   - `mod.ts` — barrel re-export serving as `deno doc --lint` entry point
     (not a runtime public API; sole non-redundant consumer is
     `scripts/check.ts` JSDoc validation)
@@ -517,12 +543,12 @@ graph TD
   - `agent.ts:executeClaudeProcess()` — register/unregister in try/finally.
   - `engine.ts:Engine.run()` — onShutdown for lock release + state save;
     disposers called in finally to prevent leak in loops.
-  - `cli.ts`, `self_runner.ts`, `loop_in_claude.ts` — installSignalHandlers()
+  - `cli.ts`, `self-runner.ts`, `loop-in-claude.ts` — installSignalHandlers()
     at entry point.
 - **Design rationale:** Module-scoped global state (same pattern as Phase
   Registry) because signal handlers are process-wide. `_reset()` for test
   isolation. `onShutdown` disposer pattern prevents callback accumulation
-  when `Engine.run()` called in a loop (`self_runner.ts`).
+  when `Engine.run()` called in a loop (`self-runner.ts`).
 
 ### 3.4 Binary Distribution (`scripts/compile.ts`) — FR-E39
 
@@ -557,7 +583,7 @@ graph TD
 
 - **Status:** Pending.
 - **Purpose:** Single authoritative source for exponential backoff logic used by
-  both `scripts/self_runner.ts` and `scripts/loop_in_claude.ts`. Eliminates
+  both `scripts/self-runner.ts` and `scripts/loop-in-claude.ts`. Eliminates
   duplicated `nextPause()` function and associated constants.
 - **Exports:**
   - `MIN_PAUSE_SEC` (60) — minimum pause / reset value on success.
@@ -565,10 +591,10 @@ graph TD
   - `BACKOFF_FACTOR` (2) — multiplier per iteration.
   - `nextPause(current: number): number` — returns
     `Math.min(current * BACKOFF_FACTOR, MAX_PAUSE_SEC)`.
-- **Consumers:** `self_runner.ts`, `loop_in_claude.ts` — both import
+- **Consumers:** `self-runner.ts`, `loop-in-claude.ts` — both import
   `nextPause` and `MIN_PAUSE_SEC` (used for pause reset on success).
 - **Tests:** `scripts/backoff_test.ts` — 3 tests (doubling, max cap, min floor)
-  moved from `self_runner_test.ts`.
+  moved from `self-runner_test.ts`.
 - **Deps:** None (pure function, no imports).
 
 ### 3.5 Binary Compile Script (`scripts/compile.ts`) — FR-E39
@@ -800,23 +826,33 @@ graph TD
       `markNodeSkipped()`.
     - `run_on: "failure"` → skip if `workflowSuccess`, call
       `markNodeSkipped()`.
-  - **HITL via AskUserQuestion Interception** (FR-21):
-    Engine detects agent HITL requests by inspecting `permission_denials` in
-    Claude CLI JSON output. Flow:
-    1. Agent node completes → engine parses JSON `result` event.
-    2. If `permission_denials[]` contains entry with
-       `tool_name == "AskUserQuestion"`: extract `tool_input.questions` (structured
-       question with `question`, `header`, `options[]`, `multiSelect`) and
-       `session_id` from result.
-    3. Engine calls `defaults.hitl.ask_script` (external workflow script) with
-       question JSON + context args (repo, issue, run-id, node-id).
-    4. Engine sets node state to `waiting` in `state.json`, saves `session_id`.
-    5. Engine enters poll loop: `sleep(poll_interval)` → call
+  - **HITL via Runtime-Native Structured Requests** (FR-21):
+    Engine detects agent HITL requests through runtime-specific structured
+    output and normalizes them into one engine-level resume flow. Flow:
+    1. Agent node completes or is intentionally interrupted after emitting a
+       structured HITL request.
+    2. Claude path: inspect `permission_denials[]` for
+       `tool_name == "AskUserQuestion"` and extract `tool_input`.
+    3. OpenCode path: inject a per-invocation local MCP server via
+       `OPENCODE_CONFIG_CONTENT`; inspect NDJSON `tool_use` events for
+       `hitl_request_human_input`; terminate the process after the first
+       detected HITL tool event so the model session can be resumed later by
+       the engine.
+    4. Engine normalizes the payload to `{question, header, options[],
+       multiSelect}` and stores it in `state.json` together with `session_id`.
+    5. Engine calls `defaults.hitl.ask_script` (external workflow script) with
+       question JSON + context args.
+    6. Engine enters poll loop: `sleep(poll_interval)` → call
        `defaults.hitl.check_script` → if exit 0, read reply from stdout.
-    6. Engine resumes agent: `claude --resume <session_id> -p "<reply>"
-       --output-format json`. Agent sees full previous context + reply as new
-       user message.
-    7. On `timeout` exceeded: node marked `failed`.
+    7. Engine resumes the same session through the selected runtime
+       (`claude --resume <session_id>` or `opencode run --session <session_id>`).
+    8. On `timeout` exceeded: node marked `failed`.
+  - **Runtime-Normalized Logging**:
+    Agent outputs are persisted as runtime-agnostic JSON logs using the
+    normalized `ClaudeCliOutput` shape. Transcript copying is capability-based:
+    Claude copies external JSONL transcripts from `~/.claude/projects/...`;
+    OpenCode writes only the engine-managed JSON log because the current
+    integration does not expose a copyable external transcript file.
     Workflow config example:
     ```yaml
     defaults:

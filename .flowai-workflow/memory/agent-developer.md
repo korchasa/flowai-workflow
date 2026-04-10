@@ -16,7 +16,7 @@ type: feedback
 - Writing complete files (Write) for simple section inserts when Edit would work
 - Not checking deno fmt compliance before writing — blank lines between headings and list items required
 - Splitting import updates and test additions into separate Edit calls (one Write/Edit per file rule)
-- NOT committing immediately after deno task check passes — background self_runner resets to main
+- NOT committing immediately after deno task check passes — background self-runner resets to main
 - Writing indentation incorrectly in multi-line function call args (matching the wrong reference level)
 - Placing import statements at the bottom of a file (TS requires all imports at top)
 - Leaving extra trailing blank line at end of file — deno fmt expects exactly one trailing newline
@@ -28,7 +28,7 @@ type: feedback
 - ONE Edit for single-location changes; ONE Write for multi-location changes (whole file rewrite)
 - All parallel Reads + git log in first turn = minimal turns
 - Pre-flight git log check prevents wasted work on pre-committed tasks
-- COMMIT IMMEDIATELY after writing code — then run deno task check; self_runner can reset during check
+- COMMIT IMMEDIATELY after writing code — then run deno task check; self-runner can reset during check
 - When a pre-existing fmt failure blocks check (out-of-scope file): `git stash push -- <file>`, run check,
   `git stash pop`. Confirms own code is correct without losing another agent's uncommitted work.
 - For nested multi-arg calls, count indentation level carefully
@@ -42,8 +42,8 @@ type: feedback
 - `deno fmt` checks ALL `.md` files in the repo, not just TypeScript
 - Memory files require blank lines between `##` headings and first list item (deno fmt rule)
 - deno task check output >50KB persisted to temp file — no `<error>` wrapper = PASS; check tail for "All checks passed!"
-- **CRITICAL**: `scripts/self_runner.ts` runs as background process. When `.flowai-workflow/lock.json` is absent,
-  self_runner starts a new workflow run → calls `.flowai-workflow/scripts/reset-to-main.sh` →
+- **CRITICAL**: `scripts/self-runner.ts` runs as background process. When `.flowai-workflow/lock.json` is absent,
+  self-runner starts a new workflow run → calls `.flowai-workflow/scripts/reset-to-main.sh` →
   `git checkout -f main && git reset --hard origin/main && git clean -fd`. DESTROYS all uncommitted changes.
 - TypeScript `.some((e) => ...)` callbacks need explicit `: string` type annotation to avoid TS7006
 - "File has been modified since read" appears due to background resets — always re-read before writing

@@ -1,25 +1,33 @@
+/**
+ * @module
+ * Human-in-the-loop (HITL) detection and poll loop.
+ * Detects AskUserQuestion requests in Claude CLI output, delivers questions
+ * via external ask_script, polls check_script for replies, and resumes the
+ * agent session with the human response.
+ * Entry points: {@link detectHitlRequest}, {@link runHitlLoop}.
+ */
+
 import type {
   ClaudeCliOutput,
   HitlConfig,
+  HumanInputRequest,
   NodeConfig,
   NodeSettings,
+  RuntimeId,
   TemplateContext,
 } from "./types.ts";
 import { interpolate } from "./template.ts";
 import type { AgentResult } from "./agent.ts";
-import type { InvokeOptions } from "./claude-process.ts";
+import { getRuntimeAdapter } from "./runtime/index.ts";
+import type { RuntimeAdapter, RuntimeInvokeOptions } from "./runtime/types.ts";
 import type { OutputManager } from "./output.ts";
 
-/** Structured question extracted from AskUserQuestion permission denial. */
-export interface HitlQuestion {
-  /** The question text to present to the human. */
-  question: string;
-  /** Optional heading displayed above the question. */
-  header?: string;
-  /** Selectable answer choices with labels and optional descriptions. */
-  options?: Array<{ label: string; description?: string }>;
-  /** Whether the user can select multiple options. */
-  multiSelect?: boolean;
+/** Structured question extracted from a runtime-native HITL request. */
+export interface HitlQuestion extends HumanInputRequest {}
+
+/** True when workflow HITL scripts are fully configured and runnable. */
+export function isHitlConfigured(config?: HitlConfig): config is HitlConfig {
+  return Boolean(config?.ask_script && config?.check_script);
 }
 
 /** Script runner function signature (injectable for testing). */
@@ -30,7 +38,7 @@ export type ScriptRunner = (
 
 /** Claude CLI runner function signature (injectable for testing). */
 export type ClaudeRunner = (
-  opts: InvokeOptions,
+  opts: RuntimeInvokeOptions,
 ) => Promise<{ output?: ClaudeCliOutput; error?: string }>;
 
 /** Options for running the HITL poll loop. */
@@ -55,12 +63,16 @@ export interface HitlRunOptions {
   ctx: TemplateContext;
   /** Resolved node settings (timeouts, retries). */
   settings: Required<NodeSettings>;
-  /** Extra CLI flags forwarded to Claude on resume. */
-  claudeArgs?: string[];
+  /** Runtime used for HITL resume. Defaults to claude for backward compatibility. */
+  runtime?: RuntimeId;
+  /** Extra CLI flags forwarded to the selected runtime on resume. */
+  runtimeArgs?: string[];
   /** Permission mode forwarded to Claude on resume. */
   permissionMode?: string;
   /** Claude model override. Forwarded to invokeClaudeCli on resume. */
   model?: string;
+  /** Injected runtime adapter for unit testing. */
+  runtimeAdapter?: RuntimeAdapter;
   /** Output manager for status/progress messages. */
   output?: OutputManager;
   /** Injected script runner — defaults to real shell; override in tests. */
@@ -78,6 +90,9 @@ export interface HitlRunOptions {
 export function detectHitlRequest(
   output: ClaudeCliOutput,
 ): HitlQuestion | null {
+  if (output.hitl_request) {
+    return output.hitl_request;
+  }
   if (!output.permission_denials || output.permission_denials.length === 0) {
     return null;
   }
@@ -137,15 +152,35 @@ export async function runHitlLoop(
     sessionId,
     question,
     settings,
-    claudeArgs,
+    runtime = "claude",
+    runtimeArgs,
     output,
   } = opts;
 
   const cwdOpt = opts.cwd;
   const runner = opts.scriptRunner ??
     ((path: string, args: string[]) => defaultScriptRunner(path, args, cwdOpt));
-  const claudeRun = opts.claudeRunner ??
-    (await import("./claude-process.ts")).invokeClaudeCli;
+  const adapter = opts.runtimeAdapter ?? getRuntimeAdapter(runtime);
+  const runtimeRun = opts.claudeRunner ??
+    ((invokeOpts: RuntimeInvokeOptions) => adapter.invoke(invokeOpts));
+
+  if (!isHitlConfigured(config)) {
+    return {
+      success: false,
+      continuations: 0,
+      error: "defaults.hitl requires non-empty ask_script and check_script",
+      error_category: "unknown",
+    };
+  }
+
+  if (!adapter.capabilities.hitl) {
+    return {
+      success: false,
+      continuations: 0,
+      error: `Runtime '${runtime}' does not support HITL`,
+      error_category: "unknown",
+    };
+  }
 
   // Step 1: Deliver question (unless resuming)
   if (!skipAsk) {
@@ -202,12 +237,13 @@ export async function runHitlLoop(
       // Reply received — resume agent
       const reply = checkResult.stdout.trim();
 
-      const result = await claudeRun({
+      const result = await runtimeRun({
         resumeSessionId: sessionId,
         taskPrompt: reply,
-        claudeArgs,
+        extraArgs: runtimeArgs,
         permissionMode: opts.permissionMode,
         model: opts.model,
+        hitlConfig: config,
         timeoutSeconds: settings.timeout_seconds,
         maxRetries: settings.max_retries,
         retryDelaySeconds: settings.retry_delay_seconds,

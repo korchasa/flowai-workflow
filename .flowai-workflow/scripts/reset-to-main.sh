@@ -4,7 +4,7 @@ set -euo pipefail
 # reset-to-main.sh — Hard reset to latest origin/main before workflow run.
 # Ensures agents always load from main (prompts, workflow config, memory).
 # Destructive by design: discards uncommitted changes, force-switches branch.
-# Called by self_runner.ts and cli.ts BEFORE engine starts.
+# Called by self-runner.ts and cli.ts BEFORE engine starts.
 
 # Auto-stash uncommitted changes to preserve developer work before reset.
 if [ -n "$(git status --porcelain)" ]; then

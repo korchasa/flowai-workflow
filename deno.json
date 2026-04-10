@@ -2,6 +2,7 @@
   "version": "0.1.5",
   "imports": {
     "@std/assert": "./vendor/assert.ts",
+    "@std/path": "jsr:@std/path@1.1.4",
     "@std/yaml": "./vendor/yaml.ts"
   },
   "tasks": {
@@ -9,12 +10,10 @@
     "test": "deno test -A --no-check --ignore=.claude/",
     "test:lib": "deno test -A --no-check .flowai-workflow/scripts/lib_test.ts",
     "run": "deno run -A --no-check engine/cli.ts --config .flowai-workflow/workflow.yaml",
-    "loop": "deno run -A --no-check scripts/self_runner.ts",
+    "loop": "deno run -A --no-check scripts/self-runner.ts",
     "test:engine": "deno test -A --no-check engine/",
     "fmt": "deno fmt",
-    "loop-in-claude": "deno run -A --no-check scripts/loop_in_claude.ts",
-    "dev": "echo 'No dev server for workflow project'",
-    "prod": "echo 'No prod mode for workflow project'",
+    "loop-in-claude": "deno run -A --no-check scripts/loop-in-claude.ts",
     "dashboard": "deno run --allow-read --allow-write scripts/generate-dashboard.ts",
     "compile": "deno run -A scripts/compile.ts",
     "release": "deno run -A npm:standard-version --skip.tag"

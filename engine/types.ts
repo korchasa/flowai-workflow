@@ -1,4 +1,5 @@
 /**
+ * @module
  * Type declarations for the configurable node-based workflow engine.
  * No logic — pure type definitions.
  */
@@ -22,6 +23,15 @@ export const VALID_PERMISSION_MODES: readonly string[] = [
   "dontAsk",
   "plan",
   "auto",
+];
+
+/** Supported agent runtime IDs. */
+export type RuntimeId = "claude" | "opencode";
+
+/** All valid runtime IDs, used for config validation. */
+export const VALID_RUNTIME_IDS: readonly RuntimeId[] = [
+  "claude",
+  "opencode",
 ];
 
 // --- Workflow Configuration (parsed from YAML) ---
@@ -49,6 +59,10 @@ export interface WorkflowDefaults extends NodeSettings {
   worktree_disabled?: boolean;
   /** Maximum parallel node executions; 0 means unlimited (default). */
   max_parallel?: number;
+  /** Runtime used for agent execution when not overridden (default: claude). */
+  runtime?: RuntimeId;
+  /** Generic extra CLI args forwarded to the selected runtime. */
+  runtime_args?: string[];
   /** Extra CLI args forwarded to every claude invocation. */
   claude_args?: string[];
   /** Permission mode for all agent nodes (maps to --permission-mode CLI flag).
@@ -87,6 +101,10 @@ export interface NodeConfig {
   system_prompt?: string;
   /** Claude model override for this node (e.g. "claude-opus-4-6"). */
   model?: string;
+  /** Runtime override for this node. */
+  runtime?: RuntimeId;
+  /** Generic extra CLI args forwarded to this node's selected runtime. */
+  runtime_args?: string[];
   /** Permission mode override for this node (maps to --permission-mode CLI flag). */
   permission_mode?: PermissionMode;
 
@@ -324,8 +342,30 @@ export interface PermissionDenial {
   tool_input: Record<string, unknown>;
 }
 
+/** One selectable answer option in a human-input request. */
+export interface HumanInputOption {
+  /** User-visible option label. */
+  label: string;
+  /** Optional explanatory text shown alongside the label. */
+  description?: string;
+}
+
+/** Runtime-normalized human-input request emitted by Claude or OpenCode. */
+export interface HumanInputRequest {
+  /** Main question text to present to the operator. */
+  question: string;
+  /** Optional heading displayed above the question. */
+  header?: string;
+  /** Optional list of predefined answer choices. */
+  options?: HumanInputOption[];
+  /** Whether multiple options may be selected. */
+  multiSelect?: boolean;
+}
+
 /** JSON output from `claude -p ... --output-format json`. */
 export interface ClaudeCliOutput {
+  /** Runtime that produced this output. Optional for backward-compatible tests. */
+  runtime?: RuntimeId;
   /** Agent's final text response. */
   result: string;
   /** Session ID for continuation and log correlation. */
@@ -342,6 +382,8 @@ export interface ClaudeCliOutput {
   is_error: boolean;
   /** Tools the agent tried to use but was denied permission for. */
   permission_denials?: PermissionDenial[];
+  /** Runtime-normalized human-input request captured from a structured tool call. */
+  hitl_request?: HumanInputRequest;
 }
 
 // --- HITL Configuration ---

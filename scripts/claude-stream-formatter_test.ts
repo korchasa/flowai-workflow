@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { formatStreamEvent, processStream } from "./claude_stream_formatter.ts";
+import { formatStreamEvent, processStream } from "./claude-stream-formatter.ts";
 
 const DIM = "\x1b[2m";
 const RESET = "\x1b[0m";

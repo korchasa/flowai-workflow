@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { checkArgs, printUsage } from "./self_runner.ts";
+import { checkArgs, printUsage } from "./self-runner.ts";
 
 // --- printUsage ---
 
