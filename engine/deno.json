@@ -1,4 +1,5 @@
 {
+  "$comment": "JSR rejects publish.include paths outside this package dir (no ../). See AGENTS.md § Deno Workspace Layout for workspace quirks.",
   "name": "@korchasa/flowai-workflow",
   "version": "0.1.10",
   "license": "MIT",

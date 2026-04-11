@@ -314,12 +314,34 @@ if (import.meta.main) {
     console.log("No test files found, skipping.");
   }
 
-  // Doc lint: missing JSDoc, private-type-ref, circular deps
+  // Doc lint: missing JSDoc, private-type-ref, circular deps.
+  // Caveat: `deno doc --lint` validates ONLY symbols reachable from the
+  // given entry. Public symbols exported via other barrels are not
+  // visited — rely on `deno publish --dry-run` below for full coverage.
   await run(
     "deno",
     ["doc", "--lint", "engine/mod.ts"],
     "Doc Lint (engine)",
   );
+
+  // Engine JSR publish dry-run — catches JSR `no-slow-types`,
+  // `missing-jsdoc`, `private-type-ref`, and `invalid-path` errors that
+  // `deno check` and `deno doc --lint` do NOT surface locally. Must run
+  // with CWD set to the workspace member because `deno publish` from
+  // the workspace root publishes only the first member.
+  console.log("\n--- Publish Dry-Run (engine) ---");
+  console.log("> deno publish --dry-run --allow-dirty (cwd=engine)");
+  const enginePublish = new Deno.Command("deno", {
+    args: ["publish", "--dry-run", "--allow-dirty"],
+    cwd: "engine",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  const { success: enginePublishOk } = await enginePublish.output();
+  if (!enginePublishOk) {
+    console.error("FAILED: Publish Dry-Run (engine)");
+    Deno.exit(1);
+  }
 
   // Delegate library-specific checks (fmt, lint, type-check, tests,
   // doc-lint, publish dry-run) to @korchasa/ai-ide-cli's self-contained

@@ -1,4 +1,5 @@
 {
+  "$comment": "bumpFiles MUST list every workspace-member deno.json — standard-version does not walk Deno workspaces. packageFiles is the canonical version source (engine/deno.json).",
   "types": [
     { "type": "feat", "section": "Features" },
     { "type": "fix", "section": "Bug Fixes" },

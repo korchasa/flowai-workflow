@@ -66,6 +66,42 @@ example of engine usage.
   subagents). Memory in `.flowai-workflow/memory/`
 - **Docker image:** Single image with claude CLI, deno, git, gh
 
+## Deno Workspace Layout
+
+Project is a Deno workspace with two members, each a separately published
+JSR package:
+
+- `engine/` → `@korchasa/flowai-workflow` — DAG executor (main package)
+- `ai-ide-cli/` → `@korchasa/ai-ide-cli` — Claude/OpenCode CLI wrapper library
+  (extracted from engine per FR-E44; engine depends on it one-way)
+
+Workspace gotchas discovered empirically — honor these to avoid CI failures:
+
+- **`deno publish` from workspace root publishes ONLY the first member.**
+  CI and local publish must use explicit per-member `cd <member> && deno
+  publish` steps. Publication order matters: `ai-ide-cli` first, then
+  `engine` (engine's workspace imports auto-pin to ide-cli version at
+  publish time, so ide-cli must already exist on JSR).
+- **`publish.include` cannot reference files outside the package
+  directory.** `../README.md` / `../LICENSE` get rejected with
+  `error[invalid-path]`. Each member ships only its own files.
+- **Root `deno.json` cannot be both a workspace root AND a package.**
+  Keep `name`/`version`/`exports`/`publish` out of root deno.json —
+  move them into member `deno.json` files.
+- **`deno compile` DOES embed workspace members inline** without requiring
+  JSR publication — the resulting binary is self-contained.
+- **`deno task check` runs both packages' checks** — engine's `scripts/
+  check.ts` runs engine publish dry-run, then delegates to
+  `cd ai-ide-cli && deno task check` for library-scoped verification
+  (fmt/lint/type-check/tests/doc-lint/publish-dry).
+- **JSR slow-types rules (`no-slow-types`, `missing-jsdoc`,
+  `private-type-ref`) fire ONLY on `deno publish --dry-run`** — not on
+  `deno check` or `deno lint`. Always run `deno task check` before commit
+  to catch these locally.
+- **`deno doc --lint <entry>` visits only reachable symbols.** Public
+  exports bypassed through other barrels are not validated by a single
+  entry — use `deno publish --dry-run` for full public-API coverage.
+
 ## Scope Separation
 
 Two scopes with strict boundary:
