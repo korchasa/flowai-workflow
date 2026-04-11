@@ -1075,6 +1075,47 @@ The system is considered accepted if:
 6. All agent logs are preserved and accessible.
 7. Re-running the workflow on the same issue cleanly overwrites artifacts.
 
+## 7. Proposals (Non-Binding)
+
+Design ideas captured for discussion; not committed work. Promote to FR-S only after explicit decision and measured evidence that the idea solves a real pain.
+
+### P1-S: PR-Diff Scope Boundary Verifier
+
+- **Description:** Pre-merge verifier that parses a pull request's diff and classifies touched files by project scope (`engine` vs `sdlc` vs cross-cutting). When a PR labelled `scope: engine` touches SDLC-only files (or vice versa), the verifier emits a blocking finding that the Tech Lead Review node must address before merge.
+- **Motivation:** Project has a strict scope separation rule — engine MUST remain domain-agnostic, SDLC workflows use the engine but never reach into it. Runtime per-node enforcement already exists via engine's `allowed_paths` + `scope_check` rule (FR-E37), but that catches violations only during agent execution. A PR-level check would catch cases where a human merges a pre-existing branch that violates scope, or where an agent legitimately produced a mixed-scope change that should have been labelled `engine+sdlc`.
+- **Relation to existing mechanisms:** Overlaps with FR-E37 at runtime level. P1-S adds a complementary pre-merge gate that considers the full diff regardless of which agent produced each hunk.
+- **Open questions:** How to classify new files with ambiguous path prefixes? How to handle root-level config files (deno.json, CLAUDE.md) that are legitimately cross-cutting? Should the verifier run as a `deno task check` step, a CI workflow, or inside the Tech Lead Review agent's turn?
+- **Status:** Deferred. No measured scope-boundary violation has escaped runtime enforcement so far. Revisit when a concrete regression demonstrates the gap.
+- **Source:** R&D walkthrough 2026-04-11, [documents/claude-code-best-practices-for-sdlc.md § Topic 5](claude-code-best-practices-for-sdlc.md).
+
+### P2-S: GO/NO-GO Gate After PM Specification
+
+- **Description:** Optional decision gate between the PM (specification) and Architect (design) stages. After the PM produces `01-spec.md`, an automated or human check decides whether the selected issue is worth proceeding to expensive Architect design. On a NO-GO verdict, the workflow terminates early with a clear reason; on GO, it proceeds normally. Gate outcome is written as a frontmatter field on the spec artifact so the engine's existing `condition_node` mechanism can branch.
+- **Motivation:** Architect runs on the most expensive model (opus). If the PM selects a low-value or non-viable issue, Architect spend is wasted. The current PM stage performs issue health checks (no merged PRs, no `needs-triage` label) which filters some bad candidates, but there is no explicit viability gate separating "found a candidate" from "worth expensive design work".
+- **Inspiration:** The RPI (Research → Plan → Implement) workflow in Claude Code best practices uses an explicit GO/NO-GO gate at the end of its Research phase. That gate rejects non-viable features before planning. SDLC has no equivalent — PM always produces a spec and Architect always runs.
+- **Design options:**
+  1. **Automated gate:** PM writes `verdict: PROCEED | SKIP` in spec frontmatter; engine uses `condition_node` to branch. Keeps workflow fully autonomous (FR-S1 invariant preserved).
+  2. **Human gate:** Engine `human` node between PM and Architect prompts operator for approval. Breaks autonomous operation but maximises safety.
+  3. **Hybrid:** Automated gate normally; escalate to human when PM confidence is low.
+- **Open questions:** What measured symptom would justify implementing this? How often does PM currently produce specs that Architect would have rejected if asked? Is this a single-developer problem at all, or does it only appear at team scale?
+- **Status:** Deferred pending evidence. Need to log cases where Architect (or downstream Tech Lead) regrets the PM's issue selection. Without such evidence, gate adds friction without measurable benefit.
+- **Source:** R&D walkthrough 2026-04-11, [documents/claude-code-best-practices-for-sdlc.md § Topic 12](claude-code-best-practices-for-sdlc.md).
+
+### P3-S: Batch Migration Workflow for Cross-Cutting Changes
+
+- **Description:** A separate SDLC workflow config (e.g. `workflow-batch.yaml`) dedicated to cross-cutting migrations that touch many files with the same change pattern. Instead of one PR per issue (current model), the batch workflow fans out work to N parallel developer agents, each operating on a disjoint file subset in its own isolated worktree. After all parallel workers complete, results merge into a single branch and PR.
+- **Motivation:** Current SDLC is optimised for the "one issue, one PR" model with a linear pipeline. Large migrations (rename an API across 50 files, apply the same security fix to N similar modules, bulk-update docs across all FRs) do not fit this model — they either run sequentially in one agent session (slow, context-bloat) or are done manually outside the workflow.
+- **Pattern origin:** Claude Code's `/batch` command, which interviews the operator, splits the work into atomic units, creates a git worktree per unit, and runs a Claude subagent per worktree in parallel. This is fan-out over identical task pattern applied to disjoint data, not fan-out over different tasks.
+- **Prerequisite:** Engine [P2 (Per-Node Worktree Isolation for Safe Parallel Execution)](requirements-engine.md#p2-per-node-worktree-isolation-for-safe-parallel-execution) must ship first. Without per-node worktree isolation, parallel developers writing to overlapping paths will race. `allowed_paths` enforcement mitigates but does not solve nested-tree merge semantics.
+- **Potential shape (illustrative):**
+  ```
+  specification → split → parallel(dev-worker-1, dev-worker-2, ..., dev-worker-N) → merge → verify → review
+  ```
+  Where `split` is a new agent or engine node type that computes the task partition, and `dev-worker-*` are isomorphic nodes running the same prompt against different file subsets.
+- **Open questions:** How does the split agent produce a safe partition? How are merge conflicts between worker outputs resolved — fail the whole batch, resolve via second agent, or escalate to human? What fraction of real SDLC migrations are large enough to justify the batch overhead? Does the workflow.yaml DSL need new syntax for parametric node instantiation, or can it be expressed with existing primitives?
+- **Status:** Deferred until engine P2 ships and a concrete migration (first FR touching >20 files under a single pattern) demonstrates the need.
+- **Source:** R&D walkthrough 2026-04-11, [documents/claude-code-best-practices-for-sdlc.md § Topic 18](claude-code-best-practices-for-sdlc.md).
+
 ## Appendix A: Workflow Stage Map
 
 | Stage | Role             | Artifact                                | Key Validation                               |

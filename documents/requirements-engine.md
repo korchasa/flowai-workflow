@@ -1086,14 +1086,12 @@ Design ideas captured for discussion; not committed work. Promote to FR-E only a
 - **Open questions:** JSON Schema library choice (Deno-native vs npm bridge), error message UX, interaction with `frontmatter_field` (replace / coexist).
 - **Source:** R&D walkthrough 2026-04-10, [documents/rnd/claude-code-best-practices-for-engine.md § Topic 6](rnd/claude-code-best-practices-for-engine.md).
 
-### P2: Parallel DAG Level Execution with Per-Node Worktree Isolation
+### P2: Per-Node Worktree Isolation for Safe Parallel Execution
 
-- **Description:** Optional parallel execution of sibling nodes within a DAG level, gated by per-node `isolation: node_worktree` field and workflow-level `parallelism: <N>` setting. Extends existing FR-E24 (run-level worktree) with nested per-node worktrees for I/O isolation.
-- **Motivation:** Engine executes DAG levels sequentially (`engine/engine.ts:251` `for (const level of filteredLevels)`). Sibling independent nodes in the same level cannot run in parallel. Theoretical 2-3× wallclock reduction for workflows with parallelizable phases. Current SDLC workflow is mostly linear (PM → Architect → Tech Lead → loop(Dev → QA) → Review), so ROI is **speculative** until a workflow emerges that actually needs this.
+- **Description:** Optional per-node `isolation: node_worktree` field that creates a nested git worktree per node, extending existing FR-E24 (run-level worktree) with finer I/O isolation. Enables safe parallel execution of sibling nodes that write to overlapping file paths.
+- **Motivation:** Sibling independent nodes on the same DAG level already run in parallel via `Promise.allSettled` with `max_parallel` semaphore (`engine/engine.ts:363-366`). However, they share the run-level worktree — any two agents writing to the same file race each other. Current SDLC workflow avoids this because parallel sibling nodes are rare (mostly linear PM → Architect → Tech Lead → loop(Dev → QA) → Review). P2 unlocks safe parallelism for workflows that would benefit (e.g., parallel explore-backend + explore-frontend, or adversarial design-review alongside design).
 - **Sketch:**
   ```yaml
-  defaults:
-    parallelism: 3    # default 1 = sequential (current behavior)
   nodes:
     explore-backend:
       type: agent
@@ -1106,8 +1104,8 @@ Design ideas captured for discussion; not committed work. Promote to FR-E only a
   ```
 - **Breakdown (three phases):**
   1. **Node-level worktree isolation.** `isolation: node_worktree | shared` field; engine creates nested worktree per node, merges on success, preserves on failure. Works for top-level nodes only (not loop body for start).
-  2. **Parallel level execution.** `parallelism: N` in defaults; `Promise.all` with semaphore; only `node_worktree` nodes join parallel group; `shared` nodes remain sequential.
-  3. **Parallel-safe I/O + budget.** Atomic `state.json` updates; concurrent cost aggregation; SIGTERM propagation to all child processes; integration tests for race conditions.
+  2. **Parallel-safe I/O + budget.** Atomic `state.json` updates; concurrent cost aggregation; SIGTERM propagation to all child processes; integration tests for race conditions.
+  3. **Merge semantics.** How the nested worktree's changes flow back into the run-level worktree on success: fast-forward, 3-way merge, or explicit `allowed_paths` disjoint enforcement.
 - **Risks:**
   - Nested git worktree — may or may not be supported. Fallback: temp dir + rsync instead of `git worktree add`.
   - Merge conflicts when parallel nodes write overlapping files. Mitigation: `allowed_paths` enforcement (FR-E37) with fail-fast on overlap detection at config load.
