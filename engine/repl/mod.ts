@@ -143,11 +143,16 @@ export async function loadBundledSkills(): Promise<SkillDef[]> {
 }
 
 /**
- * Resolve the absolute path to the bundled skills directory. Uses
- * `import.meta.url` so it works in local dev, JSR, and compiled binary.
+ * Resolve the absolute path to the bundled skills directory.
+ *
+ * IMPORTANT: Uses `new URL("./skills/", import.meta.url)` — this static
+ * pattern is detected by `deno compile` which embeds the entire directory
+ * (including non-TS files like SKILL.md) into the compiled binary's VFS.
+ * Do NOT refactor this to string-based path construction — the compiler
+ * won't detect it and skills won't be available in the compiled binary.
  */
 function resolveSkillsRoot(): string {
-  return join(dirname(fromFileUrl(import.meta.url)), "skills");
+  return fromFileUrl(new URL("./skills/", import.meta.url));
 }
 
 /** System prompt injected into every REPL session. */

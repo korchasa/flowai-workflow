@@ -76,6 +76,8 @@ async function run(): Promise<void> {
           "compile",
           "--allow-all",
           "--no-check",
+          "--include",
+          "engine/repl/skills/",
           "--target",
           target,
           "--env-file",
