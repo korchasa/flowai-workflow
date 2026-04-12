@@ -227,33 +227,56 @@ async function agentListAccuracy(): Promise<void> {
   console.log("  AGENTS.md agent list valid (6 active agents, no deprecated).");
 }
 
+// Empirical byte-to-token ratio measured on SRS/SDS markdown. Used both
+// for the docs size budget and for the offender's estimated-token count
+// so both numbers move together if the ratio is ever retuned.
+const BYTES_PER_TOKEN = 3.4;
+// Working budget leaves ~1200-token headroom under Read's 10k-token hard
+// limit so files can grow before CI starts failing.
+const DOCS_MAX_TOKENS = 8800;
+const DOCS_MAX_BYTES = Math.round(DOCS_MAX_TOKENS * BYTES_PER_TOKEN);
+
 /**
- * Enforces per-file size budget on `documents/` so every doc fits in the
- * `Read` tool's 10k-token limit in one call. Uses a byte heuristic (~3.4
- * bytes per token, measured empirically on SRS/SDS) with a working budget
- * of 30 KB (~8800 tokens), leaving ~1200-token headroom. Files exceeding
- * the budget must be split by functional area (see AGENTS.md Read
- * Efficiency rules). Whiteboards and rnd/ are excluded — temp/reference.
+ * Pure core for `docsTokenBudget`: returns offender message lines for every
+ * file whose size exceeds `maxBytes`. Extracted so the selection rule and
+ * message format are unit-testable without file I/O. Mirrors the
+ * `validateHitlArtifactSource` / `hitlArtifactSource` pattern used elsewhere
+ * in this file.
  */
-async function docsTokenBudget(): Promise<void> {
-  console.log("\n--- Docs Token Budget ---");
-  const MAX_BYTES = 30000; // ≈ 8800 tokens (≈ 3.4 B/tok)
-  // Prune temp/reference subtrees at walk level — they may contain many
-  // files (one whiteboard per task) and are not subject to the budget.
-  const skipDirs = new Set(["whiteboards", "rnd"]);
+export function validateDocsTokenBudget(
+  files: Array<{ path: string; size: number }>,
+  maxBytes: number,
+): string[] {
   const offenders: string[] = [];
-  for await (const entry of walkDir("documents", skipDirs)) {
-    if (!entry.endsWith(".md")) continue;
-    const info = await Deno.stat(entry);
-    if (info.size > MAX_BYTES) {
-      const estTokens = Math.round(info.size / 3.4);
+  for (const file of files) {
+    if (file.size > maxBytes) {
+      const estTokens = Math.round(file.size / BYTES_PER_TOKEN);
       offenders.push(
-        `  ${entry}: ${info.size} bytes (~${estTokens} tok) > ${MAX_BYTES} bytes budget`,
+        `${file.path}: ${file.size} bytes (~${estTokens} tok) > ${maxBytes} bytes budget`,
       );
     }
   }
+  return offenders;
+}
+
+/**
+ * Enforces per-file size budget on `documents/` so every doc fits in the
+ * `Read` tool's 10k-token limit in one call. Whiteboards and rnd/ are
+ * excluded at walk level — temp/reference, not subject to the budget.
+ * Size comparison and message formatting live in `validateDocsTokenBudget`.
+ */
+async function docsTokenBudget(): Promise<void> {
+  console.log("\n--- Docs Token Budget ---");
+  const skipDirs = new Set(["whiteboards", "rnd"]);
+  const files: Array<{ path: string; size: number }> = [];
+  for await (const entry of walkDir("documents", skipDirs)) {
+    if (!entry.endsWith(".md")) continue;
+    const info = await Deno.stat(entry);
+    files.push({ path: entry, size: info.size });
+  }
+  const offenders = validateDocsTokenBudget(files, DOCS_MAX_BYTES);
   if (offenders.length > 0) {
-    for (const line of offenders) console.error(line);
+    for (const line of offenders) console.error(`  ${line}`);
     console.error(
       "FAILED: Docs token budget — split overlarge files by functional area (see AGENTS.md Read Efficiency).",
     );

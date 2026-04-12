@@ -3,6 +3,7 @@ import {
   checkArgs,
   printUsage,
   validateAgentListContent,
+  validateDocsTokenBudget,
   validateHitlArtifactSource,
 } from "./check.ts";
 
@@ -127,4 +128,61 @@ Deno.test("validateHitlArtifactSource — absent field skips (passes)", () => {
 Deno.test("validateHitlArtifactSource — empty string skips (passes)", () => {
   const errors = validateHitlArtifactSource("");
   assertEquals(errors, []);
+});
+
+// --- validateDocsTokenBudget ---
+
+Deno.test("validateDocsTokenBudget — empty input returns no offenders", () => {
+  assertEquals(validateDocsTokenBudget([], 30000), []);
+});
+
+Deno.test("validateDocsTokenBudget — file under budget passes", () => {
+  const offenders = validateDocsTokenBudget(
+    [{ path: "documents/small.md", size: 1234 }],
+    30000,
+  );
+  assertEquals(offenders, []);
+});
+
+Deno.test("validateDocsTokenBudget — file exactly at budget passes (strict >)", () => {
+  const offenders = validateDocsTokenBudget(
+    [{ path: "documents/boundary.md", size: 30000 }],
+    30000,
+  );
+  assertEquals(offenders, []);
+});
+
+Deno.test("validateDocsTokenBudget — file over budget reports one offender", () => {
+  const offenders = validateDocsTokenBudget(
+    [{ path: "documents/big.md", size: 40000 }],
+    30000,
+  );
+  assertEquals(offenders.length, 1);
+  assertEquals(offenders[0].includes("documents/big.md"), true);
+  assertEquals(offenders[0].includes("40000 bytes"), true);
+  assertEquals(offenders[0].includes("30000 bytes budget"), true);
+});
+
+Deno.test("validateDocsTokenBudget — offender message includes estimated token count", () => {
+  // 34000 bytes / 3.4 B/tok = 10000 tok
+  const offenders = validateDocsTokenBudget(
+    [{ path: "documents/a.md", size: 34000 }],
+    30000,
+  );
+  assertEquals(offenders[0].includes("~10000 tok"), true);
+});
+
+Deno.test("validateDocsTokenBudget — mixed list returns only over-budget entries", () => {
+  const offenders = validateDocsTokenBudget(
+    [
+      { path: "documents/a.md", size: 1000 },
+      { path: "documents/b.md", size: 50000 },
+      { path: "documents/c.md", size: 29999 },
+      { path: "documents/d.md", size: 30001 },
+    ],
+    30000,
+  );
+  assertEquals(offenders.length, 2);
+  assertEquals(offenders[0].includes("documents/b.md"), true);
+  assertEquals(offenders[1].includes("documents/d.md"), true);
 });
