@@ -165,13 +165,12 @@ Options:
 
 Workflow behavior is defined in a YAML config file. Key settings under `defaults:`:
 
-- `runtime` — agent runtime: `claude` (default) or `opencode`
-- `runtime_args` — generic extra CLI args forwarded to the selected runtime
+- `runtime` — agent runtime: `claude` (default), `opencode`, or `cursor`
+- `runtime_args` — extra CLI args forwarded to the selected runtime
 - `max_continuations` — max agent re-invocations on validation failure (default: 3)
 - `max_parallel` — concurrent node execution limit (default: 2)
 - `timeout_seconds` — per-node timeout (default: 1800)
-- `claude_args` — legacy extra args for Claude runtime only
-- `permission_mode` — Claude-only permission mode override
+- `permission_mode` — permission mode override (Claude: full support; opencode/cursor: only `bypassPermissions`)
 - `hitl` — Human-in-the-Loop config: `ask_script`, `check_script`, `poll_interval`, `timeout` (used by Claude directly and by OpenCode via injected local MCP)
 
 Node-level overrides are supported for all defaults.

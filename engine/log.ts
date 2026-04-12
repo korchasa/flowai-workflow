@@ -33,7 +33,9 @@ export async function saveAgentLog(
   let projectsDir = claudeProjectsDir;
 
   if (
-    runtimeOrProjectsDir === "claude" || runtimeOrProjectsDir === "opencode"
+    runtimeOrProjectsDir === "claude" ||
+    runtimeOrProjectsDir === "opencode" ||
+    runtimeOrProjectsDir === "cursor"
   ) {
     runtimeId = runtimeOrProjectsDir;
   } else if (typeof runtimeOrProjectsDir === "string") {

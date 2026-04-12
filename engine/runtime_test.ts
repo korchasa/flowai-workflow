@@ -82,28 +82,6 @@ nodes:
   );
 });
 
-Deno.test("parseConfig — defaults.runtime opencode rejects defaults.claude_args", () => {
-  const yaml = `
-name: test
-version: "1"
-defaults:
-  runtime: opencode
-  claude_args:
-    - --dangerously-skip-permissions
-nodes:
-  spec:
-    type: agent
-    label: Spec
-    prompt: "write spec"
-`;
-
-  assertThrows(
-    () => parseConfig(yaml),
-    Error,
-    "defaults.claude_args is only supported for runtime 'claude'",
-  );
-});
-
 Deno.test("parseConfig — defaults.hitl is allowed for opencode runtime nodes", () => {
   const yaml = `
 name: test
@@ -125,11 +103,10 @@ nodes:
   parseConfig(yaml);
 });
 
-Deno.test("resolveRuntimeConfig — top-level claude runtime gets legacy and generic args", () => {
+Deno.test("resolveRuntimeConfig — top-level claude runtime merges runtime_args", () => {
   const defaults: WorkflowDefaults = {
     runtime: "claude",
-    claude_args: ["--allowedTools", "Bash"],
-    runtime_args: ["--verbose"],
+    runtime_args: ["--allowedTools", "Bash", "--verbose"],
     model: "claude-sonnet-4-6",
     permission_mode: "bypassPermissions",
   };

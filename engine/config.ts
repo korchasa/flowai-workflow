@@ -35,7 +35,6 @@ export const DEFAULT_WORKFLOW_DEFAULTS: Required<
   max_parallel: 0,
   runtime: "claude",
   runtime_args: [],
-  claude_args: [],
   model: "",
   hitl: {
     ask_script: "",
@@ -178,19 +177,6 @@ function validateSchema(config: Record<string, unknown>): void {
             VALID_PERMISSION_MODES.join(", ")
           }`,
         );
-      }
-      // Conflict detection: permission_mode vs permission-related claude_args
-      if (Array.isArray(defaults.claude_args)) {
-        const args = defaults.claude_args as string[];
-        if (
-          args.includes("--dangerously-skip-permissions") ||
-          args.includes("--permission-mode")
-        ) {
-          throw new Error(
-            "Conflict: defaults.permission_mode and permission-related flags in defaults.claude_args cannot coexist. " +
-              "Remove --dangerously-skip-permissions or --permission-mode from claude_args.",
-          );
-        }
       }
     }
   }
@@ -682,20 +668,14 @@ function mergeDefaults(
 function validateRuntimeCompatibility(config: WorkflowConfig): void {
   const defaults = config.defaults;
 
-  if (
-    defaults?.runtime === "opencode" &&
-    (defaults.claude_args?.length ?? 0) > 0
-  ) {
-    throw new Error(
-      "defaults.claude_args is only supported for runtime 'claude'",
-    );
-  }
-
   const checkNode = (nodeId: string, node: NodeConfig, parent?: NodeConfig) => {
     if (node.type !== "agent") return;
 
     const runtimeConfig = resolveRuntimeConfig({ defaults, node, parent });
-    if (runtimeConfig.runtime !== "opencode") return;
+    if (
+      runtimeConfig.runtime !== "opencode" &&
+      runtimeConfig.runtime !== "cursor"
+    ) return;
 
     if (
       runtimeConfig.permissionMode &&
@@ -705,7 +685,7 @@ function validateRuntimeCompatibility(config: WorkflowConfig): void {
         ? `nodes.${nodeId}.permission_mode`
         : "defaults.permission_mode";
       throw new Error(
-        `${source} '${runtimeConfig.permissionMode}' is not supported for runtime 'opencode' — only 'bypassPermissions' is supported (node '${nodeId}')`,
+        `${source} '${runtimeConfig.permissionMode}' is not supported for runtime '${runtimeConfig.runtime}' — only 'bypassPermissions' is supported (node '${nodeId}')`,
       );
     }
   };
@@ -808,7 +788,6 @@ function extractNodeSettings(defaults: WorkflowDefaults): NodeSettings {
     max_parallel: _,
     runtime: _rt,
     runtime_args: _ra,
-    claude_args: _ca,
     hitl: _hitl,
     model: _model,
     permission_mode: _pm,

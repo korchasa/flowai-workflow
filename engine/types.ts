@@ -64,8 +64,6 @@ export interface WorkflowDefaults extends NodeSettings {
   runtime?: RuntimeId;
   /** Generic extra CLI args forwarded to the selected runtime. */
   runtime_args?: string[];
-  /** Extra CLI args forwarded to every claude invocation. */
-  claude_args?: string[];
   /** Permission mode for all agent nodes (maps to --permission-mode CLI flag).
    * Overridable per-node via NodeConfig.permission_mode. */
   permission_mode?: PermissionMode;
