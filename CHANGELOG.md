@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.15](https://github.com/korchasa/flowai-workflow/compare/v0.1.14...v0.1.15) (2026-04-12)
+
+
+### Features
+
+* **ai-ide-cli:** add cursor runtime support, remove legacy claude_args ([290a95d](https://github.com/korchasa/flowai-workflow/commit/290a95dba49596d982c7fe927083934e5f55e2cf))
+
+
+### Bug Fixes
+
+* **engine/cli:** add init subcommand to --help output ([706e45c](https://github.com/korchasa/flowai-workflow/commit/706e45c41364750a5d073d4e1e38d6e34108fb2d))
+
+
+### Documentation
+
+* **ai-ide-cli:** add SRS/SDS and register as third project scope ([5737968](https://github.com/korchasa/flowai-workflow/commit/57379687789659a47347445a63f43650a9d0bb67))
+
 ### [0.1.14](https://github.com/korchasa/flowai-workflow/compare/v0.1.13...v0.1.14) (2026-04-12)
 
 
