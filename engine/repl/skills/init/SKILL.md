@@ -34,12 +34,11 @@ Read manifest files to detect:
   `pyproject.toml` → `[project] name`. Fallback: current directory name.
 - **DEFAULT_BRANCH** — run `git symbolic-ref refs/remotes/origin/HEAD`,
   extract branch name after `refs/remotes/origin/`. Fallback: `main`.
-- **TEST_CMD** — from `deno.json` → `tasks.test`, `package.json` →
-  `scripts.test`, or by presence of `Cargo.toml` (`cargo test`),
-  `go.mod` (`go test ./...`), `pyproject.toml` (`pytest`).
-- **LINT_CMD** — from `deno.json` → `tasks.check`, `package.json` →
-  `scripts.lint`, or by presence of `Cargo.toml` (`cargo clippy`),
-  `go.mod` (`go vet ./...`).
+- **CHECK_CMD** — single command that runs all project checks (format, lint,
+  tests). Detect from: `deno.json` → `tasks.check`, `package.json` →
+  `scripts.check` or `scripts.test`, or by stack: `cargo test` (Rust),
+  `go test ./...` (Go), `pytest` (Python). If no check task but separate
+  lint and test tasks exist, combine them: e.g. `npm run lint && npm test`.
 
 ### 3. Confirm with user
 
@@ -50,8 +49,7 @@ I detected the following project settings:
 
   PROJECT_NAME:    <detected>
   DEFAULT_BRANCH:  <detected>
-  TEST_CMD:        <detected or empty>
-  LINT_CMD:        <detected or empty>
+  CHECK_CMD:       <detected or empty>
 
 Are these correct? If not, tell me what to change.
 ```
@@ -60,14 +58,15 @@ Wait for user response. Apply any corrections.
 
 ### 4. Run init
 
-Write a temporary YAML answers file and run init:
+Write a temporary YAML answers file. The template uses two separate
+placeholders (`TEST_CMD`, `LINT_CMD`) — pass the single CHECK_CMD as both:
 
 ```bash
 cat > /tmp/flowai-init-answers.yaml << 'EOF'
 PROJECT_NAME: "<value>"
 DEFAULT_BRANCH: "<value>"
-TEST_CMD: "<value>"
-LINT_CMD: "<value>"
+TEST_CMD: "<CHECK_CMD value>"
+LINT_CMD: "<CHECK_CMD value>"
 EOF
 
 flowai-workflow init --answers /tmp/flowai-init-answers.yaml
