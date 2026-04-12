@@ -3,7 +3,7 @@
  * @module
  * CLI entry point for the workflow engine.
  * Parses arguments and delegates to {@link Engine}.
- * Usage: deno task run [options]
+ * Usage: flowai-workflow [options]
  *
  * Options:
  *   --config <path>       Workflow config file (default: .flowai-workflow/workflow.yaml)
@@ -166,7 +166,7 @@ function printUsage(): void {
 Workflow Engine — Configurable multi-agent workflow runner
 
 Usage:
-  deno task run [options]
+  flowai-workflow [options]
 
 Options:
   --config <path>       Workflow config file (default: .flowai-workflow/workflow.yaml)
@@ -184,12 +184,12 @@ Options:
   -h, --help            Show this help
 
 Examples:
-  deno task run
-  deno task run --prompt "Focus on the login bug"
-  deno task run --config custom.yaml -v
-  deno task run --resume 20260308T143022
-  deno task run --dry-run
-  deno task run --skip meta-agent --env DEBUG=true
+  flowai-workflow
+  flowai-workflow --prompt "Focus on the login bug"
+  flowai-workflow --config custom.yaml -v
+  flowai-workflow --resume 20260308T143022
+  flowai-workflow --dry-run
+  flowai-workflow --skip meta-agent --env DEBUG=true
 `);
 }
 
