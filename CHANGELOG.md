@@ -2,6 +2,86 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.1](https://github.com/korchasa/flowai-workflow/compare/v0.2.0...v0.2.1) (2026-04-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* existing .env files must rename TELEGRAM_BOT_TOKEN →
+FLOWAI_TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID → FLOWAI_TELEGRAM_CHAT_ID.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+* refactor!: extract ai-ide-cli to standalone repository
+
+The @korchasa/ai-ide-cli library now lives in its own repository at
+github.com/korchasa/ai-ide-cli. Engine depends on it one-way via JSR
+(jsr:@korchasa/ai-ide-cli@^0.2.0, pinned in engine/deno.json). For
+local development the root workspace deno.json uses the `links` field
+to resolve the JSR specifier from a sibling checkout
+(`../ai-ide-cli`), so contributor experience stays the same as with
+the former workspace layout.
+
+Rationale: the library already had a one-way dependency from engine
+and was published separately on JSR. Splitting the repositories
+removes release-cadence coupling (engine and library can bump
+independently), isolates issue trackers and CI, and lets each package
+follow its own evolution timeline.
+
+Scope of this commit:
+- Remove `ai-ide-cli/` from the workspace (`deno.json`: workspace
+  drops the member, `links` added pointing at `../ai-ide-cli`).
+- `engine/deno.json`: add JSR import pin for `@korchasa/ai-ide-cli`.
+- Delete the `ai-ide-cli/` subtree (history preserved in the sibling
+  repo via `git filter-repo --subdirectory-filter`).
+- `.github/workflows/ci.yml`: drop the ai-ide-cli publish and
+  publish-dry-run steps (moved to the sibling repo's CI).
+- `.versionrc.json`: drop `ai-ide-cli/deno.json` from bumpFiles —
+  `engine/deno.json` is the sole canonical version source now.
+- `scripts/check.ts`: remove the delegated library check block.
+- Docs updated to reflect the split: AGENTS.md, documents/AGENTS.md,
+  FR-E44 description/acceptance, design-engine module-core refs,
+  design-sdlc init delegation note.
+
+Verification: `deno task check` green, `deno task test` 3004 passed,
+0 failed. Library-side `deno task check` green in sibling repo.
+
+Breaking: consumers that depended on the monorepo's `ai-ide-cli/`
+paths must switch to the JSR spec (already recommended). No code
+rename on either side.
+
+* fix(ci): remove `links` from checked-in deno.json
+
+Keep `@korchasa/ai-ide-cli` resolved via JSR in CI and publish
+dry-run — a committed `links` override would (a) require a sibling
+checkout in every CI job and (b) mask version drift because local
+source differs from the JSR-pinned version.
+
+Documented the manual dev-time override in AGENTS.md: clone both
+repos side by side and add `"links": ["../ai-ide-cli"]` to the
+workspace root as a local, uncommitted change when iterating across
+the two packages.
+
+Also drop the stale `.flowai-workflow/worktrees/` side effect from
+the prior run — already gitignored, the harness was picking up
+stale copies with pre-extraction import maps.
+
+* fix(ci): regenerate deno.lock without stale npm:yaml
+
+The previous lock carried an orphaned `npm:yaml@2` entry (marked
+`bin: true`) from a removed dependency. CI's fresh-cache run tried to
+resolve its binary export and failed with
+"Failed resolving binary export '.../yaml/2.8.2/package.json' did not
+exist" before any user code ran. Local runs worked because the cache
+was warm.
+
+Lock regenerated from the current source imports; npm section is now
+empty.
+
+### Code Refactoring
+
+* extract ai-ide-cli to standalone repository ([#207](https://github.com/korchasa/flowai-workflow/issues/207)) ([8e563a5](https://github.com/korchasa/flowai-workflow/commit/8e563a5a86466ff3ab9b727c9d6535f8f986ccb7))
+
 ## [0.2.0](https://github.com/korchasa/flowai-workflow/compare/v0.1.18...v0.2.0) (2026-04-18)
 
 
