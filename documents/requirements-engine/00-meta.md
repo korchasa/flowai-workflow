@@ -7,7 +7,7 @@
 
 ## 0. Resolved Design Decisions
 
-- **Cost limits:** Not tracked. No budget constraints.
+- **Cost limits:** Workflow-wide `--budget <USD>` CLI cap; per-node `budget.max_usd` / `budget.max_turns` in YAML config. Engine aborts run or fails node on cap exceeded. See FR-E47.
 - **Rollback:** Manual operation (no automated rollback).
 - **Retry logic:** 3 attempts with exponential backoff for external API calls (`claude`, `gh`) in `lib.sh`.
 - **Target project:** Engine is domain-agnostic; no project-specific logic. Workflow configs define domain workflows.
@@ -49,7 +49,7 @@
 
 ## 5. Interfaces
 
-- **CLI entry:** `deno task run [--prompt "..."]`. Flags: `--resume <run-id>`, `--dry-run`, `-v` (verbose), `-q` (quiet), `-s` (semi-verbose), `--config <path>`, `--skip <node>`, `--only <node>`, `--env <K=V>`.
+- **CLI entry:** `deno task run [--prompt "..."]`. Flags: `--resume <run-id>`, `--dry-run`, `-v` (verbose), `-q` (quiet), `-s` (semi-verbose), `--config <path>`, `--skip <node>`, `--only <node>`, `--env <K=V>`, `--budget <USD>` (workflow cost cap; see FR-E47).
 - **Agent runtime:** runtime selected by config. Supported: `claude`
   (default), `opencode`, `cursor`. CLI invocation contracts per runtime
   documented in the sibling `korchasa/ai-ide-cli` repo

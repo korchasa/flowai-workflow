@@ -251,3 +251,48 @@
     Evidence: `repl/mod_test.ts`.
 
 
+
+### 3.47 FR-E47: Run Budget Enforcement
+
+- **Description:** Engine enforces cost caps at two levels: (1) workflow-wide
+  `--budget <USD>` CLI argument aborts the run when `total_cost_usd` exceeds
+  the cap after any node completes; (2) per-node `budget.max_usd` in YAML
+  config fails the node when its individual cost exceeds the per-node cap;
+  (3) per-node `budget.max_turns` passes `--max-turns <N>` to the CLI
+  runtime. Resolution cascade: node → enclosing loop → workflow `defaults`.
+  Loop nodes additionally perform a pre-check before each iteration: if the
+  running-average iteration cost exceeds remaining budget, the loop exits
+  cleanly with reason `budget_preempt`. Engine already tracks per-node
+  `cost_usd` and `total_cost_usd` in `state.json` (FR-E17).
+- **Motivation:** Cost is tracked (FR-E17) but never enforced — SRS §0
+  previously stated "No budget constraints." Runaway workflows on
+  misconfigured or unbounded loops can incur unbounded API cost. Users need a
+  safety cap without modifying workflow logic.
+- **Acceptance criteria:**
+  - [ ] `--budget <USD>` CLI argument parsed in `cli.ts`; stored in
+    `EngineOptions.budget_usd?: number`. Shown in `--help` output.
+  - [ ] Engine checks `total_cost_usd > budget_usd` after each node
+    completion; aborts workflow with clear error:
+    `Budget exceeded: $X.XX >= $Y.YY`.
+  - [ ] Loop body (`loop.ts`) checks workflow budget after each iteration
+    node completes.
+  - [ ] `budget.max_usd?: number` field on `NodeConfig` (and on `defaults`
+    level); validated as positive number. Engine fails the node (not the
+    workflow) when per-node cost exceeds cap.
+  - [ ] `budget.max_turns?: number` field on `NodeConfig` (and on `defaults`
+    level); validated as positive integer; emits `--max-turns <N>` in CLI
+    args on both initial and resume invocations.
+  - [ ] Resolution cascade: node → loop → `defaults` for both `budget.max_usd`
+    and `budget.max_turns`; workflow-wide `--budget` and per-node cap checked
+    independently — either can trigger.
+  - [ ] Loop pre-check: before each iteration spawn, if
+    `avg_iter_cost > remaining_budget`, loop exits cleanly with reason
+    `budget_preempt` in iteration log. No pre-check on first iteration
+    (insufficient data).
+  - [ ] Budget is optional; runs without `--budget` or `budget` YAML fields
+    behave identically to current behavior (no-op).
+  - [ ] Unit tests: no budget (no-op), not exceeded, exceeded mid-run,
+    exceeded in loop body, per-node limit hit, cascade, loop pre-check with
+    `budget_preempt`.
+  - [ ] `deno task check` passes.
+
