@@ -1,18 +1,23 @@
 {
   "version": "5",
   "specifiers": {
-    "jsr:@std/assert@*": "1.0.19",
+    "jsr:@korchasa/ai-ide-cli@0.2": "0.2.0",
     "jsr:@std/assert@^1.0.19": "1.0.19",
     "jsr:@std/fs@1": "1.0.23",
     "jsr:@std/internal@^1.0.12": "1.0.12",
-    "jsr:@std/path@*": "1.1.4",
     "jsr:@std/path@^1.1.4": "1.1.4",
     "jsr:@std/semver@1": "1.0.8",
-    "jsr:@std/yaml@*": "1.0.12",
-    "jsr:@std/yaml@^1.0.12": "1.0.12",
-    "npm:yaml@2": "2.8.2"
+    "jsr:@std/yaml@^1.0.12": "1.0.12"
   },
   "jsr": {
+    "@korchasa/ai-ide-cli@0.2.0": {
+      "integrity": "752260acdb90492bc237a2e83ef25358ee2a746b1e966e02ce61a729e943ffd4",
+      "dependencies": [
+        "jsr:@std/fs",
+        "jsr:@std/path",
+        "jsr:@std/yaml"
+      ]
+    },
     "@std/assert@1.0.19": {
       "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
       "dependencies": [
@@ -23,7 +28,7 @@
       "integrity": "3ecbae4ce4fee03b180fa710caff36bb5adb66631c46a6460aaad49515565a37",
       "dependencies": [
         "jsr:@std/internal",
-        "jsr:@std/path@^1.1.4"
+        "jsr:@std/path"
       ]
     },
     "@std/internal@1.0.12": {
@@ -42,12 +47,6 @@
       "integrity": "7deabca4545bcedd07c5f69ea53acea71b8b4c67562f224e17b90d75944cb20c"
     }
   },
-  "npm": {
-    "yaml@2.8.2": {
-      "integrity": "sha512-mplynKqc1C2hTVYxd0PU2xQAc22TI1vShAYGksCCfxbn/dFwnHTNi1bvYsBTkhdUNtGIf5xNOg938rrSSYvS9A==",
-      "bin": true
-    }
-  },
   "workspace": {
     "dependencies": [
       "jsr:@std/assert@^1.0.19",
@@ -61,16 +60,6 @@
       "engine": {
         "dependencies": [
           "jsr:@korchasa/ai-ide-cli@0.2"
-        ]
-      }
-    },
-    "links": {
-      "jsr:@korchasa/ai-ide-cli@0.2.0": {
-        "dependencies": [
-          "jsr:@std/assert@^1.0.19",
-          "jsr:@std/fs@1",
-          "jsr:@std/path@^1.1.4",
-          "jsr:@std/yaml@^1.0.12"
         ]
       }
     }
