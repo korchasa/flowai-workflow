@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.2.0](https://github.com/korchasa/flowai-workflow/compare/v0.1.18...v0.2.0) (2026-04-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* remove local flowai
+
+### Features
+
+* remove local flowai ([b5fe70a](https://github.com/korchasa/flowai-workflow/commit/b5fe70a3d9af47eee51407ce8be12d938a07d2b1))
+
 ### [0.1.18](https://github.com/korchasa/flowai-workflow/compare/v0.1.17...v0.1.18) (2026-04-18)
 
 
