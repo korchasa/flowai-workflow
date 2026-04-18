@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.18](https://github.com/korchasa/flowai-workflow/compare/v0.1.17...v0.1.18) (2026-04-18)
+
+
+### Features
+
+* **sdlc:** migrate HITL transport from GitHub Issues to Telegram Bot API ([c547599](https://github.com/korchasa/flowai-workflow/commit/c5475995fdb90b72506e32536556bdd4574fc9e1))
+
 ### [0.1.17](https://github.com/korchasa/flowai-workflow/compare/v0.1.16...v0.1.17) (2026-04-17)
 
 
