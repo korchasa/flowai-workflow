@@ -1414,3 +1414,218 @@ nodes:
     "invalid permission_mode 'wrongValue'",
   );
 });
+
+// --- FR-E47: Budget validation + cascade ---
+
+Deno.test("parseConfig — node budget with valid max_usd accepted", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    prompt: do it
+    budget:
+      max_usd: 0.5
+`;
+  const config = parseConfig(yaml);
+  assertEquals(config.nodes.spec.budget?.max_usd, 0.5);
+});
+
+Deno.test("parseConfig — node budget with valid max_turns accepted", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    prompt: do it
+    budget:
+      max_turns: 10
+`;
+  const config = parseConfig(yaml);
+  assertEquals(config.nodes.spec.budget?.max_turns, 10);
+});
+
+Deno.test("parseConfig — defaults.budget accepted", () => {
+  const yaml = `
+name: test
+version: "1"
+defaults:
+  budget:
+    max_usd: 2.5
+    max_turns: 50
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    prompt: do it
+`;
+  const config = parseConfig(yaml);
+  assertEquals(config.defaults?.budget?.max_usd, 2.5);
+  assertEquals(config.defaults?.budget?.max_turns, 50);
+});
+
+Deno.test("parseConfig — budget.max_usd zero rejects", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    prompt: do it
+    budget:
+      max_usd: 0
+`;
+  assertThrows(
+    () => parseConfig(yaml),
+    Error,
+    "budget.max_usd must be a positive number",
+  );
+});
+
+Deno.test("parseConfig — budget.max_usd negative rejects", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    prompt: do it
+    budget:
+      max_usd: -1
+`;
+  assertThrows(
+    () => parseConfig(yaml),
+    Error,
+    "budget.max_usd must be a positive number",
+  );
+});
+
+Deno.test("parseConfig — budget.max_turns non-integer rejects", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    prompt: do it
+    budget:
+      max_turns: 2.5
+`;
+  assertThrows(
+    () => parseConfig(yaml),
+    Error,
+    "budget.max_turns must be a positive integer",
+  );
+});
+
+Deno.test("parseConfig — budget.max_turns zero rejects", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    prompt: do it
+    budget:
+      max_turns: 0
+`;
+  assertThrows(
+    () => parseConfig(yaml),
+    Error,
+    "budget.max_turns must be a positive integer",
+  );
+});
+
+Deno.test("parseConfig — unknown budget key rejects", () => {
+  const yaml = `
+name: test
+version: "1"
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    prompt: do it
+    budget:
+      max_typos: 1
+`;
+  assertThrows(
+    () => parseConfig(yaml),
+    Error,
+    "budget has unknown key 'max_typos'",
+  );
+});
+
+Deno.test("parseConfig — defaults.budget invalid rejects with 'defaults' context", () => {
+  const yaml = `
+name: test
+version: "1"
+defaults:
+  budget:
+    max_usd: -5
+nodes:
+  spec:
+    type: agent
+    label: Spec
+    prompt: do it
+`;
+  assertThrows(
+    () => parseConfig(yaml),
+    Error,
+    "defaults.budget.max_usd must be a positive number",
+  );
+});
+
+Deno.test("resolveBudget — node wins over loop parent and defaults", async () => {
+  const { resolveBudget } = await import("./config.ts");
+  const node = {
+    type: "agent",
+    label: "n",
+    prompt: "p",
+    budget: { max_usd: 1 },
+  } as const;
+  const loopParent = {
+    type: "loop",
+    label: "l",
+    budget: { max_usd: 2 },
+  } as const;
+  const defaults = { budget: { max_usd: 3 } };
+  const resolved = resolveBudget(node, defaults, loopParent);
+  assertEquals(resolved?.max_usd, 1);
+});
+
+Deno.test("resolveBudget — loop parent wins over defaults when node has none", async () => {
+  const { resolveBudget } = await import("./config.ts");
+  const node = { type: "agent", label: "n", prompt: "p" } as const;
+  const loopParent = {
+    type: "loop",
+    label: "l",
+    budget: { max_usd: 2 },
+  } as const;
+  const defaults = { budget: { max_usd: 3 } };
+  const resolved = resolveBudget(node, defaults, loopParent);
+  assertEquals(resolved?.max_usd, 2);
+});
+
+Deno.test("resolveBudget — defaults used when neither node nor loop has budget", async () => {
+  const { resolveBudget } = await import("./config.ts");
+  const node = { type: "agent", label: "n", prompt: "p" } as const;
+  const defaults = { budget: { max_usd: 3, max_turns: 25 } };
+  const resolved = resolveBudget(node, defaults);
+  assertEquals(resolved?.max_usd, 3);
+  assertEquals(resolved?.max_turns, 25);
+});
+
+Deno.test("resolveBudget — undefined when no budget at any level", async () => {
+  const { resolveBudget } = await import("./config.ts");
+  const node = { type: "agent", label: "n", prompt: "p" } as const;
+  const resolved = resolveBudget(node, undefined);
+  assertEquals(resolved, undefined);
+});

@@ -107,6 +107,24 @@ export interface AgentRunOptions {
   verbosity?: Verbosity;
   /** Working directory for subprocesses (worktree path or "."). */
   cwd?: string;
+  /** Resolved `budget.max_turns` (FR-E47). Claude-only: emits `--max-turns <N>`
+   * to extraArgs; other runtimes silently omit to avoid unknown-flag rejection. */
+  maxTurns?: number;
+}
+
+/**
+ * Append runtime-specific budget flags to `extraArgs`. Currently only Claude
+ * gets `--max-turns <N>` (FR-E47). Other runtimes may reject unknown flags —
+ * emit a warning and omit instead of relying on silent-ignore tolerance.
+ */
+export function applyBudgetFlags(
+  base: string[] | undefined,
+  runtime: RuntimeId,
+  maxTurns: number | undefined,
+): string[] | undefined {
+  if (maxTurns === undefined) return base;
+  if (runtime !== "claude") return base;
+  return [...(base ?? []), "--max-turns", String(maxTurns)];
 }
 
 /**
@@ -148,8 +166,10 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
     streamLogPath,
     verbosity,
     cwd,
+    maxTurns,
   } = opts;
   const adapter = runtimeAdapter ?? getRuntimeAdapter(runtime);
+  const extraArgs = applyBudgetFlags(runtimeArgs, runtime, maxTurns);
 
   // Derive onOutput callback from OutputManager
   const onOutput = output && nodeId
@@ -183,7 +203,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
       ? interpolate(node.system_prompt, ctx, cwd)
       : undefined,
     taskPrompt,
-    extraArgs: runtimeArgs,
+    extraArgs,
     permissionMode,
     model,
     hitlConfig,
@@ -290,7 +310,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentResult> {
     result = await adapter.invoke({
       resumeSessionId: result.output.session_id,
       taskPrompt: resumePrompt,
-      extraArgs: runtimeArgs,
+      extraArgs,
       permissionMode,
       model,
       hitlConfig,

@@ -54,6 +54,19 @@ export interface WorkflowConfig {
   phases?: Record<string, string[]>;
 }
 
+/**
+ * Per-node budget limits (FR-E47).
+ * `max_usd` caps the node's own `cost_usd` (for loop body nodes: per-iteration).
+ * `max_turns` is forwarded to the Claude CLI as `--max-turns <N>` — other
+ * runtimes omit the flag and emit a one-time warning at workflow start.
+ */
+export interface NodeBudget {
+  /** Maximum allowed `cost_usd` for this node; exceeding it fails the node. */
+  max_usd?: number;
+  /** Claude-only. Maps to `--max-turns <N>` CLI flag. */
+  max_turns?: number;
+}
+
 /** Global defaults applied to all nodes unless overridden. */
 export interface WorkflowDefaults extends NodeSettings {
   /** When true, skip worktree creation and run in CWD (default false). */
@@ -77,6 +90,8 @@ export interface WorkflowDefaults extends NodeSettings {
    * Supports template interpolation (run_dir, run_id, env.*, args.*).
    * Skipped on resume. Non-zero exit aborts the workflow (FR-E30). */
   prepare_command?: string;
+  /** Workflow-level default budget cascade source (FR-E47). */
+  budget?: NodeBudget;
 }
 
 /** Configuration for a single workflow node. */
@@ -165,6 +180,9 @@ export interface NodeConfig {
    * and injects a scope_check validation failure if out-of-scope modifications
    * are detected. Pre-existing uncommitted changes are excluded (FR-E37). */
   allowed_paths?: string[];
+
+  /** Per-node budget limits (FR-E47). Cascades: node → enclosing loop → defaults. */
+  budget?: NodeBudget;
 }
 
 /** Per-node settings (merged with defaults). */
@@ -326,4 +344,6 @@ export interface EngineOptions {
   only_nodes?: string[];
   /** Override lock file path (default: .flowai-workflow/runs/.lock). Used in tests. */
   lock_path?: string;
+  /** Workflow-wide USD cost cap (FR-E47). Strict: exact-equal does not trigger. */
+  budget_usd?: number;
 }

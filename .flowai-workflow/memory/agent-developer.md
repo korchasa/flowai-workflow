@@ -108,7 +108,7 @@ type: feedback
 
 - `VERSION` constant uses `Deno.env.get("VERSION") ?? "dev"` — embedded at compile time via `deno compile --env-file <tmpfile>` where tmpfile contains `VERSION=<tag>`.
 - `getVersionString()` exported for testability; `--version`/`-V` case in parseArgs calls it + `Deno.exit(0)` (same as `--help`).
-- `scripts/compile.ts` writes a temp env file, iterates targets, runs `deno compile --allow-all --target <t> --env-file <f> --output <name> engine/cli.ts`, removes temp file in `finally` block.
+- `scripts/compile.ts` writes a temp env file, iterates targets, runs `deno compile --allow-all --target <t> --env-file <f> --output <name> cli.ts`, removes temp file in `finally` block. (Entry was `engine/cli.ts` pre-#208; now at repo root.)
 - Release workflow: `ubuntu-latest` for all 4 targets (cross-compilation handled by deno compile's built-in cross-target support); `actions/upload-artifact` per job; final job uses `actions/download-artifact` with `merge-multiple: true` then `gh release create`.
 - No test needed for `--version` flag itself (calls Deno.exit; same untested pattern as `--help`). Test VERSION type + getVersionString format instead.
 

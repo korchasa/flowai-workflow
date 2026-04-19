@@ -17,6 +17,7 @@ import type {
   TemplateContext,
 } from "./types.ts";
 import { interpolate } from "./template.ts";
+import { applyBudgetFlags } from "./agent.ts";
 import type { AgentResult } from "./agent.ts";
 import { getRuntimeAdapter } from "@korchasa/ai-ide-cli/runtime";
 import type {
@@ -85,6 +86,8 @@ export interface HitlRunOptions {
   claudeRunner?: ClaudeRunner;
   /** Working directory for subprocesses (worktree path or undefined for CWD). */
   cwd?: string;
+  /** Resolved `budget.max_turns` (FR-E47) forwarded to the runtime on resume. */
+  maxTurns?: number;
 }
 
 /**
@@ -159,6 +162,7 @@ export async function runHitlLoop(
     runtime = "claude",
     runtimeArgs,
     output,
+    maxTurns,
   } = opts;
 
   const cwdOpt = opts.cwd;
@@ -244,7 +248,7 @@ export async function runHitlLoop(
       const result = await runtimeRun({
         resumeSessionId: sessionId,
         taskPrompt: reply,
-        extraArgs: runtimeArgs,
+        extraArgs: applyBudgetFlags(runtimeArgs, runtime, maxTurns),
         permissionMode: opts.permissionMode,
         model: opts.model,
         hitlConfig: config,

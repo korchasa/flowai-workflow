@@ -153,3 +153,45 @@ Deno.test("extractCliFlags — output passes through parseArgs cleanly", () => {
   assertEquals(opts.args.prompt, "Ship it");
   assertEquals(opts.verbosity, "quiet");
 });
+
+Deno.test("parseArgs — --budget sets budget_usd as float", () => {
+  const opts = parseArgs(["--budget", "12.5"]);
+  assertEquals(opts.budget_usd, 12.5);
+});
+
+Deno.test("parseArgs — --budget integer accepted", () => {
+  const opts = parseArgs(["--budget", "50"]);
+  assertEquals(opts.budget_usd, 50);
+});
+
+Deno.test("parseArgs — missing --budget leaves budget_usd undefined", () => {
+  const opts = parseArgs([]);
+  assertEquals(opts.budget_usd, undefined);
+});
+
+Deno.test("parseArgs — --budget 0 rejects", () => {
+  try {
+    parseArgs(["--budget", "0"]);
+    throw new Error("should have thrown");
+  } catch (e) {
+    assertEquals((e as Error).message.includes("Invalid --budget"), true);
+  }
+});
+
+Deno.test("parseArgs — --budget negative rejects", () => {
+  try {
+    parseArgs(["--budget", "-1"]);
+    throw new Error("should have thrown");
+  } catch (e) {
+    assertEquals((e as Error).message.includes("Invalid --budget"), true);
+  }
+});
+
+Deno.test("parseArgs — --budget non-numeric rejects", () => {
+  try {
+    parseArgs(["--budget", "abc"]);
+    throw new Error("should have thrown");
+  } catch (e) {
+    assertEquals((e as Error).message.includes("Invalid --budget"), true);
+  }
+});

@@ -19,7 +19,9 @@ import {
   extractWorktreeDisabled,
   findNodeConfig,
   loadConfig,
+  resolveBudget,
 } from "./config.ts";
+import { resolveRuntimeConfig } from "@korchasa/ai-ide-cli/runtime";
 import { buildLevels } from "./dag.ts";
 import { terminalInput } from "./human.ts";
 import type { UserInput } from "./human.ts";
@@ -209,6 +211,11 @@ export class Engine {
     await this.ensureRunDirs(levels);
     await saveState(this.state, this.workDir);
 
+    // FR-E47: pre-execution budget check (applies to fresh and resumed runs)
+    this.checkWorkflowBudget("resume");
+    // FR-E47: one-time warnings before the level loop
+    this.warnBudgetCaveats();
+
     // Run prepare_command before level loop (skip on resume)
     const prepareCmd = this.config.defaults?.prepare_command ?? "";
     const cwd = this.workDir !== "." ? this.workDir : undefined;
@@ -356,6 +363,8 @@ export class Engine {
             return false;
           }
         }
+        // FR-E47: check after each chunk to short-circuit mid-level
+        this.checkWorkflowBudget("runtime");
       }
       return true;
     }
@@ -370,6 +379,8 @@ export class Engine {
         return false;
       }
     }
+    // FR-E47: workflow-wide budget check after each level completes
+    this.checkWorkflowBudget("runtime");
     return true;
   }
 
@@ -442,6 +453,28 @@ export class Engine {
               .slice(0, 400)
             : undefined,
         );
+
+        // FR-E47: per-node budget check. Demote to failed if cost cap exceeded.
+        // Only applies to top-level nodes; loop body nodes are checked inside runLoop.
+        const resolvedBudget = resolveBudget(node, this.config.defaults);
+        const nodeCost = this.state.nodes[nodeId].cost_usd ?? 0;
+        if (
+          resolvedBudget?.max_usd !== undefined &&
+          nodeCost > resolvedBudget.max_usd
+        ) {
+          const msg = `Node budget exceeded: $${nodeCost.toFixed(4)} > $${
+            resolvedBudget.max_usd.toFixed(4)
+          }`;
+          markNodeFailed(this.state, nodeId, msg, "aborted");
+          this.output.nodeFailed(nodeId, msg);
+          if (lastAgentResult?.output) {
+            this.output.nodeResult(nodeId, lastAgentResult.output);
+          }
+          const onError = node.settings?.on_error ?? "fail";
+          await saveState(this.state, this.workDir);
+          return onError === "continue";
+        }
+
         const duration = this.state.nodes[nodeId].duration_ms ?? 0;
         this.output.nodeCompleted(nodeId, duration);
         if (lastAgentResult?.output) {
@@ -533,6 +566,73 @@ export class Engine {
             { recursive: true },
           );
         }
+      }
+    }
+  }
+
+  /**
+   * FR-E47 workflow-wide budget enforcement.
+   * Throws when `state.total_cost_usd` strictly exceeds `options.budget_usd`.
+   * No-op when `budget_usd` is unset.
+   * @param phase — "resume" produces a resume-specific error message; "runtime"
+   * uses the generic runtime-abort message.
+   */
+  private checkWorkflowBudget(phase: "resume" | "runtime"): void {
+    const cap = this.options.budget_usd;
+    if (cap === undefined) return;
+    const total = this.state.total_cost_usd ?? 0;
+    if (total > cap) {
+      const prefix = phase === "resume"
+        ? "Budget exceeded on resume: "
+        : "Budget exceeded: ";
+      throw new Error(`${prefix}$${total.toFixed(4)} > $${cap.toFixed(4)}`);
+    }
+  }
+
+  /**
+   * FR-E47 pre-run warnings. Emits at most two one-line warnings:
+   * (1) `budget.max_turns` set on a node whose resolved runtime is not Claude
+   *     — the flag is Claude CLI-only and other runtimes may reject it.
+   * (2) `--budget` set while the default runtime does not report `cost_usd`
+   *     — the workflow-wide cap will no-op because `total_cost_usd` stays 0.
+   */
+  private warnBudgetCaveats(): void {
+    const defaults = this.config.defaults;
+
+    // (1) max_turns on non-Claude runtime
+    const nonClaudeWithMaxTurns = new Set<string>();
+    const walk = (
+      nodes: Record<string, NodeConfig>,
+      parent?: NodeConfig,
+    ): void => {
+      for (const [id, node] of Object.entries(nodes)) {
+        const resolvedBudget = resolveBudget(node, defaults, parent);
+        if (resolvedBudget?.max_turns !== undefined) {
+          const rc = resolveRuntimeConfig({ defaults, node, parent });
+          if (rc.runtime !== "claude") {
+            nonClaudeWithMaxTurns.add(`${id}:${rc.runtime}`);
+          }
+        }
+        if (node.type === "loop" && node.nodes) {
+          walk(node.nodes, node);
+        }
+      }
+    };
+    walk(this.config.nodes);
+    for (const entry of nonClaudeWithMaxTurns) {
+      const [nodeId, runtime] = entry.split(":");
+      this.output.warn(
+        `budget.max_turns ignored: runtime=${runtime} (node '${nodeId}')`,
+      );
+    }
+
+    // (2) --budget with non-cost-reporting runtime (heuristic: non-claude default)
+    if (this.options.budget_usd !== undefined) {
+      const runtime = defaults?.runtime ?? "claude";
+      if (runtime !== "claude") {
+        this.output.warn(
+          `--budget set but default runtime '${runtime}' may not report cost_usd — budget checks may no-op`,
+        );
       }
     }
   }

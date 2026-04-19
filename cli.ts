@@ -80,6 +80,7 @@ export function parseArgs(args: string[]): EngineOptions {
   const envOverrides: Record<string, string> = {};
   let skipNodes: string[] | undefined;
   let onlyNodes: string[] | undefined;
+  let budgetUsd: number | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -125,6 +126,17 @@ export function parseArgs(args: string[]): EngineOptions {
       case "--only":
         onlyNodes = args[++i].split(",").map((s) => s.trim());
         break;
+      case "--budget": {
+        const raw = args[++i];
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed) || parsed <= 0) {
+          throw new Error(
+            `Invalid --budget value: ${raw}. Expected positive number of USD.`,
+          );
+        }
+        budgetUsd = parsed;
+        break;
+      }
       case "--version":
       case "-V":
         handleVersion();
@@ -155,6 +167,7 @@ export function parseArgs(args: string[]): EngineOptions {
     env_overrides: envOverrides,
     skip_nodes: skipNodes,
     only_nodes: onlyNodes,
+    budget_usd: budgetUsd,
   };
 }
 
@@ -187,6 +200,7 @@ Run options:
   --env <KEY=VAL>       Set environment variable (repeatable)
   --skip <node-ids>     Comma-separated node IDs to skip
   --only <node-ids>     Comma-separated node IDs to run exclusively
+  --budget <USD>        Workflow-wide cost cap (positive USD; strict >)
   --skip-update-check   Do not check JSR for a newer version on startup
 
 Global options:

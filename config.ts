@@ -11,6 +11,7 @@ import { resolveRuntimeConfig } from "@korchasa/ai-ide-cli/runtime";
 import { validateTemplateVars } from "./template.ts";
 import { VALID_PERMISSION_MODES, VALID_RUNTIME_IDS } from "./types.ts";
 import type {
+  NodeBudget,
   NodeConfig,
   NodeSettings,
   WorkflowConfig,
@@ -26,9 +27,9 @@ export const DEFAULT_SETTINGS: Required<NodeSettings> = {
   retry_delay_seconds: 5,
 };
 
-/** Default workflow-level settings (permission_mode intentionally excluded — undefined means "not set"). */
+/** Default workflow-level settings (permission_mode and budget intentionally excluded — undefined means "not set"). */
 export const DEFAULT_WORKFLOW_DEFAULTS: Required<
-  Omit<WorkflowDefaults, "permission_mode">
+  Omit<WorkflowDefaults, "permission_mode" | "budget">
 > = {
   ...DEFAULT_SETTINGS,
   worktree_disabled: false,
@@ -178,6 +179,9 @@ function validateSchema(config: Record<string, unknown>): void {
           }`,
         );
       }
+    }
+    if (defaults.budget !== undefined) {
+      validateBudget("defaults", defaults.budget);
     }
   }
 
@@ -447,6 +451,11 @@ function validateNode(
   if (node.allowed_paths !== undefined) {
     validateAllowedPaths(id, node.allowed_paths);
   }
+
+  // Validate budget if present (FR-E47)
+  if (node.budget !== undefined) {
+    validateBudget(`Node '${id}'`, node.budget);
+  }
 }
 
 function validateSettings(
@@ -557,6 +566,56 @@ function validateAllowedPaths(
       );
     }
   }
+}
+
+/**
+ * Validate a budget object (node-level or defaults-level, FR-E47).
+ * `max_usd` must be a positive finite number; `max_turns` must be a positive
+ * integer. Extra keys are rejected to catch typos early.
+ */
+function validateBudget(context: string, budget: unknown): void {
+  if (!budget || typeof budget !== "object" || Array.isArray(budget)) {
+    throw new Error(`${context}.budget must be an object`);
+  }
+  const b = budget as Record<string, unknown>;
+  const validKeys = ["max_usd", "max_turns"];
+  for (const key of Object.keys(b)) {
+    if (!validKeys.includes(key)) {
+      throw new Error(`${context}.budget has unknown key '${key}'`);
+    }
+  }
+  if (b.max_usd !== undefined) {
+    if (
+      typeof b.max_usd !== "number" || !Number.isFinite(b.max_usd) ||
+      b.max_usd <= 0
+    ) {
+      throw new Error(`${context}.budget.max_usd must be a positive number`);
+    }
+  }
+  if (b.max_turns !== undefined) {
+    if (
+      typeof b.max_turns !== "number" || !Number.isInteger(b.max_turns) ||
+      b.max_turns <= 0
+    ) {
+      throw new Error(
+        `${context}.budget.max_turns must be a positive integer`,
+      );
+    }
+  }
+}
+
+/**
+ * Resolve effective budget for a node via cascade: node → enclosing loop
+ * parent → workflow defaults. First-defined wins at the object level (shallow
+ * cascade, same spirit as the `model` field resolution). Returns undefined
+ * when no budget is set at any level.
+ */
+export function resolveBudget(
+  node: NodeConfig,
+  defaults: WorkflowDefaults | undefined,
+  loopParent?: NodeConfig,
+): NodeBudget | undefined {
+  return node.budget ?? loopParent?.budget ?? defaults?.budget;
 }
 
 function validateRuntimeArgs(

@@ -8,7 +8,20 @@
     `buildLoopBodyOrder()` reads from inline `nodes` sub-object (replaces
     `body` array), topo-sorts body nodes by their `inputs` declarations.
     `buildContext()` resolves `inputs` against both sibling body nodes and
-    top-level nodes. Accepts `streamLogPath` pattern from engine; computes
+    top-level nodes.
+    **Budget enforcement (FR-E47):** After each body node `markNodeCompleted()`:
+    (a) per-node check using `resolveBudget(bodyNode, defaults, loopNode)` —
+    if `iterCost > resolvedBudget.max_usd` the body node is demoted to failed
+    (per-iteration semantics) and the loop returns failure;
+    (b) workflow-wide check `state.total_cost_usd > opts.budgetUsd` → throws
+    — propagates to `executeNode`'s catch, which marks the loop node failed
+    and aborts the workflow. Pre-iteration preempt lives in exported
+    `shouldPreemptLoop(budgetUsd, totalRunCost, totalLoopCost, completedIter)`
+    helper — called for iteration > 1. When avg iter cost > remaining budget,
+    loop exits cleanly (`success=true`) with `exit_reason: "budget_preempt"`;
+    a `BUDGET_PREEMPT` status line is emitted via `OutputManager`. First
+    iteration always runs (skipped check, no cost data). `budgetUsd` is
+    threaded in via `LoopRunOptions.budgetUsd` by `executeLoopNode`. Accepts `streamLogPath` pattern from engine; computes
     iteration-qualified path `${nodeId}-iter-${i}.jsonl` per body node
     invocation; forwards to inner `runAgent()` calls.
     **Runtime condition_field presence check (FR-E36):**
@@ -77,6 +90,26 @@
     node result summary display (FR-E15/E22),
     phase registry init via `setPhaseRegistry(config)` at engine startup,
     pre-post-workflow `on_failure_script` execution.
+    **Budget enforcement (FR-E47):**
+    Per-node check inside `executeNode()` after `markNodeCompleted()`: when
+    `resolvedBudget.max_usd && state.nodes[id].cost_usd > max_usd` — demotes
+    the node via `markNodeFailed(..., "aborted")`, emits `nodeFailed`, honours
+    `on_error` (so `continue` still suppresses the failure).
+    Workflow-wide check in `executeLevel()` (after each level and after each
+    chunk when `max_parallel > 0`) via `checkWorkflowBudget("runtime")` —
+    throws `Error("Budget exceeded: $X.XX > $Y.YY")` when total strictly
+    exceeds `options.budget_usd`. Throw propagates to the `runWithLock` outer
+    try/catch which flips `workflowSuccess=false`.
+    Resume entry check: `runWithLock` calls `checkWorkflowBudget("resume")`
+    before the level loop — aborts immediately when a loaded
+    `state.total_cost_usd` already exceeds the cap.
+    `warnBudgetCaveats()` runs once at workflow start (after phase registry
+    init): (1) for every node with resolved `budget.max_turns` whose runtime
+    is not `claude` emits `budget.max_turns ignored: runtime=<id> (node
+    '<nodeId>')`; (2) when `--budget` is set and the default runtime is
+    non-Claude emits a one-line warning about possible silent no-op.
+    `budget_usd` flows from `EngineOptions` to `runLoop` via
+    `LoopRunOptions.budgetUsd`.
     Two-phase config loading (FR-E24): `run()` reads raw YAML →
     `extractPreRun()` → `runPreRunScript()` if present → `loadConfig()`
     re-reads (potentially updated) config.
@@ -101,7 +134,9 @@
     bare `--` flags → backward-compat shim (deprecated, delegates to `run`),
     default (no args) → dynamic import `repl/mod.ts` → `launchRepl()`.
     `runEngine()` extracted as named function shared by `run` and compat shim.
-    `parseArgs()` unchanged (synchronous).
+    `parseArgs()`: parses `--budget <USD>` flag (FR-E47). Converts to float,
+    validates positive. Maps to `EngineOptions.budget_usd`. Added to `--help`
+    output.
     `VERSION` constant: `Deno.env.get("VERSION") ?? "dev"`.
   - `repl/mod.ts` — interactive REPL module (FR-E46):
     `resolveRuntime()` — flag → persisted config
@@ -146,7 +181,8 @@
 - **Interfaces:**
   - CLI: `flowai-workflow` (REPL), `flowai-workflow run [--prompt <text>]
     [--config <path>] [--resume <run-id>] [--dry-run] [-v|-s|-q]
-    [--env KEY=VAL] [--skip nodes] [--only nodes]`, `--version|-V`, `--help`
+    [--env KEY=VAL] [--skip nodes] [--only nodes] [--budget <USD>]`,
+    `--version|-V`, `--help`
   - Config: `.flowai-workflow/workflow.yaml` (YAML, version "1")
   - State: `.flowai-workflow/runs/<run-id>/state.json` (JSON)
 - **Node types:** `agent`, `merge`, `loop` (with inline `nodes` sub-object

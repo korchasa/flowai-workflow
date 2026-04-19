@@ -42,7 +42,11 @@ All `gh issue comment` body strings MUST start with `**[Developer · implement]*
    - Grep-first for multi-file checks: ONE Grep with glob instead of reading
      each file individually.
    - **Data format discovery:** Read the **source code** that produces data
-     (e.g., `engine/log.ts`) — NOT old run data.
+     (e.g., `log.ts` at repo root) — NOT old run data.
+   - **Repo layout (post-#208 flatten):** Engine sources live at the repo
+     root (`types.ts`, `cli.ts`, `engine.ts`, `config.ts`, `loop.ts`,
+     `agent.ts`, …), NOT under `engine/`. Plan/decision artifacts predating
+     the flatten may show `engine/X.ts` — treat as `X.ts`.
 4. **Write code and tests:** Follow TDD (tests first), project code style.
 5. **Commit and push:** After all checks pass, ONE chained Bash call.
    **SCOPE-STRICT STAGING:** Do NOT use `git add -A` or `git add .`.

@@ -6,6 +6,7 @@
  */
 import type { AgentResult } from "./agent.ts";
 import { resolveInputArtifacts, runAgent } from "./agent.ts";
+import { resolveBudget } from "./config.ts";
 import { handleAgentHitl } from "./hitl-handler.ts";
 import { detectHitlRequest, isHitlConfigured } from "./hitl.ts";
 import { runHuman } from "./human.ts";
@@ -89,6 +90,7 @@ export async function executeAgentNode(
       model: runtimeConfig.model,
       output: eng.output,
       cwd,
+      maxTurns: resolveBudget(node, eng.config.defaults)?.max_turns,
     });
   }
 
@@ -113,6 +115,7 @@ export async function executeAgentNode(
     streamLogPath,
     verbosity: eng.options.verbosity,
     cwd,
+    maxTurns: resolveBudget(node, eng.config.defaults)?.max_turns,
   });
 
   if (!result.success) {
@@ -155,6 +158,7 @@ export async function executeAgentNode(
         model: runtimeConfig.model,
         output: eng.output,
         cwd,
+        maxTurns: resolveBudget(node, eng.config.defaults)?.max_turns,
       });
     }
   }
@@ -209,6 +213,7 @@ export async function executeLoopNode(
     loopNodeId: nodeId,
     config: eng.config,
     state: eng.state,
+    budgetUsd: eng.options.budget_usd,
     buildCtx: (bodyNodeId, iteration) =>
       eng.buildContext(bodyNodeId, iteration),
     onNodeStart: (id, iteration) =>

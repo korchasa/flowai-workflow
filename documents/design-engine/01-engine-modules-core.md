@@ -27,9 +27,14 @@
     `RunState.total_cost_usd` (FR-E17 aggregated run cost),
     `WorkflowDefaults.on_failure_script` (FR-E19 configurable failure hook),
     `WorkflowDefaults.prepare_command` (FR-E30 post-config/pre-node shell hook),
+    `WorkflowDefaults.budget` (FR-E47: `{ max_usd?: number; max_turns?: number }`,
+    default budget applied to all nodes when no per-node budget specified),
     `HitlConfig.artifact_source` (renamed from `issue_source`),
     `HitlConfig.exclude_login` (renamed from `bot_login`),
-    `Verbosity` union: `"quiet"|"normal"|"semi-verbose"|"verbose"` (FR-E21))
+    `Verbosity` union: `"quiet"|"normal"|"semi-verbose"|"verbose"` (FR-E21),
+    `NodeConfig.budget` (FR-E47: `{ max_usd?: number; max_turns?: number }`,
+    optional per-node budget limits),
+    `EngineOptions.budget_usd` (FR-E47: workflow-wide USD cap from `--budget`))
   - `template.ts` — `{{var}}` interpolation for prompts/paths.
     `resolve()` handles `file("path")` pattern within `{{...}}` matches
     (FR-E32): detects `/^file\("(.+)"\)$/`, reads file via
@@ -65,6 +70,16 @@
     `validateAllowedPaths()` (FR-E37): when `allowed_paths` present on node,
     validates array of non-empty strings. Invalid → config error at parse time.
     Called from `validateNode()`.
+    `validateBudget()` (FR-E47): validates `budget.max_usd` (positive number)
+    and `budget.max_turns` (positive integer) when present on node or defaults.
+    Rejects unknown keys. Called from `validateNode()` and (for
+    `defaults.budget`) from the defaults-level validation pass. Invalid →
+    config error at parse time.
+    `resolveBudget(node, defaults, loopParent?)` (FR-E47): exported helper —
+    shallow cascade `node.budget ?? loopParent.budget ?? defaults.budget`.
+    Runtime-resolved (same spirit as `resolveRuntimeConfig` for the `model`
+    field); NOT merged into `NodeConfig` at config time. Returns `undefined`
+    when no budget is set at any level.
     `validateValidationRule()` (FR-E33, FR-E38): `"artifact"` added to
     `validTypes`. When `type === "artifact"`: at least one of `sections` or
     `fields` required (both optional individually). `sections` validated as
@@ -146,6 +161,14 @@
     `runAgent()` resolves the adapter once and keeps continuation semantics
     unchanged across runtimes. `runAgent()` wires `hitlMcpCommandBuilder`
     from `engine/hitl-mcp-command.ts` for OpenCode HITL.
+    **Budget max_turns emission (FR-E47):** In `runAgent()`, if resolved
+    `budget.max_turns` is present AND the active runtime identifier is
+    `claude`, appends `--max-turns <N>` to `extraArgs`. Same pattern as
+    `--model` emission. For non-Claude runtimes (`opencode`, `cursor`) the
+    flag is omitted — these CLIs are not guaranteed to ignore unknown flags
+    and may reject invocation. A one-line warning
+    `budget.max_turns ignored: runtime=<id>` is emitted once at workflow
+    start when the field is set on a non-Claude runtime.
     **Permission mode (FR-E40):** `PermissionMode` type in
     `@korchasa/ai-ide-cli/types`. Optional field on `WorkflowDefaults` and
     `NodeConfig`. Resolution cascade: node → defaults → omit. Config

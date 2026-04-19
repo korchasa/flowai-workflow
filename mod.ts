@@ -10,6 +10,7 @@ export type {
   HitlConfig,
   HumanInputOption,
   HumanInputRequest,
+  NodeBudget,
   NodeConfig,
   NodeSettings,
   NodeState,
@@ -72,7 +73,7 @@ export type {
 export { markNodeWaiting } from "./state.ts";
 export { saveAgentLog } from "./log.ts";
 export { extractFrontmatterField, runLoop } from "./loop.ts";
-export type { LoopResult, LoopRunOptions } from "./loop.ts";
+export type { LoopExitReason, LoopResult, LoopRunOptions } from "./loop.ts";
 export { runHuman } from "./human.ts";
 export type { HumanResult, UserInput } from "./human.ts";
 export { OutputManager } from "./output.ts";

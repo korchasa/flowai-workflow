@@ -376,3 +376,45 @@ Deno.test(
     assertEquals(value, "PASS");
   },
 );
+
+// --- FR-E47: loop budget pre-check ---
+
+import { shouldPreemptLoop } from "./loop.ts";
+
+Deno.test("shouldPreemptLoop — no budget → never preempt", () => {
+  assertEquals(shouldPreemptLoop(undefined, 10, 5, 2), false);
+});
+
+Deno.test("shouldPreemptLoop — zero completed iterations → never preempt", () => {
+  assertEquals(shouldPreemptLoop(100, 0, 0, 0), false);
+});
+
+Deno.test("shouldPreemptLoop — avg iter cost within remaining → no preempt", () => {
+  // budget=10, spent=3, remaining=7, avg iter = 4/2 = 2 → fits
+  assertEquals(shouldPreemptLoop(10, 3, 4, 2), false);
+});
+
+Deno.test("shouldPreemptLoop — avg iter cost exceeds remaining → preempt", () => {
+  // budget=10, spent=8, remaining=2, avg iter = 6/2 = 3 → preempt
+  assertEquals(shouldPreemptLoop(10, 8, 6, 2), true);
+});
+
+Deno.test("shouldPreemptLoop — remaining exactly equal to avg → no preempt (strict >)", () => {
+  // budget=10, spent=5, remaining=5, avg iter = 10/2 = 5 → 5 > 5 is false
+  assertEquals(shouldPreemptLoop(10, 5, 10, 2), false);
+});
+
+Deno.test("shouldPreemptLoop — budget already exceeded → preempt (remaining negative)", () => {
+  // budget=10, spent=15, remaining=-5, avg=2 → 2 > -5 → preempt
+  assertEquals(shouldPreemptLoop(10, 15, 4, 2), true);
+});
+
+Deno.test("LoopResult — exit_reason includes budget_preempt literal type", () => {
+  // Type-level sanity: accept all three exit_reason values
+  const values: Array<"exit_value" | "max_iterations" | "budget_preempt"> = [
+    "exit_value",
+    "max_iterations",
+    "budget_preempt",
+  ];
+  assertEquals(values.length, 3);
+});

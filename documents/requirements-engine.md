@@ -76,3 +76,4 @@ FR-IDs are stable — never renumber them on move.
 - FR-E44 (IDE CLI Wrapper Split)     → 06-distribution-and-housekeeping
 - FR-E45 (Subcommand Routing)        → 05-cli-and-observability
 - FR-E46 (Interactive REPL)           → 05-cli-and-observability
+- FR-E47 (Run Budget Enforcement)    → 05-cli-and-observability

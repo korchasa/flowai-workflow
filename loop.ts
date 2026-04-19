@@ -23,6 +23,13 @@ import type { AgentResult } from "./agent.ts";
 import { markNodeCompleted, markNodeFailed, markNodeStarted } from "./state.ts";
 import type { OutputManager } from "./output.ts";
 import { resolveRuntimeConfig } from "@korchasa/ai-ide-cli/runtime";
+import { resolveBudget } from "./config.ts";
+
+/** Reason a loop exited. Undefined on failure. */
+export type LoopExitReason =
+  | "exit_value"
+  | "max_iterations"
+  | "budget_preempt";
 
 /** Result of a loop execution. */
 export interface LoopResult {
@@ -38,6 +45,8 @@ export interface LoopResult {
   lastConditionValue?: string;
   /** Per-iteration AgentResult entries for log extraction by the engine. */
   bodyResults: AgentResult[];
+  /** Why the loop exited; set on clean exits (FR-E47 adds `budget_preempt`). */
+  exit_reason?: LoopExitReason;
 }
 
 /** Options for running a loop node. */
@@ -68,6 +77,29 @@ export interface LoopRunOptions {
   saveState?: () => Promise<void>;
   /** Working directory for subprocesses (worktree path or undefined for CWD). */
   cwd?: string;
+  /** Workflow-wide USD cap (FR-E47). When set, enforced after each body node
+   * and consulted for the pre-iteration preempt heuristic. */
+  budgetUsd?: number;
+}
+
+/**
+ * FR-E47 pre-iteration budget preempt heuristic.
+ * Returns true when the running-average iteration cost exceeds the remaining
+ * budget — signalling the loop to exit cleanly with `budget_preempt`.
+ * Advisory: uses the mean of completed iterations, so variance can produce
+ * false positives (preempting a loop whose next iteration would have fit) or
+ * false negatives. Must NOT be called with `completedIterations === 0`.
+ */
+export function shouldPreemptLoop(
+  budgetUsd: number | undefined,
+  totalRunCost: number,
+  totalLoopCost: number,
+  completedIterations: number,
+): boolean {
+  if (budgetUsd === undefined || completedIterations === 0) return false;
+  const remaining = budgetUsd - totalRunCost;
+  const avgIterCost = totalLoopCost / completedIterations;
+  return avgIterCost > remaining;
 }
 
 /**
@@ -92,9 +124,38 @@ export async function runLoop(opts: LoopRunOptions): Promise<LoopResult> {
 
   let lastConditionValue: string | undefined;
   const bodyResults: AgentResult[] = [];
+  let totalLoopCost = 0;
+  let completedIterations = 0;
 
   for (let iteration = 1; iteration <= maxIterations; iteration++) {
+    // FR-E47 pre-check: skip on iteration 1 (no cost data).
+    if (
+      iteration > 1 && shouldPreemptLoop(
+        opts.budgetUsd,
+        state.total_cost_usd ?? 0,
+        totalLoopCost,
+        completedIterations,
+      )
+    ) {
+      opts.output?.status(
+        loopNodeId,
+        `BUDGET_PREEMPT iter=${iteration} avg=$${
+          (totalLoopCost / completedIterations).toFixed(4)
+        } remaining=$${
+          (opts.budgetUsd! - (state.total_cost_usd ?? 0)).toFixed(4)
+        }`,
+      );
+      return {
+        success: true,
+        iterations: completedIterations,
+        lastConditionValue,
+        bodyResults,
+        exit_reason: "budget_preempt",
+      };
+    }
+
     opts.onIteration?.(iteration, maxIterations);
+    let iterCost = 0;
 
     // Run each body node in order (from inline nodes sub-object)
     for (const bodyNodeId of bodyOrder) {
@@ -112,6 +173,12 @@ export async function runLoop(opts: LoopRunOptions): Promise<LoopResult> {
 
       const streamLogPath = `${ctx.node_dir}/stream.log`;
 
+      const resolvedBudget = resolveBudget(
+        bodyNode,
+        config.defaults,
+        loopNode,
+      );
+
       const result = await runAgent({
         node: bodyNode,
         ctx,
@@ -126,12 +193,41 @@ export async function runLoop(opts: LoopRunOptions): Promise<LoopResult> {
         streamLogPath,
         verbosity: opts.verbosity,
         cwd: opts.cwd,
+        maxTurns: resolvedBudget?.max_turns,
       });
 
       bodyResults.push(result);
 
       if (result.success) {
         markNodeCompleted(state, bodyNodeId, result.output?.total_cost_usd);
+
+        // FR-E47 per-node check: body node cost is per-iteration
+        const iterNodeCost = state.nodes[bodyNodeId].cost_usd ?? 0;
+        iterCost += iterNodeCost;
+        if (
+          resolvedBudget?.max_usd !== undefined &&
+          iterNodeCost > resolvedBudget.max_usd
+        ) {
+          const msg = `Node budget exceeded (iter ${iteration}): $${
+            iterNodeCost.toFixed(4)
+          } > $${resolvedBudget.max_usd.toFixed(4)}`;
+          markNodeFailed(state, bodyNodeId, msg, "aborted");
+          opts.onNodeComplete?.(bodyNodeId, iteration, {
+            ...result,
+            success: false,
+            error: msg,
+            error_category: "aborted",
+          });
+          await opts.saveState?.();
+          return {
+            success: false,
+            iterations: iteration,
+            error: msg,
+            error_category: "aborted",
+            lastConditionValue,
+            bodyResults,
+          };
+        }
       } else {
         markNodeFailed(
           state,
@@ -155,7 +251,23 @@ export async function runLoop(opts: LoopRunOptions): Promise<LoopResult> {
           bodyResults,
         };
       }
+
+      // FR-E47 workflow-wide check after each body node completion.
+      // Propagate via exception → executeNode marks the loop node failed.
+      if (opts.budgetUsd !== undefined) {
+        const total = state.total_cost_usd ?? 0;
+        if (total > opts.budgetUsd) {
+          throw new Error(
+            `Budget exceeded: $${total.toFixed(4)} > $${
+              opts.budgetUsd.toFixed(4)
+            }`,
+          );
+        }
+      }
     }
+
+    totalLoopCost += iterCost;
+    completedIterations = iteration;
 
     // Check exit condition (condition node is in inline nodes sub-object).
     // extractConditionValue throws (FR-E36) if field is missing — treat as loop failure.
@@ -185,6 +297,7 @@ export async function runLoop(opts: LoopRunOptions): Promise<LoopResult> {
         iterations: iteration,
         lastConditionValue,
         bodyResults,
+        exit_reason: "exit_value",
       };
     }
   }

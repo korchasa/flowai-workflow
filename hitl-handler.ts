@@ -39,6 +39,8 @@ interface HitlBaseParams {
   output: OutputManager;
   /** Working directory for subprocesses (worktree path or undefined for CWD). */
   cwd?: string;
+  /** Resolved `budget.max_turns` (FR-E47). */
+  maxTurns?: number;
 }
 
 /** Resume-from-waiting mode: node was previously set to waiting state. */
@@ -79,6 +81,7 @@ export async function handleAgentHitl(
     runtimeAdapter,
     output,
     cwd,
+    maxTurns,
   } = params;
   // ctx.run_dir already includes workDir prefix from buildContext
   const runDir = ctx.run_dir;
@@ -115,6 +118,7 @@ export async function handleAgentHitl(
         runtimeAdapter,
         output,
         cwd,
+        maxTurns,
       },
       true, /* skipAsk — question already delivered */
     );
@@ -164,6 +168,7 @@ export async function handleAgentHitl(
       runtimeAdapter,
       output,
       cwd,
+      maxTurns,
     },
     false, /* skipAsk=false — deliver question */
   );

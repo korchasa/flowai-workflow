@@ -1149,3 +1149,40 @@ Deno.test("buildClaudeArgs — permissionMode + claudeArgs both present", () => 
   assertEquals(args.includes("--permission-mode"), true);
   assertEquals(args.includes("--verbose"), true);
 });
+
+// --- FR-E47: applyBudgetFlags ---
+
+import { applyBudgetFlags } from "./agent.ts";
+
+Deno.test("applyBudgetFlags — undefined maxTurns → returns base unchanged", () => {
+  assertEquals(applyBudgetFlags(["--foo"], "claude", undefined), ["--foo"]);
+  assertEquals(applyBudgetFlags(undefined, "claude", undefined), undefined);
+});
+
+Deno.test("applyBudgetFlags — claude + maxTurns → appends --max-turns N", () => {
+  assertEquals(applyBudgetFlags(undefined, "claude", 50), [
+    "--max-turns",
+    "50",
+  ]);
+  assertEquals(applyBudgetFlags(["--foo"], "claude", 10), [
+    "--foo",
+    "--max-turns",
+    "10",
+  ]);
+});
+
+Deno.test("applyBudgetFlags — opencode + maxTurns → returns base unchanged", () => {
+  assertEquals(applyBudgetFlags(["--foo"], "opencode", 50), ["--foo"]);
+  assertEquals(applyBudgetFlags(undefined, "opencode", 50), undefined);
+});
+
+Deno.test("applyBudgetFlags — cursor + maxTurns → returns base unchanged", () => {
+  assertEquals(applyBudgetFlags(undefined, "cursor", 25), undefined);
+});
+
+Deno.test("applyBudgetFlags — does not mutate the input base array", () => {
+  const base = ["--foo"];
+  const result = applyBudgetFlags(base, "claude", 5);
+  assertEquals(base, ["--foo"]);
+  assertEquals(result, ["--foo", "--max-turns", "5"]);
+});
