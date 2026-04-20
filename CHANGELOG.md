@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.3.0](https://github.com/korchasa/flowai-workflow/compare/v0.2.2...v0.3.0) (2026-04-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* **engine:** runtime_args YAML/TS shape changed from string[] to
+Record<string, string | null> (ExtraArgsMap). Migration:
+  runtime_args: ["--flag", "value"]
+becomes
+  runtime_args: { "--flag": "value" }
+Bare boolean flags use empty-string value, null suppresses an inherited
+flag.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+### Features
+
+* **engine:** FR-E48 node tool filtering ([#188](https://github.com/korchasa/flowai-workflow/issues/188)) ([4400b3e](https://github.com/korchasa/flowai-workflow/commit/4400b3e71e96b1f031265c0f3b3f4770b50a2dcf))
+
+
+### Chores
+
+* **engine:** migrate to @korchasa/ai-ide-cli ^0.5.4 ([3529ef7](https://github.com/korchasa/flowai-workflow/commit/3529ef79daccea01ea0b96064f825e3271b6e6da)), closes [#188](https://github.com/korchasa/flowai-workflow/issues/188)
+
 ### [0.2.2](https://github.com/korchasa/flowai-workflow/compare/v0.2.1...v0.2.2) (2026-04-19)
 
 
