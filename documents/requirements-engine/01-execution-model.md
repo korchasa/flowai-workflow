@@ -129,7 +129,6 @@
   - [x] `cli.ts` calls `installSignalHandlers()` at startup. Evidence: `cli.ts:139`
   - [x] `engine.ts` registers shutdown callbacks for lock release and state save after lock acquisition; disposes in finally. Evidence: `engine.ts:139-153`
   - [x] `self-runner.ts` calls `Engine.run()` directly (no subprocess), `installSignalHandlers()` at startup. Evidence: `scripts/self-runner.ts:5-7,57-64,135`
-  - [x] `loop-in-claude.ts` registers/unregisters claude child, `installSignalHandlers()` at startup. Evidence: `scripts/loop-in-claude.ts:7-11,80,100,106,152`
   - [x] 9 unit tests cover registry operations, killAll, shutdown callbacks, error resilience. Evidence: `process-registry_test.ts`
   - [x] All 474 existing tests pass. Evidence: `deno task check` output
 

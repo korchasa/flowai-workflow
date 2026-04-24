@@ -50,8 +50,7 @@
   - `agent.ts:executeClaudeProcess()` — register/unregister in try/finally.
   - `engine.ts:Engine.run()` — onShutdown for lock release + state save;
     disposers called in finally to prevent leak in loops.
-  - `cli.ts`, `self-runner.ts`, `loop-in-claude.ts` — installSignalHandlers()
-    at entry point.
+  - `cli.ts`, `self-runner.ts` — installSignalHandlers() at entry point.
 - **Design rationale:** Module-scoped global state (same pattern as Phase
   Registry) because signal handlers are process-wide. `_reset()` for test
   isolation. `onShutdown` disposer pattern prevents callback accumulation
@@ -90,16 +89,16 @@
 
 - **Status:** Pending.
 - **Purpose:** Single authoritative source for exponential backoff logic used by
-  both `scripts/self-runner.ts` and `scripts/loop-in-claude.ts`. Eliminates
-  duplicated `nextPause()` function and associated constants.
+  `scripts/self-runner.ts`. Eliminates duplicated `nextPause()` function and
+  associated constants.
 - **Exports:**
   - `MIN_PAUSE_SEC` (60) — minimum pause / reset value on success.
   - `MAX_PAUSE_SEC` (14400) — 4h cap.
   - `BACKOFF_FACTOR` (2) — multiplier per iteration.
   - `nextPause(current: number): number` — returns
     `Math.min(current * BACKOFF_FACTOR, MAX_PAUSE_SEC)`.
-- **Consumers:** `self-runner.ts`, `loop-in-claude.ts` — both import
-  `nextPause` and `MIN_PAUSE_SEC` (used for pause reset on success).
+- **Consumers:** `self-runner.ts` — imports `nextPause` and `MIN_PAUSE_SEC`
+  (used for pause reset on success).
 - **Tests:** `scripts/backoff_test.ts` — 3 tests (doubling, max cap, min floor)
   moved from `self-runner_test.ts`.
 - **Deps:** None (pure function, no imports).

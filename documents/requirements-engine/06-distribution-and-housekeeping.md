@@ -29,14 +29,12 @@
 
 ### 3.28 FR-E28: Shared Backoff Utility (`nextPause()`)
 
-- **Description:** `nextPause()` function is duplicated in `scripts/self-runner.ts` and `scripts/loop-in-claude.ts`. Extract into a shared `scripts/backoff.ts` module to eliminate duplication.
-- **Motivation:** DRY violation — backoff logic changes must be applied in multiple places; shared module ensures consistency.
+- **Description:** `nextPause()` function lives in a single module `scripts/backoff.ts` so all loop runners share one implementation.
+- **Motivation:** DRY — backoff logic changes apply in one place.
 - **Acceptance criteria:**
   - [x] `scripts/backoff.ts` exists and exports `nextPause()`.
   - [x] `scripts/self-runner.ts` imports `nextPause` from `scripts/backoff.ts`;
     no local `nextPause` definition remains.
-  - [x] `scripts/loop-in-claude.ts` imports `nextPause` from
-    `scripts/backoff.ts`; no local `nextPause` definition remains.
   - [x] All tests pass.
 
 
