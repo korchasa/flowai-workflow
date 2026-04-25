@@ -90,6 +90,13 @@
     node result summary display (FR-E15/E22),
     phase registry init via `setPhaseRegistry(config)` at engine startup,
     pre-post-workflow `on_failure_script` execution.
+    **CLI Version Pinning (FR-E49):** At run start (after config load, before
+    first node execution): (1) calls `buildEngineEnv()` from `spawn-env.ts`,
+    applies each key via `Deno.env.set()` — all spawned Claude processes
+    inherit `DISABLE_AUTOUPDATER=1`; (2) calls `captureCliVersion(workDir)`,
+    stores result in `state.claude_cli_version`, persists via `saveState()`.
+    No per-call-site wiring — Unix process env inheritance covers all spawn
+    paths (initial, continuation, HITL resume, loop body).
     **Budget enforcement (FR-E47):**
     Per-node check inside `executeNode()` after `markNodeCompleted()`: when
     `resolvedBudget.max_usd && state.nodes[id].cost_usd > max_usd` — demotes

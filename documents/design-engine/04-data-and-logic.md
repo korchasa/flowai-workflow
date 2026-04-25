@@ -31,9 +31,11 @@
     inline excerpt logic (filter empty → take 3 → join ` | ` → truncate 400),
     both set at completion via `markNodeCompleted()` optional params (FR-E17,
     FR-E22)
-  - RunState: `{ ..., total_cost_usd?: number }` — sum of all
+  - RunState: `{ ..., total_cost_usd?: number,
+    claude_cli_version?: string }` — `total_cost_usd`: sum of all
     `nodes[*].cost_usd`, recomputed by `updateRunCost()` on each node
-    completion (FR-E17)
+    completion (FR-E17). `claude_cli_version` (FR-E49): captured once at run
+    start via `claude --version`, absent for pre-FR-E49 runs
   - EngineOptions: `{ ..., budget_usd?: number }` — workflow-wide USD cap
     from `--budget` CLI flag (FR-E47). When set, engine aborts after any node
     completion if `state.total_cost_usd > budget_usd`
@@ -331,6 +333,20 @@
     `state.json`; budget applies to the cumulative total. Engine aborts via
     `checkWorkflowBudget("resume")` before executing any node if the loaded
     state already exceeds the cap.
+  - **CLI Version Pinning (FR-E49):** At engine run start (after config load,
+    before first node execution):
+    1. `buildEngineEnv()` from `spawn-env.ts` returns
+       `{ DISABLE_AUTOUPDATER: "1" }`.
+    2. Engine applies each key via `Deno.env.set()`. Unix process inheritance
+       propagates to all `Deno.Command` subprocesses — covers initial agent
+       invocation, continuation resume, HITL resume, and loop body spawn paths.
+    3. `captureCliVersion(workDir)` runs `claude --version` via `Deno.Command`,
+       stores trimmed stdout in `state.claude_cli_version`, saved to
+       `state.json` via `saveState()`.
+    No per-invocation env threading — process-level set is sufficient because
+    the library adapter uses default env inheritance (no explicit `env` field
+    on `Deno.Command`). If the library ever adds explicit `env` construction,
+    `buildEngineEnv()` output can be spread into it.
   - **Binary Compile Flow (FR-E39):** `scripts/compile.ts` iterates
     `TARGETS` array. Per target: construct `deno compile --allow-all --target
     <denoTarget> --output dist/flowai-workflow-<os>-<arch> cli.ts`. If

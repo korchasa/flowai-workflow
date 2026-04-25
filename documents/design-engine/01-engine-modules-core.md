@@ -34,7 +34,9 @@
     `Verbosity` union: `"quiet"|"normal"|"semi-verbose"|"verbose"` (FR-E21),
     `NodeConfig.budget` (FR-E47: `{ max_usd?: number; max_turns?: number }`,
     optional per-node budget limits),
-    `EngineOptions.budget_usd` (FR-E47: workflow-wide USD cap from `--budget`))
+    `EngineOptions.budget_usd` (FR-E47: workflow-wide USD cap from `--budget`),
+    `RunState.claude_cli_version` (FR-E49: optional string, captured once at
+    run start via `claude --version`; absent for pre-FR-E49 runs))
   - `template.ts` — `{{var}}` interpolation for prompts/paths.
     `resolve()` handles `file("path")` pattern within `{{...}}` matches
     (FR-E32): detects `/^file\("(.+)"\)$/`, reads file via
@@ -190,4 +192,16 @@
     Low-level CLI invocation, stream parsing, event formatting, and
     `FileReadTracker` live in `@korchasa/ai-ide-cli` — see the sibling
     repo's `documents/design/01-modules.md` for details
+  - `spawn-env.ts` — engine spawn environment management (FR-E49).
+    Exports:
+    - `buildEngineEnv(): Record<string, string>` — returns engine-mandated
+      env overrides (`{ DISABLE_AUTOUPDATER: "1" }`). Applied to process env
+      via `Deno.env.set()` at engine startup. All child processes inherit
+      through standard Unix process semantics.
+    - `captureCliVersion(cwd?: string): Promise<string>` — runs
+      `claude --version` via `Deno.Command`, returns trimmed stdout. Throws
+      on non-zero exit (fail-fast). Called once at run start, result stored
+      in `RunState.claude_cli_version`.
+    Unit tests in `spawn-env_test.ts`: always-wins semantics (AC4),
+    user-merge override (AC5)
 
