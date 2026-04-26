@@ -230,3 +230,58 @@
   - [ ] Unit test: `buildSpawnEnv()` returns env containing `DISABLE_AUTOUPDATER=1` regardless of process env.
   - [ ] Unit test: user-provided env merged but `DISABLE_AUTOUPDATER=1` always wins.
   - [ ] `deno task check` passes.
+
+
+
+### 3.50 FR-E50: Worktree Isolation Guardrail
+
+- **Description:** When a workflow runs under worktree isolation
+  (`workDir !== "."`), the engine snapshots the main repo's working tree
+  before each agent invocation and verifies after the invocation that no
+  files were modified outside `<workDir>/` and outside the node's
+  `allowed_paths`. Any leak triggers `markNodeFailed(error_category:
+  "scope_violation")` and an automatic `git checkout --` rollback of
+  exactly the leaked paths. Complements FR-E37 (which checks `allowed_paths`
+  inside the worktree) by guarding the dual: writes outside the worktree.
+- **Motivation:** Even after FR-E48/b0db7e6 fixed the cwd-relative template
+  path emission, an LLM agent may still decide to write to absolute paths
+  for other reasons (e.g., misreading prompts, prior training artifacts,
+  inferred conventions). Two real incidents observed: this repo issue #196
+  v3 (4 memory files leaked into main) and `kazar-fairy-taler` (developer
+  memory + accidental gitlink). The guardrail converts silent corruption
+  of main into immediate, attributable node failure.
+- **Constraints:**
+  - No-op when `workDir === "."` (no worktree); behavior identical to
+    pre-feature.
+  - `git status --porcelain` snapshot uses
+    `-c status.showUntrackedFiles=normal` to override user-global config.
+  - Fail-CLOSED on git failure (snapshot/rollback): mark node failed with
+    explicit message rather than silently skipping.
+  - Rollback scope = exactly the leaked paths (`git checkout -- <paths>`),
+    NOT `git checkout -- .` — preserves any user work-in-progress.
+  - No external deps.
+  - Whitelist of legitimate cross-workdir actions: `git push`, `git
+    checkout` inside worktree, read-only access to main. The guardrail
+    sees only working-tree changes, so refs and reads pass through.
+- **Acceptance criteria:**
+  - [ ] Engine snapshots main repo tree before and after every agent
+    invocation when `workDir !== "."`.
+  - [ ] Difference (after − before), filtered by NOT-prefixed-by `<workDir>/`
+    and NOT-matching `node.allowed_paths`, is treated as leaked paths.
+  - [ ] Non-empty leak triggers `markNodeFailed` with
+    `error_category: "scope_violation"`.
+  - [ ] Engine runs `git checkout -- <leaked-paths>` (per-path, not bulk)
+    to restore main.
+  - [ ] `workDir === "."` mode is a no-op (no snapshot, no overhead).
+  - [ ] Fail-closed: snapshot or rollback failure marks node failed with
+    explicit error message.
+  - [ ] Output: default verbosity prints
+    `[guardrail] node=<id> leaked <N> file(s): <list> (rolled back)`;
+    verbose adds first 200 lines of diff per file.
+  - [ ] Unit test: pure `detectLeaks` covers whitelist (workDir prefix,
+    allowed_paths globs), pre-existing modifications, untracked, modified.
+  - [ ] Integration test: `engine_test.ts` exercises full guardrail flow
+    against a temp git repo with mocked agent.
+  - [ ] E2E test: `e2e_worktree_isolation_test.ts` runs a fake agent that
+    writes outside workDir; main is restored, node fails.
+  - [ ] `deno task check` passes.
