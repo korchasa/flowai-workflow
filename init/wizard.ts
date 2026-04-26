@@ -21,6 +21,7 @@ import type { Answers, TemplateManifest, TemplateQuestion } from "./types.ts";
 /** Keys that may appear in an `--answers` YAML file. */
 const KNOWN_KEYS: ReadonlySet<keyof Answers> = new Set<keyof Answers>([
   "PROJECT_NAME",
+  "WORKFLOW_NAME",
   "DEFAULT_BRANCH",
   "TEST_CMD",
   "LINT_CMD",

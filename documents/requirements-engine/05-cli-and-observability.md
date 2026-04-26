@@ -323,3 +323,44 @@
     covered indirectly via `checkWorkflowBudget` unit semantics.
   - [x] `deno task check` passes.
 
+
+
+
+### 3.53 FR-E53: `--workflow` Flag (Sole CLI Workflow Selector)
+
+- **Description:** The `run` subcommand accepts a single workflow-
+  selection flag, `--workflow <dir>`. The flag points at a workflow
+  folder; the engine loads `<dir>/workflow.yaml`. The legacy
+  `--config <path>` flag is removed (BREAKING; FR-S47).
+- **Auto-detection:** When `--workflow` is omitted, the CLI scans
+  `.flowai-workflow/` for direct subdirectories that contain a
+  `workflow.yaml`:
+  - **0 candidates** → error `No workflow found in
+    .flowai-workflow/. Run 'flowai-workflow init' to scaffold one.`
+    (also covers fresh end-user projects with no
+    `.flowai-workflow/` directory at all).
+  - **1 candidate** → silently selected.
+  - **>1 candidates** → error `Multiple workflows: <list>. Pass
+    --workflow .flowai-workflow/<name>.`
+- **Rules:**
+  - `--config <path>` MUST be rejected with a help message pointing
+    to `--workflow` (no deprecation period; immediate BREAKING).
+  - `parseArgs` is FS-free — `config_path` stays empty until
+    `runEngine` calls `resolveWorkflowConfigPath` so unit tests
+    don't require fixtures.
+  - Engine derives `workflowDir = path.dirname(config_path)` once
+    at construction and threads it to every state-path call (FR-E9
+    update / DoD-14).
+- **Acceptance:**
+  - [x] `cli.ts::parseArgs` accepts `--workflow <dir>` and rejects
+    `--config <path>` with a `Use --workflow` hint. Evidence:
+    `cli_test.ts::parseArgs — --config flag rejected`,
+    `cli_test.ts::parseArgs — --workflow sets config_path`.
+  - [x] `cli.ts::resolveWorkflowConfigPath` implements the 0/1/>1
+    autodetect path. Evidence: 5 test cases under
+    `cli_test.ts` (`listWorkflows — discovers …`, `… missing root`,
+    `resolveWorkflowConfigPath — explicit`, `resolveWorkflowConfigPath
+     — autodetect with single`, `… multiple`, `… empty root`).
+  - [x] `deno.json#tasks.run` uses
+    `--workflow .flowai-workflow/github-inbox`. Evidence: `deno.json`.
+  - [x] `deno task check` is green after the migration (DoD-11).

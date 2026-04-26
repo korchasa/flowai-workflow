@@ -1,7 +1,7 @@
 # Test workflow config — opencode runtime with glm-5 model
 # Minimal: single agent node to verify opencode+glm-5 integration
 
-name: "opencode-glm5-test"
+name: "github-inbox-opencode-test"
 version: "1"
 
 defaults:

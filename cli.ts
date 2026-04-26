@@ -7,8 +7,10 @@
  * - `flowai-workflow` (no args) → interactive REPL with bundled management skills
  * - `flowai-workflow run [options]` → DAG workflow engine
  *
- * Run options:
- *   --config <path>       Workflow config file (default: .flowai-workflow/workflow.yaml)
+ * Run options (FR-E53):
+ *   --workflow <dir>      Workflow folder containing workflow.yaml.
+ *                         When omitted, autodetected from `.flowai-workflow/`:
+ *                         exactly-one candidate ⇒ used; zero/multiple ⇒ error.
  *   --prompt <text>       Additional context for PM agent (sets args.prompt)
  *   --resume <run-id>     Resume a previous run from its state
  *   --dry-run             Print execution plan without running
@@ -65,13 +67,94 @@ export function getVersionString(): string {
   return `flowai-workflow v${VERSION}`;
 }
 
+/** Default workflow root dir scanned when `--workflow` is absent. */
+export const DEFAULT_WORKFLOW_ROOT = ".flowai-workflow";
+
+/**
+ * List candidate workflow folders inside a root directory.
+ * A candidate is a subdirectory containing `workflow.yaml`.
+ * Returns relative paths sorted lexicographically. Missing root → `[]`
+ * (allows fresh end-user projects without `.flowai-workflow/` to surface
+ * a friendlier "run init" message via {@link resolveWorkflowConfigPath}).
+ */
+export async function listWorkflows(root: string): Promise<string[]> {
+  const out: string[] = [];
+  try {
+    for await (const entry of Deno.readDir(root)) {
+      if (!entry.isDirectory) continue;
+      const candidate = `${root}/${entry.name}`;
+      try {
+        const stat = await Deno.stat(`${candidate}/workflow.yaml`);
+        if (stat.isFile) out.push(candidate);
+      } catch {
+        // No workflow.yaml in this dir — skip
+      }
+    }
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return [];
+    throw err;
+  }
+  return out.sort();
+}
+
+/**
+ * FR-E53 workflow-folder resolution.
+ * Returns the absolute path to a chosen `workflow.yaml`. Throws on ambiguity
+ * or absence with a user-facing message.
+ *
+ * @param explicit — value passed via `--workflow <dir>`. When set, validates
+ *   that `<dir>/workflow.yaml` exists.
+ * @param root — root scanned for autodetect (defaults to `.flowai-workflow`).
+ */
+export async function resolveWorkflowConfigPath(
+  explicit: string | undefined,
+  root: string = DEFAULT_WORKFLOW_ROOT,
+): Promise<string> {
+  if (explicit !== undefined) {
+    const trimmed = explicit.replace(/\/+$/, "");
+    const yaml = `${trimmed}/workflow.yaml`;
+    try {
+      const stat = await Deno.stat(yaml);
+      if (!stat.isFile) {
+        throw new Error(`No workflow.yaml at ${trimmed}`);
+      }
+    } catch (err) {
+      if (err instanceof Deno.errors.NotFound) {
+        throw new Error(`No workflow.yaml at ${trimmed}`);
+      }
+      throw err;
+    }
+    return yaml;
+  }
+
+  const candidates = await listWorkflows(root);
+  if (candidates.length === 0) {
+    throw new Error(
+      `No workflow found in ${root}/. ` +
+        `Run 'flowai-workflow init' to scaffold one.`,
+    );
+  }
+  if (candidates.length > 1) {
+    const names = candidates.map((c) => c.split("/").pop()).join(", ");
+    throw new Error(
+      `Multiple workflows: ${names}. Pass --workflow ${root}/<name>.`,
+    );
+  }
+  return `${candidates[0]}/workflow.yaml`;
+}
+
 /**
  * Parse CLI arguments into EngineOptions.
- * Known flags (--config, --resume, --dry-run, verbosity, --env, --skip, --only)
+ * Known flags (--workflow, --resume, --dry-run, verbosity, --env, --skip, --only)
  * set dedicated fields. Generic `--key value` pairs populate `args`.
+ *
+ * `config_path` is left empty by default — the caller (runEngine) resolves it
+ * via {@link resolveWorkflowConfigPath} so the same `parseArgs` is usable in
+ * unit tests without filesystem state.
  */
 export function parseArgs(args: string[]): EngineOptions {
-  let configPath = ".flowai-workflow/workflow.yaml";
+  let configPath = "";
+  let workflowDir: string | undefined;
   let runId: string | undefined;
   let resume = false;
   let dryRun = false;
@@ -87,7 +170,16 @@ export function parseArgs(args: string[]): EngineOptions {
 
     switch (arg) {
       case "--config":
-        configPath = args[++i];
+        throw new Error(
+          "Unknown flag: --config (removed in FR-E53). " +
+            "Use --workflow <dir> instead, where <dir> contains workflow.yaml.",
+        );
+      case "--workflow":
+        workflowDir = args[++i];
+        if (workflowDir === undefined) {
+          throw new Error("--workflow requires a directory argument");
+        }
+        configPath = `${workflowDir.replace(/\/+$/, "")}/workflow.yaml`;
         break;
       case "--prompt":
         cliArgs.prompt = args[++i];
@@ -190,7 +282,10 @@ Subcommands:
   init                  Scaffold .flowai-workflow/ directory (run init --help for details)
 
 Run options:
-  --config <path>       Workflow config file (default: .flowai-workflow/workflow.yaml)
+  --workflow <dir>      Workflow folder containing workflow.yaml.
+                        When omitted, autodetected from .flowai-workflow/:
+                        exactly one candidate ⇒ used silently;
+                        zero/multiple candidates ⇒ error.
   --prompt <text>       Additional context for PM agent (optional)
   --resume <run-id>     Resume a previous run
   --dry-run             Print execution plan without running
@@ -210,7 +305,7 @@ Global options:
 Examples:
   flowai-workflow
   flowai-workflow run --prompt "Focus on the login bug"
-  flowai-workflow run --config custom.yaml -v
+  flowai-workflow run --workflow .flowai-workflow/github-inbox -v
   flowai-workflow run --resume 20260308T143022
   flowai-workflow run --dry-run
 `);
@@ -228,6 +323,11 @@ async function runEngine(args: string[]): Promise<never> {
   try {
     const { skipUpdateCheck, remaining } = extractCliFlags(args);
     const options = parseArgs(remaining);
+
+    // FR-E53: when --workflow was not passed, autodetect from .flowai-workflow/
+    if (!options.config_path) {
+      options.config_path = await resolveWorkflowConfigPath(undefined);
+    }
 
     // Notify the user if a newer version is on JSR. Fail-open: any network
     // or parse error returns null and we silently continue. Skipped when

@@ -96,30 +96,52 @@ export function createRunState(
   };
 }
 
-/** Get the run directory path for a given run ID. */
-export function getRunDir(runId: string): string {
-  return `.flowai-workflow/runs/${runId}`;
+/** Default workflow directory used when no explicit one is supplied.
+ * Preserves backward compatibility for legacy callers / tests that predate
+ * FR-E53 (workflow folder = `.flowai-workflow/<name>/`). Production callers
+ * (Engine, CLI) always pass an explicit `workflowDir`. */
+export const DEFAULT_WORKFLOW_DIR = ".flowai-workflow";
+
+/** Get the run directory path for a given run ID.
+ * @param workflowDir — base workflow folder; defaults to `.flowai-workflow` for
+ *   legacy callers. FR-E9: Engine threads `path.dirname(configPath)` here so
+ *   runs land under `<workflowDir>/runs/<run-id>` regardless of layout. */
+export function getRunDir(
+  runId: string,
+  workflowDir: string = DEFAULT_WORKFLOW_DIR,
+): string {
+  return `${workflowDir}/runs/${runId}`;
 }
 
 /** Get the node output directory path.
  * Returns `<runDir>/<phase>/<nodeId>/` when node has a phase in the registry,
  * otherwise flat `<runDir>/<nodeId>/` (backward-compatible). */
-export function getNodeDir(runId: string, nodeId: string): string {
+export function getNodeDir(
+  runId: string,
+  nodeId: string,
+  workflowDir: string = DEFAULT_WORKFLOW_DIR,
+): string {
   const phase = getPhaseForNode(nodeId);
   if (phase) {
-    return `${getRunDir(runId)}/${phase}/${nodeId}`;
+    return `${getRunDir(runId, workflowDir)}/${phase}/${nodeId}`;
   }
-  return `${getRunDir(runId)}/${nodeId}`;
+  return `${getRunDir(runId, workflowDir)}/${nodeId}`;
 }
 
 /** Get the state.json file path for a run. */
-export function getStatePath(runId: string): string {
-  return `${getRunDir(runId)}/state.json`;
+export function getStatePath(
+  runId: string,
+  workflowDir: string = DEFAULT_WORKFLOW_DIR,
+): string {
+  return `${getRunDir(runId, workflowDir)}/state.json`;
 }
 
 /** Get the logs directory for a run. */
-export function getLogsDir(runId: string): string {
-  return `${getRunDir(runId)}/logs`;
+export function getLogsDir(
+  runId: string,
+  workflowDir: string = DEFAULT_WORKFLOW_DIR,
+): string {
+  return `${getRunDir(runId, workflowDir)}/logs`;
 }
 
 /** Prefix a relative path with workDir. No-op when workDir is ".". */
@@ -145,39 +167,44 @@ export function buildTaskPaths(
   runId: string,
   nodeId: string,
   inputs: readonly string[] = [],
+  workflowDir: string = DEFAULT_WORKFLOW_DIR,
 ): {
   node_dir: string;
   run_dir: string;
   input: Record<string, string>;
 } {
   const input: Record<string, string> = {};
-  for (const id of inputs) input[id] = getNodeDir(runId, id);
+  for (const id of inputs) input[id] = getNodeDir(runId, id, workflowDir);
   return {
-    node_dir: getNodeDir(runId, nodeId),
-    run_dir: getRunDir(runId),
+    node_dir: getNodeDir(runId, nodeId, workflowDir),
+    run_dir: getRunDir(runId, workflowDir),
     input,
   };
 }
 
 /** Save RunState to state.json.
- * @param workDir — base directory prefix for file I/O. Defaults to "." (CWD). */
+ * @param workDir — base directory prefix for file I/O. Defaults to "." (CWD).
+ * @param workflowDir — workflow folder under which `runs/<run-id>` lives. */
 export async function saveState(
   state: RunState,
   workDir = ".",
+  workflowDir: string = DEFAULT_WORKFLOW_DIR,
 ): Promise<void> {
-  const path = `${workDir}/${getStatePath(state.run_id)}`;
-  const dir = `${workDir}/${getRunDir(state.run_id)}`;
+  const path = `${workDir}/${getStatePath(state.run_id, workflowDir)}`;
+  const dir = `${workDir}/${getRunDir(state.run_id, workflowDir)}`;
   await Deno.mkdir(dir, { recursive: true });
   await Deno.writeTextFile(path, JSON.stringify(state, null, 2) + "\n");
 }
 
 /** Load RunState from state.json.
- * @param workDir — base directory prefix for file I/O. Defaults to "." (CWD). */
+ * @param workDir — base directory prefix for file I/O. Defaults to "." (CWD).
+ * @param workflowDir — workflow folder under which `runs/<run-id>` lives. */
 export async function loadState(
   runId: string,
   workDir = ".",
+  workflowDir: string = DEFAULT_WORKFLOW_DIR,
 ): Promise<RunState> {
-  const path = `${workDir}/${getStatePath(runId)}`;
+  const path = `${workDir}/${getStatePath(runId, workflowDir)}`;
   const text = await Deno.readTextFile(path);
   return JSON.parse(text) as RunState;
 }

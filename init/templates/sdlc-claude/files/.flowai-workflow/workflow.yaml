@@ -7,7 +7,7 @@
 #   __TEST_CMD__       — project test command
 #   __LINT_CMD__       — project lint/format/check command used as build gate
 
-name: "__PROJECT_NAME__-sdlc"
+name: "__WORKFLOW_NAME__"
 version: "1"
 
 defaults:
@@ -19,8 +19,8 @@ defaults:
   model: claude-sonnet-4-6
   permission_mode: bypassPermissions
   hitl:
-    ask_script: .flowai-workflow/scripts/hitl-ask.sh
-    check_script: .flowai-workflow/scripts/hitl-check.sh
+    ask_script: .flowai-workflow/__WORKFLOW_NAME__/scripts/hitl-ask.sh
+    check_script: .flowai-workflow/__WORKFLOW_NAME__/scripts/hitl-check.sh
     artifact_source: "{{input.specification}}/01-spec.md"
     poll_interval: 60
     timeout: 7200
@@ -37,11 +37,11 @@ nodes:
     type: agent
     label: "Project Manager — Specification"
     system_prompt: |
-      {{file(".flowai-workflow/agents/agent-pm.md")}}
+      {{file(".flowai-workflow/__WORKFLOW_NAME__/agents/agent-pm.md")}}
     prompt: |
-      {{file(".flowai-workflow/memory/reflection-protocol.md")}}
-      Memory: .flowai-workflow/memory/agent-pm.md
-      History: .flowai-workflow/memory/agent-pm-history.md
+      {{file(".flowai-workflow/__WORKFLOW_NAME__/memory/reflection-protocol.md")}}
+      Memory: .flowai-workflow/__WORKFLOW_NAME__/memory/agent-pm.md
+      History: .flowai-workflow/__WORKFLOW_NAME__/memory/agent-pm-history.md
       ---
       Triage open GitHub issues: check health, select best candidate by priority.
       Output: {{node_dir}}/01-spec.md with YAML frontmatter containing the `issue: <N>` field,
@@ -66,11 +66,11 @@ nodes:
     model: claude-opus-4-6
     inputs: [specification]
     system_prompt: |
-      {{file(".flowai-workflow/agents/agent-architect.md")}}
+      {{file(".flowai-workflow/__WORKFLOW_NAME__/agents/agent-architect.md")}}
     prompt: |
-      {{file(".flowai-workflow/memory/reflection-protocol.md")}}
-      Memory: .flowai-workflow/memory/agent-architect.md
-      History: .flowai-workflow/memory/agent-architect-history.md
+      {{file(".flowai-workflow/__WORKFLOW_NAME__/memory/reflection-protocol.md")}}
+      Memory: .flowai-workflow/__WORKFLOW_NAME__/memory/agent-architect.md
+      History: .flowai-workflow/__WORKFLOW_NAME__/memory/agent-architect-history.md
       ---
       Read the specification at {{input.specification}}/01-spec.md.
       Explore the codebase to identify affected files.
@@ -88,11 +88,11 @@ nodes:
     model: claude-opus-4-6
     inputs: [specification, design]
     system_prompt: |
-      {{file(".flowai-workflow/agents/agent-tech-lead.md")}}
+      {{file(".flowai-workflow/__WORKFLOW_NAME__/agents/agent-tech-lead.md")}}
     prompt: |
-      {{file(".flowai-workflow/memory/reflection-protocol.md")}}
-      Memory: .flowai-workflow/memory/agent-tech-lead.md
-      History: .flowai-workflow/memory/agent-tech-lead-history.md
+      {{file(".flowai-workflow/__WORKFLOW_NAME__/memory/reflection-protocol.md")}}
+      Memory: .flowai-workflow/__WORKFLOW_NAME__/memory/agent-tech-lead.md
+      History: .flowai-workflow/__WORKFLOW_NAME__/memory/agent-tech-lead-history.md
       ---
       Read the plan at {{input.design}}/02-plan.md.
       Read the spec at {{input.specification}}/01-spec.md.
@@ -119,11 +119,11 @@ nodes:
         label: "Developer — Implementation"
         inputs: [decision]
         system_prompt: |
-          {{file(".flowai-workflow/agents/agent-developer.md")}}
+          {{file(".flowai-workflow/__WORKFLOW_NAME__/agents/agent-developer.md")}}
         prompt: |
-          {{file(".flowai-workflow/memory/reflection-protocol.md")}}
-          Memory: .flowai-workflow/memory/agent-developer.md
-          History: .flowai-workflow/memory/agent-developer-history.md
+          {{file(".flowai-workflow/__WORKFLOW_NAME__/memory/reflection-protocol.md")}}
+          Memory: .flowai-workflow/__WORKFLOW_NAME__/memory/agent-developer.md
+          History: .flowai-workflow/__WORKFLOW_NAME__/memory/agent-developer-history.md
           ---
           Read the decision at {{input.decision}}/03-decision.md.
           Implement the changes following the task breakdown.
@@ -142,11 +142,11 @@ nodes:
         label: "QA — Verification"
         inputs: [specification, decision, build]
         system_prompt: |
-          {{file(".flowai-workflow/agents/agent-qa.md")}}
+          {{file(".flowai-workflow/__WORKFLOW_NAME__/agents/agent-qa.md")}}
         prompt: |
-          {{file(".flowai-workflow/memory/reflection-protocol.md")}}
-          Memory: .flowai-workflow/memory/agent-qa.md
-          History: .flowai-workflow/memory/agent-qa-history.md
+          {{file(".flowai-workflow/__WORKFLOW_NAME__/memory/reflection-protocol.md")}}
+          Memory: .flowai-workflow/__WORKFLOW_NAME__/memory/agent-qa.md
+          History: .flowai-workflow/__WORKFLOW_NAME__/memory/agent-qa-history.md
           ---
           Verify the implementation against the spec at {{input.specification}}/01-spec.md.
           Check the decision at {{input.decision}}/03-decision.md.
@@ -168,11 +168,11 @@ nodes:
     label: "Tech Lead Review — Final Review + CI + Merge"
     inputs: [specification, decision]
     system_prompt: |
-      {{file(".flowai-workflow/agents/agent-tech-lead-review.md")}}
+      {{file(".flowai-workflow/__WORKFLOW_NAME__/agents/agent-tech-lead-review.md")}}
     prompt: |
-      {{file(".flowai-workflow/memory/reflection-protocol.md")}}
-      Memory: .flowai-workflow/memory/agent-tech-lead-review.md
-      History: .flowai-workflow/memory/agent-tech-lead-review-history.md
+      {{file(".flowai-workflow/__WORKFLOW_NAME__/memory/reflection-protocol.md")}}
+      Memory: .flowai-workflow/__WORKFLOW_NAME__/memory/agent-tech-lead-review.md
+      History: .flowai-workflow/__WORKFLOW_NAME__/memory/agent-tech-lead-review-history.md
       ---
       Perform final code review of the PR.
       Read the spec at {{input.specification}}/01-spec.md for acceptance criteria.

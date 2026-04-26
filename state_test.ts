@@ -71,7 +71,7 @@ Deno.test("createRunState — initializes all nodes as pending", () => {
   assertEquals(state.nodes.developer.status, "pending");
 });
 
-Deno.test("getRunDir / getNodeDir / getStatePath", () => {
+Deno.test("getRunDir / getNodeDir / getStatePath — defaults preserved (back-compat)", () => {
   assertEquals(
     getRunDir("20260308T143022"),
     ".flowai-workflow/runs/20260308T143022",
@@ -83,6 +83,28 @@ Deno.test("getRunDir / getNodeDir / getStatePath", () => {
   assertEquals(
     getStatePath("20260308T143022"),
     ".flowai-workflow/runs/20260308T143022/state.json",
+  );
+});
+
+// FR-E9 (DoD-14): explicit workflowDir param threads under any folder layout.
+Deno.test("getRunDir — workflow-aware: returns <workflowDir>/runs/<run-id>", () => {
+  assertEquals(
+    getRunDir("X", ".flowai-workflow/foo"),
+    ".flowai-workflow/foo/runs/X",
+  );
+});
+
+Deno.test("getNodeDir — workflow-aware: nests under <workflowDir>/runs/", () => {
+  assertEquals(
+    getNodeDir("X", "spec", ".flowai-workflow/foo"),
+    ".flowai-workflow/foo/runs/X/spec",
+  );
+});
+
+Deno.test("getStatePath — workflow-aware: state.json under explicit workflowDir", () => {
+  assertEquals(
+    getStatePath("X", ".flowai-workflow/foo"),
+    ".flowai-workflow/foo/runs/X/state.json",
   );
 });
 

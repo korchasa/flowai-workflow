@@ -3,7 +3,7 @@
 #      ; tech-lead-review(run_on:always)
 # See: documents/requirements-sdlc.md for stage specifications.
 
-name: "flowai-workflow-sdlc"
+name: "github-inbox"
 version: "1"
 
 defaults:
@@ -17,15 +17,15 @@ defaults:
   # below dial complex stages up and trivial ones down.
   effort: medium
   permission_mode: bypassPermissions
-  on_failure_script: .flowai-workflow/scripts/rollback-uncommitted.sh
+  on_failure_script: .flowai-workflow/github-inbox/scripts/rollback-uncommitted.sh
   # FR-S28: agents must commit reflection-memory files at session end (the
   # engine fails the node if any of these globs are dirty post-run, unless
   # the node sets `memory_commit_deferred: true`).
   memory_paths:
-    - .flowai-workflow/memory/agent-*.md
+    - .flowai-workflow/github-inbox/memory/agent-*.md
   hitl:
-    ask_script: .flowai-workflow/scripts/hitl-ask.sh
-    check_script: .flowai-workflow/scripts/hitl-check.sh
+    ask_script: .flowai-workflow/github-inbox/scripts/hitl-ask.sh
+    check_script: .flowai-workflow/github-inbox/scripts/hitl-check.sh
     poll_interval: 60
     timeout: 7200
 
@@ -42,11 +42,11 @@ nodes:
     # FR-E42: triage is shallow — minimal reasoning depth.
     effort: low
     system_prompt: |
-      {{file(".claude/agents/agent-pm.md")}}
+      {{file(".flowai-workflow/github-inbox/agents/agent-pm.md")}}
     prompt: |
-      {{file(".flowai-workflow/memory/reflection-protocol.md")}}
-      Memory: .flowai-workflow/memory/agent-pm.md
-      History: .flowai-workflow/memory/agent-pm-history.md
+      {{file(".flowai-workflow/github-inbox/memory/reflection-protocol.md")}}
+      Memory: .flowai-workflow/github-inbox/memory/agent-pm.md
+      History: .flowai-workflow/github-inbox/memory/agent-pm-history.md
       ---
       Triage open GitHub issues: check health (no merged PRs, no needs-triage label), select best candidate by priority.
       Output:
@@ -73,11 +73,11 @@ nodes:
     effort: high
     inputs: [specification]
     system_prompt: |
-      {{file(".claude/agents/agent-architect.md")}}
+      {{file(".flowai-workflow/github-inbox/agents/agent-architect.md")}}
     prompt: |
-      {{file(".flowai-workflow/memory/reflection-protocol.md")}}
-      Memory: .flowai-workflow/memory/agent-architect.md
-      History: .flowai-workflow/memory/agent-architect-history.md
+      {{file(".flowai-workflow/github-inbox/memory/reflection-protocol.md")}}
+      Memory: .flowai-workflow/github-inbox/memory/agent-architect.md
+      History: .flowai-workflow/github-inbox/memory/agent-architect-history.md
       ---
       Read the specification at {{input.specification}}/01-spec.md.
       Read ONLY scope-relevant SRS/SDS docs (derive scope from spec frontmatter `scope:` field).
@@ -95,11 +95,11 @@ nodes:
     model: claude-opus-4-6
     inputs: [specification, design]
     system_prompt: |
-      {{file(".claude/agents/agent-tech-lead.md")}}
+      {{file(".flowai-workflow/github-inbox/agents/agent-tech-lead.md")}}
     prompt: |
-      {{file(".flowai-workflow/memory/reflection-protocol.md")}}
-      Memory: .flowai-workflow/memory/agent-tech-lead.md
-      History: .flowai-workflow/memory/agent-tech-lead-history.md
+      {{file(".flowai-workflow/github-inbox/memory/reflection-protocol.md")}}
+      Memory: .flowai-workflow/github-inbox/memory/agent-tech-lead.md
+      History: .flowai-workflow/github-inbox/memory/agent-tech-lead-history.md
       ---
       Read the plan at {{input.design}}/02-plan.md.
       Read the spec at {{input.specification}}/01-spec.md.
@@ -134,11 +134,11 @@ nodes:
         # leave its memory dirty between iterations; commits land later.
         memory_commit_deferred: true
         system_prompt: |
-          {{file(".claude/agents/agent-developer.md")}}
+          {{file(".flowai-workflow/github-inbox/agents/agent-developer.md")}}
         prompt: |
-          {{file(".flowai-workflow/memory/reflection-protocol.md")}}
-          Memory: .flowai-workflow/memory/agent-developer.md
-          History: .flowai-workflow/memory/agent-developer-history.md
+          {{file(".flowai-workflow/github-inbox/memory/reflection-protocol.md")}}
+          Memory: .flowai-workflow/github-inbox/memory/agent-developer.md
+          History: .flowai-workflow/github-inbox/memory/agent-developer-history.md
           ---
           Read the decision at {{input.decision}}/03-decision.md.
           Read ONLY scope-relevant SRS/SDS docs (derive scope from decision's spec reference or task context).
@@ -157,11 +157,11 @@ nodes:
         label: "QA — Verification"
         inputs: [specification, decision, build]
         system_prompt: |
-          {{file(".claude/agents/agent-qa.md")}}
+          {{file(".flowai-workflow/github-inbox/agents/agent-qa.md")}}
         prompt: |
-          {{file(".flowai-workflow/memory/reflection-protocol.md")}}
-          Memory: .flowai-workflow/memory/agent-qa.md
-          History: .flowai-workflow/memory/agent-qa-history.md
+          {{file(".flowai-workflow/github-inbox/memory/reflection-protocol.md")}}
+          Memory: .flowai-workflow/github-inbox/memory/agent-qa.md
+          History: .flowai-workflow/github-inbox/memory/agent-qa-history.md
           ---
           Verify the implementation against the spec at {{input.specification}}/01-spec.md.
           Check the decision at {{input.decision}}/03-decision.md.
@@ -183,11 +183,11 @@ nodes:
     label: "Tech Lead Review — Final Review + CI + Merge"
     inputs: [specification, decision]
     system_prompt: |
-      {{file(".claude/agents/agent-tech-lead-review.md")}}
+      {{file(".flowai-workflow/github-inbox/agents/agent-tech-lead-review.md")}}
     prompt: |
-      {{file(".flowai-workflow/memory/reflection-protocol.md")}}
-      Memory: .flowai-workflow/memory/agent-tech-lead-review.md
-      History: .flowai-workflow/memory/agent-tech-lead-review-history.md
+      {{file(".flowai-workflow/github-inbox/memory/reflection-protocol.md")}}
+      Memory: .flowai-workflow/github-inbox/memory/agent-tech-lead-review.md
+      History: .flowai-workflow/github-inbox/memory/agent-tech-lead-review-history.md
       ---
       Perform final code review of the PR.
       Read the spec at {{input.specification}}/01-spec.md for acceptance criteria.
@@ -195,7 +195,7 @@ nodes:
       Check CI status. Merge PR if all checks pass, or leave open with review comments.
       Output: {{node_dir}}/06-review.md
     run_on: always
-    after: ".flowai-workflow/scripts/run-dashboard.sh {{run_dir}}"
+    after: ".flowai-workflow/github-inbox/scripts/run-dashboard.sh {{run_dir}}"
     settings:
       on_error: continue
     validate:

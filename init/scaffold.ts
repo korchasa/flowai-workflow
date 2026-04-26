@@ -87,7 +87,12 @@ export async function copyTemplate(
   for (const rule of manifest.files.copy) {
     // Strip trailing slash(es) from rule.from (e.g. `files/` → `files`).
     const fromRel = rule.from.replace(/\/+$/, "").replace(/\/\*\*$/, "");
-    const toRel = rule.to.replace(/\/+$/, "");
+    // FR-S46: `rule.to` may contain `__UPPER_SNAKE__` placeholders that
+    // resolve to wizard answers (e.g. `__WORKFLOW_NAME__`).
+    const toRel = substitutePlaceholders(rule.to, answers).replace(
+      /\/+$/,
+      "",
+    );
     const ruleSrc = join(templateRoot, fromRel);
     const ruleDst = join(targetDir, toRel);
 

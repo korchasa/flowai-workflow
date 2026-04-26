@@ -122,7 +122,7 @@ Deno.test("loadTemplateManifest — loads bundled sdlc-claude manifest", async (
   );
   const manifest = await loadTemplateManifest(url);
   assertEquals(manifest.name, "sdlc-claude");
-  assertEquals(manifest.questions.length, 4);
+  assertEquals(manifest.questions.length, 5);
 });
 
 Deno.test("loadTemplateManifest — throws on missing file", async () => {

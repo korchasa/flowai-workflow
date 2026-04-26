@@ -82,3 +82,4 @@ per file). FR-IDs are stable — never renumber them on move.
 - FR-S44 (Confidence-Scored QA Review)     → 06-quality-and-validation
 - FR-S45 (Multi-Focus Parallel Review)     → 06-quality-and-validation
 - FR-S46 (Project Init CLI)                → 03-runtime-and-init
+- FR-S47 (Workflow Folder Contract)        → 04-artifacts-and-memory

@@ -104,19 +104,172 @@ async function* walkDir(
   }
 }
 
+/** FR-S47/FR-E53: list workflow folders directly under `root` that contain
+ * `workflow.yaml`. Mirrors {@link listWorkflows} in `cli.ts` but kept local
+ * to keep the check script free of cross-module dependencies. */
+async function listWorkflowFolders(root: string): Promise<string[]> {
+  const out: string[] = [];
+  try {
+    for await (const entry of Deno.readDir(root)) {
+      if (!entry.isDirectory) continue;
+      const dir = `${root}/${entry.name}`;
+      try {
+        const stat = await Deno.stat(`${dir}/workflow.yaml`);
+        if (stat.isFile) out.push(dir);
+      } catch {
+        // No workflow.yaml — skip
+      }
+    }
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return [];
+    throw err;
+  }
+  return out.sort();
+}
+
+/** FR-S47/DoD-1: enforce that a workflow folder has the required shape.
+ * `workflow.yaml` is required. `agents/` is required IFF the workflow uses
+ * agent prompt files (i.e. `workflow.yaml` references `agents/agent-*.md`).
+ * `memory/`, `scripts/`, `runs/`, `worktrees/` are always optional.
+ * Returns offender messages; empty = OK. */
+export async function assertWorkflowFolderShape(
+  dir: string,
+): Promise<string[]> {
+  const errors: string[] = [];
+  let yamlText = "";
+  try {
+    yamlText = await Deno.readTextFile(`${dir}/workflow.yaml`);
+  } catch {
+    errors.push(`${dir}: missing workflow.yaml`);
+    return errors;
+  }
+  // Heuristic: any reference to `agents/agent-` (e.g. via {{file(...)}})
+  // implies the workflow expects an agents/ folder.
+  const referencesAgents = /agents\/agent-[\w-]+\.md/.test(yamlText);
+  let agentsDirExists = false;
+  try {
+    const stat = await Deno.stat(`${dir}/agents`);
+    agentsDirExists = stat.isDirectory;
+  } catch {
+    // agents/ absent
+  }
+  let hasAgent = false;
+  if (agentsDirExists) {
+    for await (const entry of Deno.readDir(`${dir}/agents`)) {
+      if (
+        entry.isFile && entry.name.startsWith("agent-") &&
+        entry.name.endsWith(".md")
+      ) {
+        hasAgent = true;
+        break;
+      }
+    }
+  }
+  if (referencesAgents && !agentsDirExists) {
+    errors.push(
+      `${dir}: missing agents/ directory (referenced from workflow.yaml)`,
+    );
+  } else if (agentsDirExists && !hasAgent) {
+    errors.push(`${dir}: agents/ contains no agent-*.md file`);
+  }
+  return errors;
+}
+
 async function workflowIntegrity(): Promise<void> {
   console.log("\n--- Workflow Integrity ---");
-  const workflowPath = ".flowai-workflow/workflow.yaml";
+  const root = ".flowai-workflow";
+  const folders = await listWorkflowFolders(root);
+  if (folders.length === 0) {
+    // Fresh end-user project: no workflow yet — non-blocking.
+    console.log(
+      `  No workflow folders found under ${root}/ (fresh project).`,
+    );
+    return;
+  }
 
-  // 1. Load and validate workflow config (schema + prompt paths + phases)
   const { loadConfig } = await import("../config.ts");
-  try {
-    await loadConfig(workflowPath);
-    console.log(`  Workflow config valid: ${workflowPath}`);
-  } catch (err) {
-    console.error(`FAILED: Workflow validation: ${(err as Error).message}`);
+  for (const dir of folders) {
+    const shapeErrors = await assertWorkflowFolderShape(dir);
+    if (shapeErrors.length > 0) {
+      for (const e of shapeErrors) console.error(`  ${e}`);
+      console.error(`FAILED: Workflow folder shape: ${dir}`);
+      Deno.exit(1);
+    }
+    const workflowPath = `${dir}/workflow.yaml`;
+    try {
+      await loadConfig(workflowPath);
+      console.log(`  Workflow config valid: ${workflowPath}`);
+    } catch (err) {
+      console.error(`FAILED: Workflow validation: ${(err as Error).message}`);
+      Deno.exit(1);
+    }
+  }
+}
+
+/** FR-S47/DoD-3: scan active configs/code for residual `.claude/agents/`
+ * references (post-migration `.claude/agents/` is removed; agents live under
+ * `.flowai-workflow/<name>/agents/`).
+ * Scans `*.yaml`, `*.yml`, `*.json`, `*.ts` only — `.md` and `.sh` are
+ * excluded because docs/scripts may legitimately mention the path as a
+ * Claude Code IDE feature distinct from flowai-workflow agent layout.
+ * Skips runtime data dirs and the `documents/` tree (R&D references). */
+export async function noClaudeAgentsRefs(): Promise<string[]> {
+  const offenders: string[] = [];
+  const skipPathFragments = [
+    "/runs/",
+    "/worktrees/",
+    "/.claude/worktrees/",
+    "node_modules/",
+    "/documents/",
+  ];
+  const skipExactRel = new Set([
+    "scripts/check.ts",
+    "scripts/check_test.ts",
+  ]);
+  const exts = [".ts", ".yaml", ".yml", ".json"];
+
+  const stack: string[] = ["."];
+  while (stack.length > 0) {
+    const dir = stack.pop()!;
+    let entries: AsyncIterable<Deno.DirEntry>;
+    try {
+      entries = Deno.readDir(dir);
+    } catch {
+      continue;
+    }
+    for await (const entry of entries) {
+      const path = dir === "." ? entry.name : `${dir}/${entry.name}`;
+      if (entry.isDirectory) {
+        if (entry.name.startsWith(".") && entry.name !== ".flowai-workflow") {
+          continue;
+        }
+        if (skipPathFragments.some((frag) => `/${path}/`.includes(frag))) {
+          continue;
+        }
+        stack.push(path);
+        continue;
+      }
+      if (!exts.some((e) => path.endsWith(e))) continue;
+      if (skipPathFragments.some((frag) => `/${path}`.includes(frag))) continue;
+      if (skipExactRel.has(path)) continue;
+      const text = await Deno.readTextFile(path);
+      if (text.includes(".claude/agents/")) offenders.push(path);
+    }
+  }
+  return offenders;
+}
+
+async function noClaudeAgentsCheck(): Promise<void> {
+  console.log("\n--- No .claude/agents/ Refs ---");
+  const offenders = await noClaudeAgentsRefs();
+  if (offenders.length > 0) {
+    for (const f of offenders) console.error(`  ${f}`);
+    console.error(
+      "FAILED: stale `.claude/agents/` references found (FR-S47/DoD-3).",
+    );
     Deno.exit(1);
   }
+  console.log("  No `.claude/agents/` references in tracked sources.");
 }
 
 /**
@@ -137,30 +290,35 @@ export function validateHitlArtifactSource(
 
 async function hitlArtifactSource(): Promise<void> {
   console.log("\n--- HITL Artifact Source Validation ---");
-  const workflowPath = ".flowai-workflow/workflow.yaml";
-  const { loadConfig } = await import("../config.ts");
-  let config;
-  try {
-    config = await loadConfig(workflowPath);
-  } catch (err) {
-    // loadConfig errors are already reported by workflowIntegrity(); skip here
-    console.log(
-      `  Skipped (workflow config invalid): ${(err as Error).message}`,
-    );
+  const folders = await listWorkflowFolders(".flowai-workflow");
+  if (folders.length === 0) {
+    console.log("  No workflow folders — skipped.");
     return;
   }
-  const artifactSource = config.defaults?.hitl?.artifact_source;
-  const errors = validateHitlArtifactSource(artifactSource);
-  if (errors.length > 0) {
-    for (const err of errors) {
-      console.error(`  ${err}`);
+  const { loadConfig } = await import("../config.ts");
+  for (const dir of folders) {
+    const workflowPath = `${dir}/workflow.yaml`;
+    let config;
+    try {
+      config = await loadConfig(workflowPath);
+    } catch (err) {
+      // Already reported by workflowIntegrity(); skip here.
+      console.log(
+        `  Skipped ${workflowPath} (config invalid): ${(err as Error).message}`,
+      );
+      continue;
     }
-    console.error(
-      "FAILED: HITL artifact_source must use template syntax ({{input.<node>}})",
-    );
-    Deno.exit(1);
+    const artifactSource = config.defaults?.hitl?.artifact_source;
+    const errors = validateHitlArtifactSource(artifactSource);
+    if (errors.length > 0) {
+      for (const err of errors) console.error(`  ${err}`);
+      console.error(
+        "FAILED: HITL artifact_source must use template syntax ({{input.<node>}})",
+      );
+      Deno.exit(1);
+    }
   }
-  console.log("  HITL artifact_source uses template syntax.");
+  console.log("  HITL artifact_source uses template syntax (all workflows).");
 }
 
 /**
@@ -399,6 +557,7 @@ if (import.meta.main) {
   );
 
   await workflowIntegrity();
+  await noClaudeAgentsCheck();
   await hitlArtifactSource();
   await agentListAccuracy();
   await docsTokenBudget();

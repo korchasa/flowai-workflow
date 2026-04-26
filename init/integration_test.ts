@@ -110,37 +110,42 @@ Deno.test("runInit — scaffolds a fresh project end-to-end", async () => {
     assertEquals(exitCode, 0);
 
     const targetDir = join(root, ".flowai-workflow");
+    // FR-S47: workflow assets live under `.flowai-workflow/<WORKFLOW_NAME>/`.
+    // The integration fixture omits WORKFLOW_NAME so the default ("default")
+    // is used.
+    const workflowDir = join(targetDir, "default");
 
     // Core scaffolded files.
-    const workflowYaml = join(targetDir, "workflow.yaml");
+    const workflowYaml = join(workflowDir, "workflow.yaml");
     const workflow = await Deno.readTextFile(workflowYaml);
-    // __PROJECT_NAME__ was substituted with the wizard answer.
+    // No placeholders remain — both __PROJECT_NAME__ and __WORKFLOW_NAME__
+    // are substituted at copy time.
     if (workflow.includes("__PROJECT_NAME__")) {
       throw new Error(
         "workflow.yaml still contains __PROJECT_NAME__ placeholder",
       );
     }
-    if (!workflow.includes("integration-test-sdlc")) {
+    if (!workflow.includes('name: "default"')) {
       throw new Error(
-        "workflow.yaml missing substituted project name",
+        "workflow.yaml missing substituted workflow name (expected `default`)",
       );
     }
 
     // Generic substitutions everywhere — no __ placeholder should remain.
     const allFiles = [
       workflowYaml,
-      join(targetDir, "agents", "agent-pm.md"),
-      join(targetDir, "agents", "agent-architect.md"),
-      join(targetDir, "agents", "agent-tech-lead.md"),
-      join(targetDir, "agents", "agent-developer.md"),
-      join(targetDir, "agents", "agent-qa.md"),
-      join(targetDir, "agents", "agent-tech-lead-review.md"),
-      join(targetDir, "memory", "reflection-protocol.md"),
-      join(targetDir, "memory", "agent-pm.md"),
-      join(targetDir, "memory", "agent-pm-history.md"),
-      join(targetDir, "scripts", "hitl-ask.sh"),
-      join(targetDir, "scripts", "hitl-check.sh"),
-      join(targetDir, ".gitignore"),
+      join(workflowDir, "agents", "agent-pm.md"),
+      join(workflowDir, "agents", "agent-architect.md"),
+      join(workflowDir, "agents", "agent-tech-lead.md"),
+      join(workflowDir, "agents", "agent-developer.md"),
+      join(workflowDir, "agents", "agent-qa.md"),
+      join(workflowDir, "agents", "agent-tech-lead-review.md"),
+      join(workflowDir, "memory", "reflection-protocol.md"),
+      join(workflowDir, "memory", "agent-pm.md"),
+      join(workflowDir, "memory", "agent-pm-history.md"),
+      join(workflowDir, "scripts", "hitl-ask.sh"),
+      join(workflowDir, "scripts", "hitl-check.sh"),
+      join(workflowDir, ".gitignore"),
     ];
     for (const path of allFiles) {
       if (!await fileExists(path)) {
@@ -264,3 +269,65 @@ Deno.test("runInit — returns 0 on --help", async () => {
   const exitCode = await runInit(["--help"]);
   assertEquals(exitCode, 0);
 });
+
+// --- FR-S46/FR-S47/DoD-7: WORKFLOW_NAME drives folder + name --------------
+
+Deno.test(
+  "runInit — WORKFLOW_NAME answer scaffolds .flowai-workflow/<name>/",
+  async () => {
+    if (!await haveGit()) return;
+    const root = await Deno.makeTempDir({ prefix: "flowai-init-wname-" });
+    try {
+      await setupFakeProject(root);
+      const answersPath = join(root, "answers.yaml");
+      await Deno.writeTextFile(
+        answersPath,
+        [
+          "PROJECT_NAME: scaffold-demo",
+          "WORKFLOW_NAME: test-flow",
+          "DEFAULT_BRANCH: main",
+          "TEST_CMD: deno task test",
+          "LINT_CMD: deno task check",
+        ].join("\n"),
+      );
+      const exitCode = await runInit(
+        ["--answers", answersPath, "--allow-dirty"],
+        { cwd: root, engineVersion: "test-0.0.0" },
+      );
+      assertEquals(exitCode, 0);
+
+      const targetDir = join(root, ".flowai-workflow");
+      const wfDir = join(targetDir, "test-flow");
+
+      // Workflow folder is at .flowai-workflow/test-flow/
+      const yaml = await Deno.readTextFile(join(wfDir, "workflow.yaml"));
+      assertEquals(yaml.includes('name: "test-flow"'), true);
+
+      // Agents are inside the workflow folder.
+      const agentStat = await Deno.stat(join(wfDir, "agents", "agent-pm.md"));
+      assertEquals(agentStat.isFile, true);
+
+      // Nothing was written into a flat .flowai-workflow/workflow.yaml.
+      let flatExists = false;
+      try {
+        await Deno.stat(join(targetDir, "workflow.yaml"));
+        flatExists = true;
+      } catch {
+        // Expected.
+      }
+      assertEquals(flatExists, false);
+
+      // Nothing was written into the legacy IDE-native subagent registry.
+      let claudeAgentsExists = false;
+      try {
+        await Deno.stat(join(root, ".claude", "agents"));
+        claudeAgentsExists = true;
+      } catch {
+        // Expected.
+      }
+      assertEquals(claudeAgentsExists, false);
+    } finally {
+      await Deno.remove(root, { recursive: true });
+    }
+  },
+);

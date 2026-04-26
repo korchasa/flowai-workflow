@@ -1,8 +1,11 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertRejects, assertThrows } from "@std/assert";
+import { join } from "@std/path";
 import {
   extractCliFlags,
   getVersionString,
+  listWorkflows,
   parseArgs,
+  resolveWorkflowConfigPath,
   VERSION,
 } from "./cli.ts";
 
@@ -11,23 +14,42 @@ Deno.test("parseArgs — --prompt sets args.prompt", async () => {
   assertEquals(opts.args.prompt, "Fix the login bug");
 });
 
-Deno.test("parseArgs — no flags produces empty args", async () => {
+Deno.test("parseArgs — no flags leaves config_path empty for autodetection", async () => {
   const opts = await parseArgs([]);
   assertEquals(opts.args.prompt, undefined);
-  assertEquals(opts.config_path, ".flowai-workflow/workflow.yaml");
+  assertEquals(opts.config_path, "");
 });
 
-Deno.test("parseArgs — --prompt combined with --config and -v", async () => {
-  const opts = await parseArgs([
-    "--config",
-    "custom.yaml",
+Deno.test("parseArgs — --workflow sets config_path to <dir>/workflow.yaml", () => {
+  const opts = parseArgs([
+    "--workflow",
+    ".flowai-workflow/github-inbox",
     "--prompt",
     "Refactor auth module",
     "-v",
   ]);
-  assertEquals(opts.config_path, "custom.yaml");
+  assertEquals(
+    opts.config_path,
+    ".flowai-workflow/github-inbox/workflow.yaml",
+  );
   assertEquals(opts.args.prompt, "Refactor auth module");
   assertEquals(opts.verbosity, "verbose");
+});
+
+Deno.test("parseArgs — trailing slash on --workflow argument is normalized", () => {
+  const opts = parseArgs(["--workflow", ".flowai-workflow/github-inbox/"]);
+  assertEquals(
+    opts.config_path,
+    ".flowai-workflow/github-inbox/workflow.yaml",
+  );
+});
+
+Deno.test("parseArgs — --config flag rejected with --workflow hint (FR-E53)", () => {
+  assertThrows(
+    () => parseArgs(["--config", "x.yaml"]),
+    Error,
+    "Use --workflow",
+  );
 });
 
 Deno.test("parseArgs — --resume sets resume and run_id", async () => {
@@ -132,13 +154,13 @@ Deno.test("extractCliFlags — --skip-update-check is stripped and flag set", ()
 
 Deno.test("extractCliFlags — --skip-update-check can appear anywhere", () => {
   const { skipUpdateCheck, remaining } = extractCliFlags([
-    "--config",
-    "x.yaml",
+    "--workflow",
+    ".flowai-workflow/x",
     "--skip-update-check",
     "-v",
   ]);
   assertEquals(skipUpdateCheck, true);
-  assertEquals(remaining, ["--config", "x.yaml", "-v"]);
+  assertEquals(remaining, ["--workflow", ".flowai-workflow/x", "-v"]);
 });
 
 Deno.test("extractCliFlags — output passes through parseArgs cleanly", () => {
@@ -193,5 +215,116 @@ Deno.test("parseArgs — --budget non-numeric rejects", () => {
     throw new Error("should have thrown");
   } catch (e) {
     assertEquals((e as Error).message.includes("Invalid --budget"), true);
+  }
+});
+
+// --- FR-E53: --workflow flag + autodiscovery -----------------------------
+
+async function makeWorkflowFolder(
+  root: string,
+  name: string,
+): Promise<string> {
+  const dir = join(root, name);
+  await Deno.mkdir(dir, { recursive: true });
+  await Deno.writeTextFile(
+    join(dir, "workflow.yaml"),
+    `name: ${name}\nversion: "1"\nnodes: {}\n`,
+  );
+  return dir;
+}
+
+Deno.test("listWorkflows — discovers subfolders containing workflow.yaml", async () => {
+  const tmp = await Deno.makeTempDir({ prefix: "fr-e53-list-" });
+  try {
+    const root = join(tmp, ".flowai-workflow");
+    await makeWorkflowFolder(root, "alpha");
+    await makeWorkflowFolder(root, "beta");
+    // Folder without workflow.yaml is ignored.
+    await Deno.mkdir(join(root, "scripts"), { recursive: true });
+    const found = await listWorkflows(root);
+    assertEquals(found.sort(), [
+      `${root}/alpha`,
+      `${root}/beta`,
+    ]);
+  } finally {
+    await Deno.remove(tmp, { recursive: true });
+  }
+});
+
+Deno.test("listWorkflows — missing root returns empty list (fresh project)", async () => {
+  const tmp = await Deno.makeTempDir({ prefix: "fr-e53-empty-" });
+  try {
+    const found = await listWorkflows(join(tmp, "no-such-dir"));
+    assertEquals(found, []);
+  } finally {
+    await Deno.remove(tmp, { recursive: true });
+  }
+});
+
+Deno.test("resolveWorkflowConfigPath — explicit --workflow returns yaml path", async () => {
+  const tmp = await Deno.makeTempDir({ prefix: "fr-e53-explicit-" });
+  try {
+    const dir = await makeWorkflowFolder(tmp, "github-inbox");
+    const yaml = await resolveWorkflowConfigPath(dir);
+    assertEquals(yaml, `${dir}/workflow.yaml`);
+  } finally {
+    await Deno.remove(tmp, { recursive: true });
+  }
+});
+
+Deno.test("resolveWorkflowConfigPath — explicit --workflow with missing yaml errors", async () => {
+  const tmp = await Deno.makeTempDir({ prefix: "fr-e53-missing-" });
+  try {
+    await Deno.mkdir(join(tmp, "empty"));
+    await assertRejects(
+      () => resolveWorkflowConfigPath(join(tmp, "empty")),
+      Error,
+      "No workflow.yaml",
+    );
+  } finally {
+    await Deno.remove(tmp, { recursive: true });
+  }
+});
+
+Deno.test("resolveWorkflowConfigPath — autodetect with single candidate succeeds", async () => {
+  const tmp = await Deno.makeTempDir({ prefix: "fr-e53-single-" });
+  try {
+    const root = join(tmp, ".flowai-workflow");
+    const dir = await makeWorkflowFolder(root, "github-inbox");
+    const yaml = await resolveWorkflowConfigPath(undefined, root);
+    assertEquals(yaml, `${dir}/workflow.yaml`);
+  } finally {
+    await Deno.remove(tmp, { recursive: true });
+  }
+});
+
+Deno.test("resolveWorkflowConfigPath — autodetect with multiple candidates errors with listing", async () => {
+  const tmp = await Deno.makeTempDir({ prefix: "fr-e53-multi-" });
+  try {
+    const root = join(tmp, ".flowai-workflow");
+    await makeWorkflowFolder(root, "alpha");
+    await makeWorkflowFolder(root, "beta");
+    await assertRejects(
+      () => resolveWorkflowConfigPath(undefined, root),
+      Error,
+      "Multiple workflows",
+    );
+  } finally {
+    await Deno.remove(tmp, { recursive: true });
+  }
+});
+
+Deno.test("resolveWorkflowConfigPath — empty root suggests `flowai-workflow init`", async () => {
+  const tmp = await Deno.makeTempDir({ prefix: "fr-e53-zero-" });
+  try {
+    const root = join(tmp, ".flowai-workflow");
+    await Deno.mkdir(root);
+    await assertRejects(
+      () => resolveWorkflowConfigPath(undefined, root),
+      Error,
+      "flowai-workflow init",
+    );
+  } finally {
+    await Deno.remove(tmp, { recursive: true });
   }
 });

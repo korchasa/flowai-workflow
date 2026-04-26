@@ -1,5 +1,7 @@
 import { assertEquals } from "@std/assert";
+import { join } from "@std/path";
 import {
+  assertWorkflowFolderShape,
   checkArgs,
   printUsage,
   validateAgentListContent,
@@ -185,4 +187,98 @@ Deno.test("validateDocsTokenBudget — mixed list returns only over-budget entri
   assertEquals(offenders.length, 2);
   assertEquals(offenders[0].includes("documents/b.md"), true);
   assertEquals(offenders[1].includes("documents/d.md"), true);
+});
+
+// --- FR-S47/DoD-1: workflow folder shape contract ----------------------
+
+async function makeShapeFixture(
+  root: string,
+  name: string,
+  opts: { agents?: string[]; yamlReferencesAgents?: boolean } = {},
+): Promise<string> {
+  const dir = join(root, name);
+  await Deno.mkdir(dir, { recursive: true });
+  const yamlBody = opts.yamlReferencesAgents
+    ? `name: ${name}\nversion: "1"\nnodes:\n  pm:\n    type: agent\n    label: pm\n    system_prompt: "{{file(\\"${dir}/agents/agent-pm.md\\")}}"\n`
+    : `name: ${name}\nversion: "1"\nnodes:\n  only:\n    type: agent\n    label: only\n    prompt: "hello"\n`;
+  await Deno.writeTextFile(join(dir, "workflow.yaml"), yamlBody);
+  if (opts.agents !== undefined) {
+    await Deno.mkdir(join(dir, "agents"), { recursive: true });
+    for (const agent of opts.agents) {
+      await Deno.writeTextFile(
+        join(dir, "agents", agent),
+        `# ${agent} prompt\n`,
+      );
+    }
+  }
+  return dir;
+}
+
+Deno.test("assertWorkflowFolderShape — yaml + agents/agent-*.md is OK", async () => {
+  const tmp = await Deno.makeTempDir({ prefix: "shape-ok-" });
+  try {
+    const dir = await makeShapeFixture(tmp, "wf", {
+      agents: ["agent-pm.md"],
+      yamlReferencesAgents: true,
+    });
+    const errors = await assertWorkflowFolderShape(dir);
+    assertEquals(errors, []);
+  } finally {
+    await Deno.remove(tmp, { recursive: true });
+  }
+});
+
+Deno.test("assertWorkflowFolderShape — missing agents/ when YAML references it fails", async () => {
+  const tmp = await Deno.makeTempDir({ prefix: "shape-noagents-" });
+  try {
+    const dir = await makeShapeFixture(tmp, "wf", {
+      yamlReferencesAgents: true,
+    });
+    const errors = await assertWorkflowFolderShape(dir);
+    assertEquals(errors.length, 1);
+    assertEquals(errors[0].includes("missing agents/"), true);
+  } finally {
+    await Deno.remove(tmp, { recursive: true });
+  }
+});
+
+Deno.test("assertWorkflowFolderShape — no agents/ allowed when YAML doesn't reference it", async () => {
+  const tmp = await Deno.makeTempDir({ prefix: "shape-noref-" });
+  try {
+    const dir = await makeShapeFixture(tmp, "wf", {
+      yamlReferencesAgents: false,
+    });
+    const errors = await assertWorkflowFolderShape(dir);
+    assertEquals(errors, []);
+  } finally {
+    await Deno.remove(tmp, { recursive: true });
+  }
+});
+
+Deno.test("assertWorkflowFolderShape — missing workflow.yaml fails", async () => {
+  const tmp = await Deno.makeTempDir({ prefix: "shape-noyaml-" });
+  try {
+    const dir = join(tmp, "wf");
+    await Deno.mkdir(dir, { recursive: true });
+    const errors = await assertWorkflowFolderShape(dir);
+    assertEquals(errors.length, 1);
+    assertEquals(errors[0].includes("missing workflow.yaml"), true);
+  } finally {
+    await Deno.remove(tmp, { recursive: true });
+  }
+});
+
+Deno.test("assertWorkflowFolderShape — empty agents/ dir fails when present", async () => {
+  const tmp = await Deno.makeTempDir({ prefix: "shape-emptyagents-" });
+  try {
+    const dir = await makeShapeFixture(tmp, "wf", {
+      agents: [],
+      yamlReferencesAgents: false,
+    });
+    const errors = await assertWorkflowFolderShape(dir);
+    assertEquals(errors.length, 1);
+    assertEquals(errors[0].includes("contains no agent-*.md"), true);
+  } finally {
+    await Deno.remove(tmp, { recursive: true });
+  }
 });

@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## Unreleased
+
+### ⚠ BREAKING CHANGES
+
+- **Workflow folder = `.flowai-workflow/<name>/`** (FR-S47). The flat
+  `.flowai-workflow/workflow.yaml` layout is no longer supported.
+  Workflow assets — `workflow.yaml`, agent prompts, memory, scripts,
+  runs, worktrees — all live inside the workflow folder.
+- **CLI flag `--config` is removed** (FR-E53). Use `--workflow <dir>`
+  instead, where `<dir>` contains `workflow.yaml`. Without the flag,
+  the CLI autodetects from `.flowai-workflow/`: exactly-one folder
+  is used silently; zero or multiple yield a friendly error.
+- **Runtime memory is gitignored.** `.flowai-workflow/*/memory/agent-*.md`
+  (per-agent reflection state and history) is now ignored by git;
+  `memory/reflection-protocol.md` remains tracked as the static
+  protocol document referenced by `workflow.yaml`.
+
+#### End-user migration
+
+```sh
+# 1. Move workflow assets into a named folder.
+mkdir .flowai-workflow/default
+git mv .flowai-workflow/workflow.yaml .flowai-workflow/default/
+git mv .flowai-workflow/agents       .flowai-workflow/default/
+git mv .flowai-workflow/memory       .flowai-workflow/default/
+git mv .flowai-workflow/scripts      .flowai-workflow/default/
+
+# 2. Rewrite path references inside workflow.yaml
+#    (.flowai-workflow/agents/  → .flowai-workflow/default/agents/, etc.)
+
+# 3. If you have in-flight runs to resume, rewrite state.json paths:
+deno run -A scripts/migrate-state-paths.ts \
+    .flowai-workflow .flowai-workflow/default
+
+# 4. Replace any `--config <path>` calls with `--workflow <dir>`:
+flowai-workflow run --workflow .flowai-workflow/default
+```
+
 ### [0.3.2](https://github.com/korchasa/flowai-workflow/compare/v0.3.1...v0.3.2) (2026-04-26)
 
 

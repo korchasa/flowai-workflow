@@ -80,12 +80,18 @@ export class Engine {
   private startTime = 0;
   /** Working directory: worktree path or "." when worktree disabled. */
   private workDir = ".";
+  /** Workflow folder = directory containing `workflow.yaml` (FR-S47).
+   * Derived from `options.config_path` once at construction. Threaded into
+   * every state-path call so runs land under `<workflowDir>/runs/<run-id>`
+   * regardless of layout. */
+  private workflowDir: string;
 
   /** Create an engine instance with the given options and optional user-input provider. */
   constructor(options: EngineOptions, userInput: UserInput = terminalInput) {
     this.options = options;
     this.output = new OutputManager(options.verbosity);
     this.userInput = userInput;
+    this.workflowDir = deriveWorkflowDir(options.config_path);
   }
 
   /** Run the workflow. Main entry point. */
@@ -164,7 +170,11 @@ export class Engine {
 
     // Initialize or resume state
     if (this.options.resume && this.options.run_id) {
-      this.state = await loadState(this.options.run_id, this.workDir);
+      this.state = await loadState(
+        this.options.run_id,
+        this.workDir,
+        this.workflowDir,
+      );
       this.state.status = "running";
     } else {
       const allNodeIds = collectAllNodeIds(this.config);
@@ -188,7 +198,7 @@ export class Engine {
       onShutdown(async () => {
         if (this.state.status === "running") {
           markRunFailed(this.state);
-          await saveState(this.state, this.workDir);
+          await saveState(this.state, this.workDir, this.workflowDir);
         }
       }),
     ];
@@ -211,7 +221,7 @@ export class Engine {
 
     // Create run directory structure
     await this.ensureRunDirs(levels);
-    await saveState(this.state, this.workDir);
+    await saveState(this.state, this.workDir, this.workflowDir);
 
     // FR-E47: pre-execution budget check (applies to fresh and resumed runs)
     this.checkWorkflowBudget("resume");
@@ -224,7 +234,7 @@ export class Engine {
     if (!this.options.resume && prepareCmd) {
       await runPrepareCommand(
         prepareCmd,
-        getRunDir(this.state.run_id),
+        getRunDir(this.state.run_id, this.workflowDir),
         this.state.run_id,
         this.state.env,
         this.state.args,
@@ -249,7 +259,10 @@ export class Engine {
     // Ensure post-workflow node dirs exist
     for (const nodeId of postWorkflowNodeIds) {
       await Deno.mkdir(
-        workPath(this.workDir, getNodeDir(this.state.run_id, nodeId)),
+        workPath(
+          this.workDir,
+          getNodeDir(this.state.run_id, nodeId, this.workflowDir),
+        ),
         { recursive: true },
       );
     }
@@ -280,6 +293,7 @@ export class Engine {
       executeNode: (nodeId) => this.executeNode(nodeId),
       cwd,
       workDir: this.workDir,
+      workflowDir: this.workflowDir,
     });
 
     // Finalize run state
@@ -288,11 +302,11 @@ export class Engine {
     } else {
       markRunFailed(this.state);
     }
-    await saveState(this.state, this.workDir);
+    await saveState(this.state, this.workDir, this.workflowDir);
 
     // Worktree cleanup: copy state to original repo on success, then remove
     if (this.workDir !== ".") {
-      const statePath = getStatePath(this.state.run_id);
+      const statePath = getStatePath(this.state.run_id, this.workflowDir);
       try {
         await copyToOriginalRepo(this.workDir, statePath);
       } catch (err) {
@@ -410,7 +424,7 @@ export class Engine {
     // Capture waiting state before markNodeStarted overwrites status
     const wasWaiting = this.state.nodes[nodeId]?.status === "waiting";
     markNodeStarted(this.state, nodeId);
-    await saveState(this.state, this.workDir);
+    await saveState(this.state, this.workDir, this.workflowDir);
 
     const extra = node.type === "loop"
       ? `loop, max ${node.max_iterations ?? 3} iterations`
@@ -431,8 +445,9 @@ export class Engine {
         userInput: this.userInput,
         buildContext: (nId, loopIteration?) =>
           this.buildContext(nId, loopIteration),
-        saveState: () => saveState(this.state, this.workDir),
+        saveState: () => saveState(this.state, this.workDir, this.workflowDir),
         workDir: this.workDir,
+        workflowDir: this.workflowDir,
       };
 
       switch (node.type) {
@@ -491,7 +506,7 @@ export class Engine {
             this.output.nodeResult(nodeId, lastAgentResult.output);
           }
           const onError = node.settings?.on_error ?? "fail";
-          await saveState(this.state, this.workDir);
+          await saveState(this.state, this.workDir, this.workflowDir);
           return onError === "continue";
         }
 
@@ -518,11 +533,11 @@ export class Engine {
         }
       }
 
-      await saveState(this.state, this.workDir);
+      await saveState(this.state, this.workDir, this.workflowDir);
       return success;
     } catch (err) {
       markNodeFailed(this.state, nodeId, (err as Error).message, "unknown");
-      await saveState(this.state, this.workDir);
+      await saveState(this.state, this.workDir, this.workflowDir);
       this.output.nodeFailed(nodeId, (err as Error).message);
       return false;
     }
@@ -544,6 +559,7 @@ export class Engine {
       this.state.run_id,
       nodeId,
       node.inputs ?? [],
+      this.workflowDir,
     );
 
     // Merge node-level env with global env (node overrides global)
@@ -563,13 +579,19 @@ export class Engine {
 
   /** Ensure all node directories exist. */
   private async ensureRunDirs(levels: string[][]): Promise<void> {
-    const runDir = workPath(this.workDir, getRunDir(this.state.run_id));
+    const runDir = workPath(
+      this.workDir,
+      getRunDir(this.state.run_id, this.workflowDir),
+    );
     await Deno.mkdir(`${runDir}/logs`, { recursive: true });
 
     for (const level of levels) {
       for (const nodeId of level) {
         await Deno.mkdir(
-          workPath(this.workDir, getNodeDir(this.state.run_id, nodeId)),
+          workPath(
+            this.workDir,
+            getNodeDir(this.state.run_id, nodeId, this.workflowDir),
+          ),
           { recursive: true },
         );
       }
@@ -580,7 +602,10 @@ export class Engine {
       if (node.type === "loop" && node.nodes) {
         for (const bodyId of Object.keys(node.nodes)) {
           await Deno.mkdir(
-            workPath(this.workDir, getNodeDir(this.state.run_id, bodyId)),
+            workPath(
+              this.workDir,
+              getNodeDir(this.state.run_id, bodyId, this.workflowDir),
+            ),
             { recursive: true },
           );
         }
@@ -737,4 +762,17 @@ export async function runPrepareCommand(
     output.error(msg);
     throw new Error(msg);
   }
+}
+
+/** Derive workflow folder (the directory containing `workflow.yaml`) from a
+ * config-file path. Pure helper; FR-S47 + FR-E9. Returns "." for bare
+ * `workflow.yaml` so back-compat callers still operate cwd-relative. */
+export function deriveWorkflowDir(configPath: string): string {
+  const idx = Math.max(
+    configPath.lastIndexOf("/"),
+    configPath.lastIndexOf("\\"),
+  );
+  if (idx < 0) return ".";
+  const dir = configPath.slice(0, idx);
+  return dir.length > 0 ? dir : ".";
 }

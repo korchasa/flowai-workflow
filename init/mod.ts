@@ -23,6 +23,7 @@ import { runPreflight, summarizeFailures } from "./preflight.ts";
 import { readAnswersFile, runWizard } from "./wizard.ts";
 import {
   copyTemplate,
+  substitutePlaceholders,
   unwindScaffold,
   writeTemplateMetadata,
 } from "./scaffold.ts";
@@ -232,6 +233,7 @@ export async function runInit(
       templateRoot,
       targetDir,
       manifest,
+      answers,
     );
     for (const path of fileList) {
       console.log(`  ${path}`);
@@ -262,11 +264,14 @@ export async function runInit(
   }
 
   // --- Success message ---------------------------------------------------
+  const workflowName = (answers as unknown as Record<string, string>)
+    .WORKFLOW_NAME ?? "default";
+  const workflowDir = join(targetDir, workflowName);
   console.log(
-    `\n✓ Initialized .flowai-workflow/ for project "${answers.PROJECT_NAME}"\n` +
+    `\n✓ Initialized ${workflowDir} for project "${answers.PROJECT_NAME}"\n` +
       `Next steps:\n` +
-      `  1. Review ${targetDir}/agents/agent-*.md and edit for your project conventions (optional).\n` +
-      `  2. Run: flowai-workflow --config ${targetDir}/workflow.yaml\n`,
+      `  1. Review ${workflowDir}/agents/agent-*.md and edit for your project conventions (optional).\n` +
+      `  2. Run: flowai-workflow run --workflow ${workflowDir}\n`,
   );
   return 0;
 }
@@ -317,12 +322,17 @@ async function listTargetFiles(
   templateRootUrl: URL,
   targetDir: string,
   manifest: TemplateManifest,
+  answers: Answers = {} as Answers,
 ): Promise<string[]> {
   const templateRoot = fromFileUrlCompat(templateRootUrl);
   const result: string[] = [];
   for (const rule of manifest.files.copy) {
     const fromRel = rule.from.replace(/\/+$/, "").replace(/\/\*\*$/, "");
-    const toRel = rule.to.replace(/\/+$/, "");
+    // FR-S46: `to:` may contain `__WORKFLOW_NAME__` (or other) placeholders.
+    const toRel = substitutePlaceholders(rule.to, answers).replace(
+      /\/+$/,
+      "",
+    );
     const ruleSrc = join(templateRoot, fromRel);
     for await (const relFile of walk(ruleSrc)) {
       result.push(join(targetDir, toRel, relFile));

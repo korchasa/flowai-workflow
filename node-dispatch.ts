@@ -46,6 +46,10 @@ export interface EngineContext {
   saveState: () => Promise<void>;
   /** Working directory (worktree path or "."). All subprocesses and I/O use this. */
   workDir: string;
+  /** Workflow folder (containing `workflow.yaml`). FR-S47/FR-E9: threaded into
+   * state-path calls so runs land under `<workflowDir>/runs/<run-id>` regardless
+   * of project layout. */
+  workflowDir: string;
 }
 
 /** Run an agent node: invoke Claude CLI, handle HITL if triggered, save logs. */
@@ -230,7 +234,10 @@ export async function executeAgentNode(
 
   // Save agent log (JSON output + JSONL transcript)
   if (result.output) {
-    const runDir = workPath(eng.workDir, getRunDir(eng.state.run_id));
+    const runDir = workPath(
+      eng.workDir,
+      getRunDir(eng.state.run_id, eng.workflowDir),
+    );
     await saveAgentLog(runDir, nodeId, result.output);
   }
 
@@ -243,14 +250,17 @@ export async function executeMergeNode(
   nodeId: string,
   node: NodeConfig,
 ): Promise<boolean> {
-  const nodeDir = workPath(eng.workDir, getNodeDir(eng.state.run_id, nodeId));
+  const nodeDir = workPath(
+    eng.workDir,
+    getNodeDir(eng.state.run_id, nodeId, eng.workflowDir),
+  );
   await Deno.mkdir(nodeDir, { recursive: true });
 
   // Copy input directories as subdirectories
   for (const inputId of node.inputs ?? []) {
     const inputDir = workPath(
       eng.workDir,
-      getNodeDir(eng.state.run_id, inputId),
+      getNodeDir(eng.state.run_id, inputId, eng.workflowDir),
     );
     const targetDir = `${nodeDir}/${inputId}`;
     try {
@@ -298,7 +308,10 @@ export async function executeLoopNode(
 
       // Save agent log for successful loop body nodes (iteration-qualified)
       if (result.success && result.output) {
-        const runDir = workPath(eng.workDir, getRunDir(eng.state.run_id));
+        const runDir = workPath(
+          eng.workDir,
+          getRunDir(eng.state.run_id, eng.workflowDir),
+        );
         const iterNodeId = `${id}-iter-${iteration}`;
         saveAgentLog(runDir, iterNodeId, result.output).catch((err) => {
           eng.output.warn(

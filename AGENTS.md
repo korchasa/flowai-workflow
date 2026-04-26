@@ -68,9 +68,17 @@ example of engine usage.
   completed nodes skipped based on `state.json`
 - **Observability:** 3 verbosity levels (`-q`/default/`-v`); status lines with
   timestamps; final summary
-- **SDLC workflow (example):** `.flowai-workflow/workflow.yaml` — 6 agents automating
-  full development lifecycle. Agents in `.claude/agents/agent-*.md` (native Claude Code
-  subagents). Memory in `.flowai-workflow/memory/`
+- **SDLC workflow (example):** dogfood ships three workflow folders under
+  `.flowai-workflow/`:
+  - `github-inbox/` (Claude Code runtime; primary)
+  - `github-inbox-opencode/` (OpenCode + GLM-5)
+  - `github-inbox-opencode-test/` (smoke-test variant)
+  Each is self-contained: `workflow.yaml`, `agents/agent-*.md`, `memory/`,
+  `scripts/`, `runs/`, `worktrees/`. Pick one with `--workflow <dir>` or
+  rely on autodetect when only one folder exists. **Drift caveat:** agent
+  prompts under `.flowai-workflow/<name>/agents/` are intentionally
+  duplicated between workflow folders — when editing a shared agent,
+  apply the same change to every copy or document the divergence here.
 - **Docker image:** Single image with claude CLI, deno, git, gh
 
 ## Repo Layout

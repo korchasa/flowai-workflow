@@ -6,8 +6,11 @@
 
 /** Wizard answers keyed by placeholder name (without underscores). */
 export interface Answers {
-  /** Project identifier — used as workflow name prefix and in log output. */
+  /** Project identifier — used in log output and `name:` of generated config. */
   PROJECT_NAME: string;
+  /** Workflow folder name; placed under `.flowai-workflow/<WORKFLOW_NAME>/`
+   * (FR-S47). Defaults to `default` when wizard omitted. */
+  WORKFLOW_NAME: string;
   /** Base branch for PRs (e.g., `main`, `master`). */
   DEFAULT_BRANCH: string;
   /** Command that runs the project build/lint gate (used as `custom_script`). */

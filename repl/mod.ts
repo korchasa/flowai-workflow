@@ -182,10 +182,10 @@ function buildSystemPrompt(engineVersion: string): string {
     "",
     "## Project structure",
     "",
-    "- `.flowai-workflow/workflow.yaml` — workflow DAG config",
-    "- `.flowai-workflow/agents/agent-*.md` — agent prompt definitions",
-    "- `.flowai-workflow/memory/` — persistent agent memory",
-    "- `.flowai-workflow/runs/` — per-run artifacts and state",
+    "- `.flowai-workflow/<name>/workflow.yaml` — workflow DAG config",
+    "- `.flowai-workflow/<name>/agents/agent-*.md` — agent prompt definitions",
+    "- `.flowai-workflow/<name>/memory/` — persistent agent memory",
+    "- `.flowai-workflow/<name>/runs/` — per-run artifacts and state",
   ].join("\n");
 }
 

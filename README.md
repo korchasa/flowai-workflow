@@ -71,29 +71,52 @@ Inter-agent communication uses structured Markdown artifacts in `<runs-dir>/<run
 
 ## Quick Start: New Project
 
-Scaffold a ready-to-run `.flowai-workflow/` directory into an existing
-project in one command:
+Scaffold a ready-to-run workflow folder into an existing project in one
+command:
 
 ```bash
 cd your-project
 flowai-workflow init
 ```
 
-The wizard asks four questions (project name, default branch, test
-command, lint command) with autodetected defaults read from `deno.json`,
-`package.json`, `go.mod`, `pyproject.toml`, or `Cargo.toml`. On success, the
-bundled SDLC template (PM → Architect → Tech Lead → Developer/QA loop →
-Tech Lead Review) is written into `.flowai-workflow/`, ready for:
+The wizard asks five questions (project name, workflow name — defaults to
+`default`, default branch, test command, lint command) with autodetected
+defaults read from `deno.json`, `package.json`, `go.mod`, `pyproject.toml`,
+or `Cargo.toml`. On success, the bundled SDLC template (PM → Architect →
+Tech Lead → Developer/QA loop → Tech Lead Review) is written into
+`.flowai-workflow/<workflow-name>/`, ready for:
 
 ```bash
-flowai-workflow --config .flowai-workflow/workflow.yaml
+flowai-workflow run --workflow .flowai-workflow/<workflow-name>
 ```
+
+When a project hosts only one workflow folder, `--workflow` may be
+omitted — the CLI autodetects it.
+
+### Workflow folder
+
+Every workflow lives in its own self-contained directory:
+
+```
+.flowai-workflow/<name>/
+    workflow.yaml          # required
+    agents/agent-*.md      # required iff workflow.yaml references agent files
+    memory/                # optional; agent-*.md gitignored (runtime state)
+    scripts/               # optional
+    runs/                  # generated, gitignored
+    worktrees/             # generated, gitignored
+```
+
+Multiple workflows in one project: keep them as siblings under
+`.flowai-workflow/`; each is fully isolated. `git mv` a folder to share
+it with another repo — it carries everything it needs.
 
 ### Non-interactive init (CI)
 
 ```bash
 cat > init-answers.yaml <<EOF
 PROJECT_NAME: my-project
+WORKFLOW_NAME: default
 DEFAULT_BRANCH: main
 TEST_CMD: npm test
 LINT_CMD: npm run lint
@@ -113,19 +136,20 @@ Init preflight verifies all of these before writing any files:
 
 Missing dependencies are reported together in a single summary so the
 first run can be fixed in one pass. Init writes **only** inside
-`.flowai-workflow/` — no `.claude/agents/`, no top-level `.gitignore`
-append, no files outside the target directory. Run `flowai-workflow init
---dry-run` to preview the file list before committing.
+`.flowai-workflow/<workflow-name>/` — no native-IDE subagent registry
+writes, no top-level `.gitignore` append, no files outside the target
+directory. Run `flowai-workflow init --dry-run` to preview the file
+list before committing.
 
 ### What's inside the template
 
 The `sdlc-claude` template is framework-independent: generic agent
 prompts with no hardcoded project-specific references. Review and tune
-`.flowai-workflow/agents/agent-*.md` for your project conventions after
-scaffold. A separate `flowai-workflow update` command will pull upstream
-template changes in a future release — metadata in
-`.flowai-workflow/.template.json` records the engine + template version
-at init time for the diff.
+`.flowai-workflow/<workflow-name>/agents/agent-*.md` for your project
+conventions after scaffold. A separate `flowai-workflow update`
+command will pull upstream template changes in a future release —
+metadata in `.flowai-workflow/.template.json` records the engine +
+template version at init time for the diff.
 
 ## Quick Start
 
@@ -152,7 +176,10 @@ Options:
   --prompt <text>     Additional context passed to first agent
   --resume <run-id>   Resume a previous run (skip completed nodes)
   --dry-run           Validate config and show DAG without executing
-  --config <path>     Custom workflow config (default: .flowai-workflow/workflow.yaml)
+  --workflow <dir>    Workflow folder (e.g. .flowai-workflow/default).
+                      When omitted: autodetected from .flowai-workflow/.
+                      Errors with listing if multiple candidates exist;
+                      errors with "run flowai-workflow init" if none.
   --skip <nodes>      Comma-separated node IDs to skip
   --only <nodes>      Run only specified nodes
   --env KEY=VAL       Set environment variable for the run
@@ -218,7 +245,7 @@ graph TD
     verify -- "verdict: PASS" --> review
 ```
 
-Workflow config: `.flowai-workflow/workflow.yaml`
+Workflow config: `.flowai-workflow/<workflow-name>/workflow.yaml`
 
 | Node | Phase | Role | Output |
 |------|-------|------|--------|
@@ -228,15 +255,15 @@ Workflow config: `.flowai-workflow/workflow.yaml`
 | `implementation` | impl | Developer+QA loop (max 3 iterations) | implementation + `05-qa-report.md` |
 | `tech-lead-review` | report | Tech Lead Review — Final Review + Merge (run_on: always) | `06-review.md` |
 
-All 6 workflow agents are native Claude Code subagents in `.claude/agents/agent-<name>.md`:
+All 6 workflow agents are framework-independent Markdown files at
+`.flowai-workflow/<workflow-name>/agents/agent-<role>.md`:
 
-- `/agent-pm` — Project Manager (specification)
-- `/agent-architect` — Architect (design-solution plan)
-- `/agent-tech-lead` — Tech Lead (decision & branch & PR)
-- `/agent-developer` — Developer (implementation)
-- `/agent-qa` — QA (verification)
-- `/agent-tech-lead-review` — Tech Lead Review (final review & merge)
-- `/agent-meta-agent` — Meta-Agent (prompt optimization)
+- `agent-pm` — Project Manager (specification)
+- `agent-architect` — Architect (design-solution plan)
+- `agent-tech-lead` — Tech Lead (decision & branch & PR)
+- `agent-developer` — Developer (implementation)
+- `agent-qa` — QA (verification)
+- `agent-tech-lead-review` — Tech Lead Review (final review & merge)
 
 ## Project Structure
 
@@ -245,18 +272,16 @@ cli.ts, engine.ts, agent.ts, ... # DAG executor engine modules (root)
 init/                            # Project scaffolder (`flowai-workflow init`)
 repl/                            # Interactive REPL
 scripts/                         # Dev tooling (check, compile, dashboard, release-notes)
-.flowai-workflow/
-  workflow.yaml                  # SDLC workflow config (example)
-  agents/                        # Agent prompts (symlinked from .claude/skills/)
-    agent-pm/SKILL.md
-    agent-architect/SKILL.md
-    agent-tech-lead/SKILL.md
-    agent-developer/SKILL.md
-    agent-qa/SKILL.md
-    agent-tech-lead-review/SKILL.md
-    agent-meta-agent/SKILL.md
-  runs/                          # Per-run artifacts and state
-  scripts/                       # HITL scripts
+.flowai-workflow/                # One folder per workflow (FR-S47)
+  github-inbox/                  # Workflow folder = portable unit
+    workflow.yaml
+    agents/agent-*.md            # Agent prompts (per-workflow copy)
+    memory/                      # reflection-protocol.md tracked; agent-*.md gitignored
+    scripts/                     # HITL & hook scripts
+    runs/                        # Per-run artifacts and state (gitignored)
+    worktrees/                   # Isolated git worktrees (gitignored)
+  github-inbox-opencode/         # Sibling workflow with different runtime
+    …
 documents/
   requirements-engine.md         # SRS — Engine scope
   requirements-sdlc.md           # SRS — SDLC Workflow scope
@@ -283,7 +308,7 @@ chmod +x flowai-workflow-darwin-arm64 && mv flowai-workflow-darwin-arm64 flowai-
 ./flowai-workflow --version
 
 # Run a workflow
-./flowai-workflow --config .flowai-workflow/workflow.yaml
+./flowai-workflow run --workflow .flowai-workflow/<workflow-name>
 ```
 
 Alternatively, run directly with Deno (see Prerequisites below).

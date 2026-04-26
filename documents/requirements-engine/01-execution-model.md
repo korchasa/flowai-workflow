@@ -51,8 +51,15 @@
 - **Acceptance criteria:**
   - [x] Engine source code lives under a standard `src/` or dedicated top-level directory (not `.flowai-workflow/engine/`). Evidence: `engine/` (top-level directory, 30 files moved via `git mv .flowai-workflow/engine/ engine/`)
   - ~~`[ ] Agent prompts in a top-level agents/ directory`~~ — superseded by FR-S17/FR-S13: canonical location is `.flowai-workflow/agents/agent-<name>/`.
-  - [x] Workflow config path configurable via `--config <path>` flag (default: `.flowai-workflow/workflow.yaml`). Engine is config-path-agnostic — no hardcoded root assumption. Evidence: `cli.ts:7,37` (`--config` flag definition and handling), `config.ts:37` (`loadConfig(path)` accepts any path)
-  - [x] Run artifacts in gitignored `.flowai-workflow/runs/` directory; `.gitignore` updated. Evidence: `.gitignore:3` (`.flowai-workflow/runs/` entry)
+  - [x] Workflow config path resolved from `--workflow <dir>` (FR-E53;
+    `<dir>/workflow.yaml`). With FR-S47 the workflow folder is
+    `.flowai-workflow/<name>/`. Engine remains path-agnostic — `loadConfig`
+    accepts any path. Evidence: `cli.ts::resolveWorkflowConfigPath`,
+    `engine.ts::deriveWorkflowDir`, `config.ts::loadConfig`.
+  - [x] Run artifacts live in gitignored `<workflow-dir>/runs/` (per
+    FR-E9 update + FR-S47). Evidence: `.gitignore`
+    (`.flowai-workflow/*/runs/`), `state.ts::getRunDir(runId, workflowDir)`,
+    `engine.ts::Engine.workflowDir`.
   - ~~`[ ] Legacy shell scripts in a scripts/ directory (not .flowai-workflow/scripts/)`~~ — SDLC workflow convention, not engine constraint. Legacy scripts remain at `.flowai-workflow/scripts/` (SDLC scope, outside engine boundary).
   - [x] `deno.json` tasks (`run`, `check`, `test`) updated to reference `cli.ts` and `scripts/`. Evidence: `deno.json:7,19` (`check`, `run` tasks referencing `cli.ts`)
   - [x] All existing engine tests pass after restructuring. Evidence: `deno task check` passes.
@@ -62,9 +69,12 @@
 
 ### 3.9 FR-E9: Run Artifacts Folder Structure
 
-- **Description:** Run artifacts under `.flowai-workflow/runs/<run-id>/` must follow a
-  hierarchical layout that groups node output directories by workflow phase,
-  separating agent output artifacts from runtime metadata (logs, state).
+- **Description:** Run artifacts live under
+  `<workflow-dir>/runs/<run-id>/` — where `<workflow-dir>` is the
+  workflow folder selected by `--workflow` (FR-E53; FR-S47 mandates
+  `.flowai-workflow/<name>/`). Within a run, node output directories
+  are grouped by workflow phase, separating agent output artifacts
+  from runtime metadata (logs, state).
 - **Motivation:** Current flat layout intermixes planning nodes, implementation
   loop nodes, commit nodes, and infrastructure files (`logs/`, `state.json`)
   at the same level. This hinders navigability and does not reflect the
@@ -74,17 +84,23 @@
   at the run root level (not inside phase groups).
 - **Acceptance criteria:**
   - [x] Node output directories are grouped by workflow phase under
-    `.flowai-workflow/runs/<run-id>/` (e.g., `plan/`, `impl/`, `report/`). Phase derived
-    from exactly one mechanism per FR-E33 (canonical: top-level `phases:` block;
-    alternate: per-node `phase:` field). Evidence: `state.ts:28-45`
-    (`setPhaseRegistry()` — builds nodeId→phase map via exclusive if/else),
-    `state.ts:98-104` (`getNodeDir()` — phase-aware path resolution),
-    `engine.ts:135` (`setPhaseRegistry(config)` at engine init)
+    `<workflow-dir>/runs/<run-id>/` (e.g., `plan/`, `impl/`, `report/`).
+    Phase derived from exactly one mechanism per FR-E33 (canonical:
+    top-level `phases:` block; alternate: per-node `phase:` field).
+    Evidence: `state.ts::setPhaseRegistry`,
+    `state.ts::getNodeDir(runId, nodeId, workflowDir)`,
+    `engine.ts::Engine.runWithLock` (phase registry init at run start).
   - [x] `state.json` and `logs/` remain at the run root level
-    (`.flowai-workflow/runs/<run-id>/state.json`, `.flowai-workflow/runs/<run-id>/logs/`). Phase
-    registry applies only to node artifact dirs; `getRunDir()` is
-    phase-independent. Evidence: `state.ts:44-46` (`getPhaseForNode()`
-    — used only in `getNodeDir()`, not in state/log path resolution)
+    (`<workflow-dir>/runs/<run-id>/state.json`,
+    `<workflow-dir>/runs/<run-id>/logs/`). Phase registry applies only
+    to node artifact dirs; `getRunDir()` is phase-independent.
+    Evidence: `state.ts::getPhaseForNode` (used only in `getNodeDir`).
+  - [x] DoD-14 (FR-S47): runs land under the active workflow folder
+    regardless of layout. Evidence:
+    `state.ts::getRunDir(runId, workflowDir)`,
+    `engine.ts::Engine.workflowDir =
+    deriveWorkflowDir(options.config_path)`,
+    `state_test.ts::getRunDir — workflow-aware`.
   - [x] `{{node_dir}}` and `{{input.<node-id>}}` template variables resolve
     correctly to phase-aware hierarchical paths. Evidence:
     `state.ts:98-104` (`getNodeDir()` returns

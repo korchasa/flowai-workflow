@@ -87,6 +87,9 @@ export interface PostWorkflowOptions {
   cwd?: string;
   /** Working directory for state I/O. Defaults to ".". */
   workDir?: string;
+  /** Workflow folder hosting `runs/<run-id>` (FR-S47/FR-E9). When omitted,
+   * defaults via `saveState` to `.flowai-workflow` for backward compatibility. */
+  workflowDir?: string;
 }
 
 /**
@@ -107,6 +110,7 @@ export async function executePostWorkflow(
     executeNode,
     cwd,
     workDir,
+    workflowDir,
   } = opts;
 
   if (nodeIds.length === 0) return;
@@ -122,7 +126,7 @@ export async function executePostWorkflow(
     if (nodeRunOn === "success" && !workflowSuccess) {
       markNodeSkipped(state, nodeId);
       output.nodeSkipped(nodeId, "skipped: run_on=success but workflow failed");
-      await saveState(state, workDir);
+      await saveState(state, workDir, workflowDir);
       continue;
     }
     if (nodeRunOn === "failure" && workflowSuccess) {
@@ -131,7 +135,7 @@ export async function executePostWorkflow(
         nodeId,
         "skipped: run_on=failure but workflow succeeded",
       );
-      await saveState(state, workDir);
+      await saveState(state, workDir, workflowDir);
       continue;
     }
 

@@ -131,7 +131,8 @@ export interface NodeConfig {
 
   // agent-specific
   /** Name of Claude Code agent (without .md extension) passed via --agent flag.
-   * Points to `.claude/agents/<name>.md`. Optional — allows prompt-only nodes. */
+   * Resolved by the runtime against its own subagent registry. Optional —
+   * allows prompt-only nodes. */
   agent?: string;
   /** Templateable task prompt sent to the agent via -p flag.
    * Supports `{{...}}` interpolation. Required for agent nodes. */

@@ -142,10 +142,14 @@
     `scope: engine`, `scope: sdlc`, `deno task` in `flowai-init/templates/`
     returns zero matches. Evidence:
     `flowai-init/templates/sdlc-claude/files/.flowai-workflow/`.
-  - [x] Template manifest `template.yaml` declares 4 wizard questions
-    (`PROJECT_NAME`, `DEFAULT_BRANCH`, `TEST_CMD`, `LINT_CMD`), hard
-    requirements (github.com remote), and file copy rules. Evidence:
-    `flowai-init/templates/sdlc-claude/template.yaml:1-46`.
+  - [x] Template manifest `template.yaml` declares 5 wizard questions
+    (`PROJECT_NAME`, `WORKFLOW_NAME` — default `default`, FR-S47;
+    `DEFAULT_BRANCH`, `TEST_CMD`, `LINT_CMD`), hard requirements
+    (github.com remote), and file copy rules with the destination
+    `.flowai-workflow/__WORKFLOW_NAME__/`. Evidence:
+    `init/templates/sdlc-claude/template.yaml`,
+    `init/integration_test.ts::WORKFLOW_NAME answer scaffolds
+    .flowai-workflow/<name>/`.
   - [x] `scaffold.ts` implements placeholder substitution, tracked file copy,
     unwind-on-error, and `.template.json` metadata write. Evidence:
     `flowai-init/scaffold.ts:1-180`.

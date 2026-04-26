@@ -3,9 +3,17 @@
 # SRS SDLC — Artifacts Layout and Agent Memory
 
 
-### 3.17 FR-S17: Agentskills.io-Compliant Skill Layout
+### 3.17 FR-S17: Agent Prompt Layout
 
-- **Description:** All workflow agent skills must conform to the [agentskills.io specification](https://agentskills.io/specification). Canonical skill directories live in `.flowai-workflow/agents/agent-<name>/`. Associated stage scripts co-located under `scripts/` subdirectory of each skill. Frontmatter uses only spec-defined fields.
+- **Status:** Superseded by FR-S47 — canonical agent location is now
+  `.flowai-workflow/<name>/agents/agent-<role>.md` (single Markdown file per
+  agent; the earlier `agent-<name>/SKILL.md` directory layout is dropped).
+- **Description (current):** Each workflow folder owns its agent prompts as
+  flat Markdown files under `.flowai-workflow/<name>/agents/agent-<role>.md`.
+  Files are framework-independent (no spec-bound frontmatter required) and
+  loaded by `system_prompt: '{{file(...)}}'` in `workflow.yaml`.
+- **Description (legacy):** Earlier revisions of this FR required
+  agentskills.io-compliant skill directories at `.flowai-workflow/agents/agent-<name>/SKILL.md`. That layout is no longer used; agent prompts ship as plain `.md` files inside the workflow folder.
 - **Motivation:** Spec compliance enables standard skill tooling and discovery. Co-location reduces cognitive overhead. Removing the `agents/` → `.claude/skills/` symlink indirection eliminates broken-symlink failure mode.
 - **Acceptance criteria:**
   - [x] Each skill directory `.flowai-workflow/agents/agent-<name>/` contains `SKILL.md` with frontmatter fields: `name` (matches directory name), `description`, `compatibility`, `allowed-tools`. No `disable-model-invocation` field. Expected: `.flowai-workflow/agents/agent-pm/SKILL.md`, `.flowai-workflow/agents/agent-architect/SKILL.md`, `.flowai-workflow/agents/agent-tech-lead/SKILL.md`, `.flowai-workflow/agents/agent-tech-lead-review/SKILL.md`, `.flowai-workflow/agents/agent-developer/SKILL.md`, `.flowai-workflow/agents/agent-qa/SKILL.md`, `.flowai-workflow/agents/agent-meta-agent/SKILL.md`. Evidence: commit `f0085df sdlc(impl): rename Executor agent role to Developer (FR-S18)`; QA PASS run `20260314T000902` (436 tests)
@@ -41,7 +49,17 @@
 
 ### 3.26 FR-S26: Workflow Asset Directory Consolidation
 
-- **Desc:** All workflow assets (config, agent prompts, scripts, tasks, runs) MUST be consolidated under `.flowai-workflow/` directory. Eliminates `.flowai-workflow/` (domain-specific naming, violates engine's domain-agnostic principle) and decouples agent prompts from `.claude/skills/` (Claude Code's skill-system coupling).
+- **Status:** Superseded by FR-S47 — the consolidation unit is now the
+  workflow folder `.flowai-workflow/<name>/`, not the top-level
+  `.flowai-workflow/`. Multiple workflow folders may coexist as siblings.
+- **Desc (current):** All assets for a single workflow (config, agent
+  prompts, memory, scripts, runs, worktrees) live under one
+  `.flowai-workflow/<name>/` directory. The top level
+  `.flowai-workflow/` holds only workflow folders — never files.
+- **Desc (legacy):** Earlier revisions required all assets at the flat
+  top level (`.flowai-workflow/agents/`, `.flowai-workflow/scripts/`,
+  …). That layout is replaced by the per-workflow folder shape; each
+  workflow is a self-contained, portable unit.
 - **Directory layout:**
   ```
   .flowai-workflow/
@@ -183,3 +201,45 @@
     `20260319T204544`).
 
 
+
+
+
+### 3.47 FR-S47: Workflow Folder Contract
+
+- **Description:** A "workflow" is the unit of consolidation. Every
+  workflow lives at `.flowai-workflow/<name>/` and is fully self-
+  contained: it owns its `workflow.yaml`, agent prompts, memory,
+  scripts, runs and worktrees. A single project may host any number
+  of workflow folders as siblings under `.flowai-workflow/`. Top-
+  level `.flowai-workflow/` MUST NOT contain any non-folder entries
+  (no `runs/`, no `memory/`, no shared `_shared/` — keep workflows
+  isolated; copy duplicates instead).
+- **Required entries** (per workflow folder):
+  - `workflow.yaml` — engine config; `name:` matches `<name>`.
+  - `agents/agent-*.md` — REQUIRED iff `workflow.yaml` references any
+    `{{file("…/agents/agent-*.md")}}` prompt. Optional otherwise.
+- **Optional entries:** `memory/`, `scripts/`, `runs/`, `worktrees/`,
+  `tasks/`, `.gitignore`, `.template.json`.
+- **Cross-workflow drift:** Agent prompt copies between workflow
+  folders are intentional duplicates. Edits to a shared agent must be
+  applied to every copy or a deliberate divergence must be recorded
+  in CLAUDE.md / AGENTS.md.
+- **Acceptance:**
+  - [x] `assertWorkflowFolderShape(dir)` enforces the contract on
+    every dogfood workflow folder. Evidence:
+    `scripts/check.ts::assertWorkflowFolderShape`,
+    `scripts/check.ts::workflowIntegrity`,
+    `scripts/check_test.ts` (5 cases covering OK / missing-yaml /
+    missing-agents-when-referenced / no-agents-when-not-referenced /
+    empty-agents).
+  - [x] Top-level `.flowai-workflow/` of this repo holds exactly the
+    three workflow folders `github-inbox`, `github-inbox-opencode`,
+    `github-inbox-opencode-test` and zero files. Evidence:
+    `dogfood_layout_test.ts`.
+  - [x] No active configs/code reference `.claude/agents/`. Evidence:
+    `scripts/check.ts::noClaudeAgentsRefs` runs as part of
+    `workflowIntegrity` in `deno task check`.
+  - [x] `state.json` migration helper `scripts/migrate-state-paths.ts`
+    rewrites legacy paths in-place; idempotent. Evidence:
+    `scripts/migrate-state-paths_test.ts` (3 cases: rewrite, idempotent,
+    walk).

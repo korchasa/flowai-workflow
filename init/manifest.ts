@@ -25,7 +25,13 @@ import type {
 
 /** Keys that may appear in `questions[].key`. */
 const KNOWN_QUESTION_KEYS: ReadonlySet<keyof Answers> = new Set<keyof Answers>(
-  ["PROJECT_NAME", "DEFAULT_BRANCH", "TEST_CMD", "LINT_CMD"],
+  [
+    "PROJECT_NAME",
+    "WORKFLOW_NAME",
+    "DEFAULT_BRANCH",
+    "TEST_CMD",
+    "LINT_CMD",
+  ],
 );
 
 /** Known detect handler names matching `cli/init/autodetect.ts`. */
