@@ -2,7 +2,7 @@
  * @module
  * Dogfood-only sanity tests for the multi-workflow layout (FR-S47/DoD-2).
  *
- * Asserts that this repository hosts exactly the three expected workflow
+ * Asserts that this repository hosts exactly the four expected workflow
  * folders directly under `.flowai-workflow/`, each with a `workflow.yaml`,
  * and that no stray files or other directories live at that level.
  *
@@ -14,13 +14,14 @@
 import { assertEquals } from "@std/assert";
 
 const EXPECTED_WORKFLOWS = [
+  "autonomous-sdlc",
   "github-inbox",
   "github-inbox-opencode",
   "github-inbox-opencode-test",
 ] as const;
 
 Deno.test(
-  "dogfood — `.flowai-workflow/` contains only the three workflow folders",
+  "dogfood — `.flowai-workflow/` contains only the four workflow folders",
   async () => {
     const entries: { name: string; isDir: boolean; isFile: boolean }[] = [];
     for await (const e of Deno.readDir(".flowai-workflow")) {

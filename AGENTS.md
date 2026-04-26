@@ -68,11 +68,22 @@ example of engine usage.
   completed nodes skipped based on `state.json`
 - **Observability:** 3 verbosity levels (`-q`/default/`-v`); status lines with
   timestamps; final summary
-- **SDLC workflow (example):** dogfood ships three workflow folders under
+- **SDLC workflow (example):** dogfood ships four workflow folders under
   `.flowai-workflow/`:
   - `github-inbox/` (Claude Code runtime; primary)
   - `github-inbox-opencode/` (OpenCode + GLM-5)
   - `github-inbox-opencode-test/` (smoke-test variant)
+  - `autonomous-sdlc/` (reference template, OpenCode + GLM-5; PM
+    autonomously generates and scores tasks across business directions —
+    no GitHub issues. Developer/QA merged into a single agent that owns
+    quality end-to-end (TDD + chooses tests + self-verifies acceptance
+    criteria). Tech Lead Review is the authoritative quality gate: it
+    can Edit code directly, runs full `deno task check`, and merges the
+    feature branch into local `main` via `git merge --no-ff` on PASS.
+    Fully local pipeline — no PR, no push, no `gh`. Branch naming:
+    `task-<slug>` from spec frontmatter. 5 agents, no Dev⇄QA loop.
+    Imported from `kazar-fairy-taler` as a reusable template; retains
+    LumaTale-specific `direction` taxonomy as an example)
   Each is self-contained: `workflow.yaml`, `agents/agent-*.md`, `memory/`,
   `scripts/`, `runs/`, `worktrees/`. Select one by passing it as the
   mandatory positional argument: `flowai-workflow run <workflow>`.
