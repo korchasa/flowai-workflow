@@ -1,4 +1,9 @@
 # Core Project Rules
+
+> **Note:** `CLAUDE.md` is a symlink to this file. Edits to either path
+> retarget here. When citing edits to a user, prefer `AGENTS.md` as the
+> canonical name.
+
 - Follow your assigned role strictly — it defines scope and boundaries for your actions.
 - After finishing a session, review all project documents(readme.md, requirements.md, design.md, etc) to ensure they reflect the current state. Stale docs mislead future sessions.
 - Verify every change by running appropriate tests or scripts — never assume correctness without evidence.
@@ -87,6 +92,15 @@ example of engine usage.
   Each is self-contained: `workflow.yaml`, `agents/agent-*.md`, `memory/`,
   `scripts/`, `runs/`, `worktrees/`. Select one by passing it as the
   mandatory positional argument: `flowai-workflow run <workflow>`.
+  **`deno task run` is hardcoded to `github-inbox`.** To run a different
+  variant: `deno run -A --no-check cli.ts run .flowai-workflow/<variant>` —
+  or add a per-variant task to `deno.json`.
+  **Config validation:** use `--dry-run` (not `--validate` — it doesn't
+  exist; unknown flags are accepted silently and trigger worktree creation
+  as a side effect that has to be cleaned up with `git worktree remove
+  --force`).
+  **`memory/agent-*.md` files are gitignored** at the repo root (they
+  accumulate per run); only `memory/reflection-protocol.md` is tracked.
   **Drift caveat:** agent
   prompts under `.flowai-workflow/<name>/agents/` are intentionally
   duplicated between workflow folders — when editing a shared agent,
