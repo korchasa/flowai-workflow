@@ -65,6 +65,14 @@ export interface HitlDetectParams extends HitlBaseParams {
   agentSessionId: string;
 }
 
+/**
+ * Discriminated union over the two HITL entry points.
+ * Use `mode: "resume"` ({@link HitlResumeParams}) when the node was
+ * persisted as `waiting` and the engine is rehydrating it from state.
+ * Use `mode: "detect"` ({@link HitlDetectParams}) when a HITL question
+ * was just detected in fresh agent output and additional fields
+ * (`hitlQuestion`, `agentSessionId`) are required.
+ */
 export type HitlHandlerParams = HitlResumeParams | HitlDetectParams;
 
 /**

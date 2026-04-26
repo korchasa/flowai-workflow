@@ -151,20 +151,12 @@ export class Engine {
     }
 
     if (this.options.resume && this.options.run_id) {
-      // Resume: reuse existing worktree if it exists. Honours the FR-E57
-      // legacy-resume fallback so an in-flight run on the old layout
-      // survives a binary upgrade.
+      // Resume: reuse existing worktree if it exists.
       const existing = !worktreeDisabled
         ? resolveExistingWorktreePath(this.options.run_id, this.workflowDir)
         : undefined;
       if (existing) {
         this.workDir = existing.path;
-        if (existing.legacy) {
-          this.output.warn(
-            `legacy worktree layout at ${existing.path}; new runs use ` +
-              `${this.workflowDir}/runs/<id>/worktree (FR-E57)`,
-          );
-        }
         this.output.status("engine", `RESUME worktree: ${this.workDir}`);
       } else {
         this.workDir = ".";

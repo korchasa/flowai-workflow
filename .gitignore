@@ -1,7 +1,6 @@
 .DS_Store
 .env
 .flowai-workflow/*/runs/
-.flowai-workflow/*/worktrees/
 .flowai-workflow/*/memory/agent-*.md
 .flowai-workflow/runs/
 .claude/worktrees/

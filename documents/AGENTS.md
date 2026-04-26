@@ -2,51 +2,21 @@
 
 **CRITICAL:** MEMORY RESETS. DOCS = ONLY LINK TO PAST. MAINTAIN ACCURACY.
 
-## Scope Separation
+> Project-wide scope separation, GitHub issue rules, and the high-level
+> documentation hierarchy live in the root [AGENTS.md](../AGENTS.md). This
+> file scopes only `documents/`-specific conventions: section index for
+> R&D references, file size budget, SRS/SDS/GODS formats, compressed
+> style rules.
 
-Project has two in-repo documentation scopes:
+## Documents Index (extends root hierarchy)
 
-- **Engine** — domain-agnostic DAG executor (`engine/`). Core features: node
-  types, validation, continuation, resume, HITL, CLI, template interpolation.
-- **SDLC Workflow** — example workflow using the engine. SDLC-specific agents,
-  prompts, GitHub workflow, dashboard, devcontainer.
+In addition to the SRS/SDS indexes listed in the root `AGENTS.md`, this
+folder also hosts:
 
-Each scope has its own SRS and SDS files.
-
-The CLI wrapper library (`@korchasa/ai-ide-cli`) is documented in the sibling
-repo [`korchasa/ai-ide-cli`](https://github.com/korchasa/ai-ide-cli)
-(`documents/requirements.md`, `documents/design.md`, FR-L numbering).
-
-### GitHub Issue Rules
-
-- **Title prefix:** `engine:`, `sdlc:`, or `engine+sdlc:`. Mandatory.
-- **Labels:** Every issue MUST have scope label(s):
-  - Single scope: `scope: engine` or `scope: sdlc`.
-  - Mixed: both `scope: engine` AND `scope: sdlc`.
-- **FR reference:** If issue relates to an existing FR, include `FR-E<N>` or
-  `FR-S<N>` in the title or body.
-- **When to use `engine+sdlc:`:** Cross-cutting tasks that touch both scopes
-  and cannot be meaningfully split. Prefer separate issues when scopes are
-  independent.
-
-## Hierarchy
-
-1. **`AGENTS.md`**: "Why" & "For Whom". Long-term goal/value. READ-ONLY.
-2. **SRS Engine** (`documents/requirements-engine.md` — index; sections under
-   `documents/requirements-engine/*.md`): "What" & "Why" for engine. Source
-   of truth. FR-E numbering.
-3. **SRS SDLC** (`documents/requirements-sdlc.md` — index; sections under
-   `documents/requirements-sdlc/*.md`): "What" & "Why" for SDLC workflow.
-   Source of truth. FR-S numbering.
-4. **SDS Engine** (`documents/design-engine.md` — index; sections under
-   `documents/design-engine/*.md`): "How" for engine.
-5. **SDS SDLC** (`documents/design-sdlc.md` — index; sections under
-   `documents/design-sdlc/*.md`): "How" for SDLC workflow.
-6. **Tasks** (`documents/tasks/<YYYY-MM-DD>-<slug>.md`): Temporary plans/notes per task.
-7. **IDE Differences** (`documents/ides-difference.md` — index; sections under
-   `documents/ides-difference/*.md`): R&D reference on AI IDE/CLI capabilities,
-   context primitives, config formats, migration paths. Per-IDE files +
-   cross-IDE comparison + Cursor→Claude Code conversion guide.
+- **IDE Differences** (`documents/ides-difference.md` — index; sections under
+  `documents/ides-difference/*.md`): R&D reference on AI IDE/CLI capabilities,
+  context primitives, config formats, migration paths. Per-IDE files +
+  cross-IDE comparison + Cursor→Claude Code conversion guide.
 
 ### File size budget
 
@@ -175,7 +145,8 @@ variant.]
 - **English Only(Except task files)**.
 - **Summarize**: Extract facts -> compress. No loss of facts.
 - **Essential Info**: No fluff. High-info words.
-- **Compact**: Lists, tables, YAML, Mermaid.
+- **Compact**: Lists, tables, YAML, Mermaid. (Tables only in long-lived docs;
+  do NOT use them in chat output — they render poorly in terminals.)
 - **Lexicon**: No stopwords. Short synonyms.
 - **Entities**: Abbreviate after 1st use.
 - **Direct**: No filler.

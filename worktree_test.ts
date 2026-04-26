@@ -38,35 +38,14 @@ Deno.test("worktreeExists — returns false for non-existent worktree (FR-E57)",
   );
 });
 
-Deno.test("worktreeExists — falls back to legacy path when only legacy exists (FR-E57)", async () => {
+Deno.test("worktreeExists — returns true when FR-E57 directory exists", async () => {
   const tmp = await Deno.makeTempDir();
   const origCwd = Deno.cwd();
   try {
     Deno.chdir(tmp);
-    // Set up only the legacy layout — no new-layout dir.
-    const runId = "legacy-run-id";
-    await Deno.mkdir(`.flowai-workflow/worktrees/${runId}`, {
-      recursive: true,
-    });
-    assertEquals(worktreeExists(runId, ".flowai-workflow/example"), true);
-  } finally {
-    Deno.chdir(origCwd);
-    await Deno.remove(tmp, { recursive: true });
-  }
-});
-
-Deno.test("worktreeExists — prefers new layout over legacy (FR-E57)", async () => {
-  const tmp = await Deno.makeTempDir();
-  const origCwd = Deno.cwd();
-  try {
-    Deno.chdir(tmp);
-    const runId = "preferred-run-id";
+    const runId = "present-run-id";
     const workflowDir = ".flowai-workflow/example";
-    // Both paths exist; new path should win.
     await Deno.mkdir(`${workflowDir}/runs/${runId}/worktree`, {
-      recursive: true,
-    });
-    await Deno.mkdir(`.flowai-workflow/worktrees/${runId}`, {
       recursive: true,
     });
     assertEquals(worktreeExists(runId, workflowDir), true);

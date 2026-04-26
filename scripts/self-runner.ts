@@ -96,6 +96,7 @@ async function sleep(sec: number): Promise<void> {
   await new Promise((r) => setTimeout(r, sec * 1000));
 }
 
+/** Render the CLI help text for `deno task loop`. */
 export function printUsage(): string {
   return `Workflow loop runner — check GitHub issues and run workflow repeatedly
 
@@ -109,6 +110,11 @@ Examples:
   deno task loop`;
 }
 
+/**
+ * Parse CLI arguments for `deno task loop`.
+ * Returns `{ text, code }` for `--help` (code 0) or unknown long flags
+ * (code 1); `--` halts parsing, and `null` means "proceed with the loop".
+ */
 export function checkArgs(
   args: string[],
 ): { text: string; code: number } | null {

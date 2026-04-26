@@ -209,8 +209,9 @@ template path contract (FR-E52), and the per-workflow run lock (FR-E54).
   are first-class since FR-S47/FR-E53. The pre-existing single repo-global
   lock falsely serialized them, blocking parallel dogfood smoke runs and
   cross-workflow experimentation. Lock scope must align with the actual
-  isolation boundary — the workflow folder, which already owns its `runs/`,
-  `worktrees/`, and state namespaces.
+  isolation boundary — the workflow folder, which already owns its `runs/`
+  and state namespaces (per-run worktrees nest under `runs/<run-id>/worktree/`,
+  FR-E57).
 - **Constraints:**
   - Lock path is purely a function of `workflowDir`; no fallback to the
     legacy global path. Stale `.flowai-workflow/runs/.lock` from older
@@ -278,12 +279,6 @@ template path contract (FR-E52), and the per-workflow run lock (FR-E54).
     refuses this combination at run start with a message naming
     FR-S47/FR-E53. Users must either pass a `workflow.yaml` inside a
     workflow folder or set `worktree_disabled: true`.
-  - **One-release legacy fallback for resume.** `worktreeExists(runId,
-    workflowDir)` first probes the new path, then falls back to
-    `.flowai-workflow/worktrees/<run-id>` (with a one-line warning) so an
-    in-flight run survives an upgrade across the boundary. The fallback
-    is scheduled for removal in a follow-up FR; new worktrees are never
-    created at the legacy path.
   - **Cleanup hygiene.** `removeWorktree(path)` calls `git worktree prune`
     after a successful `git worktree remove --force` (errors swallowed —
     idempotent). Prevents stale gitlinks from blocking later removal of
@@ -305,15 +300,15 @@ template path contract (FR-E52), and the per-workflow run lock (FR-E54).
     invoking `git worktree add`. Evidence: `worktree.ts:46-66`. Test:
     `worktree_test.ts::worktree lifecycle — create, exists, remove
     (FR-E57 layout)`.
-  - [x] `worktreeExists(runId, workflowDir)` prefers the new layout and
-    falls back to the legacy `.flowai-workflow/worktrees/<run-id>` path
-    only when probing for resume. Evidence: `worktree.ts:111-138`. Tests:
-    `worktree_test.ts::worktreeExists — prefers new layout over legacy
-    (FR-E57)` and `worktreeExists — falls back to legacy path when only
-    legacy exists (FR-E57)`.
+  - [x] `worktreeExists(runId, workflowDir)` returns true iff the FR-E57
+    `<workflowDir>/runs/<run-id>/worktree/` directory exists. Evidence:
+    `worktree.ts:117-119`. Tests:
+    `worktree_test.ts::worktreeExists — returns false for non-existent
+    worktree (FR-E57)` and `worktreeExists — returns true when FR-E57
+    directory exists`.
   - [x] `Engine.run()` invokes `createWorktree(runId, this.workflowDir)`
     and uses `resolveExistingWorktreePath(runId, this.workflowDir)` for
-    resume (legacy-aware probe). Evidence: `engine.ts:144-181`.
+    resume. Evidence: `engine.ts:144-173`.
   - [x] `Engine.run()` rejects a worktree-mode run when
     `workflowDir === "."` with an error referencing FR-S47/FR-E53.
     Evidence: `engine.ts:144-153`. Test: `engine_test.ts::Engine.run() —

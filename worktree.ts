@@ -7,21 +7,10 @@
  * FR-E57 layout: a run's worktree lives at
  * `<workflowDir>/runs/<run-id>/worktree/`, sibling to its `state.json` and
  * per-node artifact directories under the same `runs/<run-id>/` parent.
- * The pre-FR-E57 repo-global location `.flowai-workflow/worktrees/<run-id>`
- * remains as a one-release legacy-resume fallback inside `worktreeExists`
- * and `resolveExistingWorktreePath`; new worktrees are never created at it.
  */
 
 import { dirname, join } from "@std/path";
 import type { OutputManager } from "./output.ts";
-
-/**
- * Pre-FR-E57 repo-global worktree base. Retained ONLY as a legacy-resume
- * fallback inside `worktreeExists` / `resolveExistingWorktreePath` so that
- * an in-flight run started on the old layout survives a binary upgrade.
- * Slated for removal in a follow-up FR — never write here.
- */
-const LEGACY_WORKTREE_BASE = ".flowai-workflow/worktrees";
 
 /**
  * Get the worktree path for a given run ID under `workflowDir`.
@@ -107,37 +96,24 @@ export async function removeWorktree(worktreePath: string): Promise<void> {
 
 /**
  * Resolve an existing worktree for a (runId, workflowDir) pair.
- *
- * Probes the FR-E57 path first; falls back to the pre-FR-E57 repo-global
- * layout when only the legacy directory is present. Returns `undefined` if
- * neither path exists. The `legacy` flag lets callers (e.g., `Engine.run()`)
- * surface a one-line warning that the old layout is still in use.
- *
- * The fallback exists only to let an in-flight resume cross the upgrade
- * boundary; new worktrees are always created at the FR-E57 path. Removal
- * scheduled for a follow-up FR.
+ * Returns `{ path }` when the FR-E57 worktree directory exists, otherwise
+ * `undefined`.
  */
 export function resolveExistingWorktreePath(
   runId: string,
   workflowDir: string,
-): { path: string; legacy: boolean } | undefined {
-  const fresh = getWorktreePath(runId, workflowDir);
-  const legacy = `${LEGACY_WORKTREE_BASE}/${runId}`;
-  for (const [p, isLegacy] of [[fresh, false], [legacy, true]] as const) {
-    try {
-      if (Deno.statSync(p).isDirectory) {
-        return { path: p, legacy: isLegacy };
-      }
-    } catch {
-      // not found, try next candidate
-    }
+): { path: string } | undefined {
+  const path = getWorktreePath(runId, workflowDir);
+  try {
+    if (Deno.statSync(path).isDirectory) return { path };
+  } catch {
+    // not found
   }
   return undefined;
 }
 
 /** Check whether a worktree directory exists for the given run ID under
- * `workflowDir`. Honours the legacy-resume fallback — see
- * {@link resolveExistingWorktreePath}. */
+ * `workflowDir`. */
 export function worktreeExists(runId: string, workflowDir: string): boolean {
   return resolveExistingWorktreePath(runId, workflowDir) !== undefined;
 }

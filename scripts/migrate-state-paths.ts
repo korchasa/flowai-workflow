@@ -83,6 +83,7 @@ export async function migrate(
   return result;
 }
 
+/** Render the CLI help text for the `migrate-state-paths` script. */
 export function printUsage(): string {
   return `migrate-state-paths — rewrite legacy state.json paths in-place
 

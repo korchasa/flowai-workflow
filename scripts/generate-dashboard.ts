@@ -480,6 +480,7 @@ strong.aborted{color:#854d0e}
 .log-content{font-family:monospace;font-size:.75rem;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow-y:scroll;margin:0}`
   .trim();
 
+/** Render the CLI help text for `deno task dashboard`. */
 export function printUsage(): string {
   return `HTML dashboard generator — produces a self-contained dashboard for a workflow run
 
@@ -494,6 +495,12 @@ Example:
   deno task dashboard --run-dir .flowai-workflow/github-inbox/runs/20260101T120000`;
 }
 
+/**
+ * Parse CLI arguments for `deno task dashboard`.
+ * Returns `{ text, code }` for `--help` (code 0) or unknown short/long
+ * flags (code 1); `--run-dir <path>` consumes its value; `null` means
+ * "proceed with dashboard generation".
+ */
 export function checkArgs(
   args: string[],
 ): { text: string; code: number } | null {

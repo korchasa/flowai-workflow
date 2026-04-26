@@ -21,9 +21,10 @@
 - `deno task check` - Full project verification (format, lint, test)
 - `deno task test` - Run all tests
 - `deno task loop` - Autonomous loop: check issues → run workflow via Engine → repeat
-- `deno fmt` - Format code
-- `deno lint` - Lint code
-- `deno test` - Run tests
+
+> Direct `deno fmt`, `deno lint`, and `deno test` invocations are blocked by
+> [`.claude/hooks/guard-deno-direct.sh`](../.claude/hooks/guard-deno-direct.sh) —
+> always go through the `deno task` wrappers above.
 
 ## Command Scripts
 

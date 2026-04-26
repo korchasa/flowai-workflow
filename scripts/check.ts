@@ -131,8 +131,7 @@ async function listWorkflowFolders(root: string): Promise<string[]> {
  * `workflow.yaml` is required. `agents/` is required IFF the workflow uses
  * agent prompt files (i.e. `workflow.yaml` references `agents/agent-*.md`).
  * `memory/`, `scripts/`, `runs/` are always optional. (FR-E57: per-run git
- * worktrees live under `runs/<run-id>/worktree/`, not at a top-level
- * `worktrees/` folder; the latter never appears in fresh layouts.)
+ * worktrees live under `runs/<run-id>/worktree/`.)
  * Returns offender messages; empty = OK. */
 export async function assertWorkflowFolderShape(
   dir: string,
@@ -219,7 +218,6 @@ export async function noClaudeAgentsRefs(): Promise<string[]> {
   const offenders: string[] = [];
   const skipPathFragments = [
     "/runs/",
-    "/worktrees/",
     "/.claude/worktrees/",
     "node_modules/",
     "/documents/",
@@ -445,6 +443,7 @@ async function docsTokenBudget(): Promise<void> {
   console.log("  All documents/ files fit within Read-tool token budget.");
 }
 
+/** Render the CLI help text for `deno task check`. */
 export function printUsage(): string {
   return `Full project verification: fmt, lint, test, comment-scan
 
@@ -471,6 +470,11 @@ Example:
   deno task check`;
 }
 
+/**
+ * Parse CLI arguments for `deno task check`.
+ * Returns `{ text, code }` for `--help` (code 0) or any unknown argument
+ * (code 1); returns `null` to signal "proceed with the full check".
+ */
 export function checkArgs(
   args: string[],
 ): { text: string; code: number } | null {
@@ -526,9 +530,7 @@ if (import.meta.main) {
   // overlapping paths would double-test the same files.
   // Ignore live git-worktree dirs (engine creates them per run; they
   // hold frozen copies of older test files that no longer reflect HEAD).
-  // FR-E57 layout: `.flowai-workflow/<wf>/runs/<run-id>/worktree/`. Pre-FR-E57
-  // legacy path `.flowai-workflow/worktrees/` retained while a one-release
-  // resume fallback is in flight.
+  // FR-E57 layout: `.flowai-workflow/<wf>/runs/<run-id>/worktree/`.
   if (await hasTestFiles(".")) {
     await run(
       "deno",
@@ -536,7 +538,7 @@ if (import.meta.main) {
         "test",
         "-A",
         "--no-check",
-        "--ignore=.flowai-workflow/worktrees,.flowai-workflow/*/runs,.claude/worktrees",
+        "--ignore=.flowai-workflow/*/runs,.claude/worktrees",
         ".",
       ],
       "Tests",
