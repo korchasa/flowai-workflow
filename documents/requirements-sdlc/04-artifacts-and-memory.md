@@ -85,6 +85,9 @@
   1. Read `.flowai-workflow/memory/<self>.md` at session start before main work.
   2. Execute main task.
   3. Rewrite `.flowai-workflow/memory/<self>.md` at end — full rewrite, compress stale data out.
+  4. **Commit** memory + history files in the worktree before exiting the
+     session (prevents reflection-loss; in-loop nodes may opt out via
+     `memory_commit_deferred: true` in `workflow.yaml`).
 - **Memory content (agent-curated, ≤50 lines):**
   - Known anti-patterns in own behavior and avoidance strategies.
   - Effective strategies discovered empirically.
@@ -102,6 +105,22 @@
   - [x] At least one end-to-end workflow run completes with agents
     reading/writing their own memory files.
   - [x] `deno task check` passes after changes.
+  - [ ] **Commit step in lifecycle:** Each agent's reflection-protocol
+    appendix instructs it to commit memory + history files at session end.
+    `.flowai-workflow/memory/reflection-protocol.md` §Lifecycle includes
+    step 3c.
+  - [ ] **Engine enforcement:** When `defaults.memory_paths` is configured
+    in `workflow.yaml`, the engine checks the worktree's working tree
+    after each agent invocation; if any path matching the configured globs
+    is dirty AND the node has not declared `memory_commit_deferred: true`,
+    the node is failed with an explicit reflection-violation message.
+  - [ ] **`memory_commit_deferred` opt-out:** Per-node boolean flag in
+    `NodeConfig` (default `false`) that disables the per-invocation dirty
+    check. Intended for loop-body agents (e.g. `build`) that defer their
+    commit to a later iteration.
+  - [ ] **`workflow.yaml`:** SDLC workflow declares
+    `defaults.memory_paths: [".flowai-workflow/memory/**.md"]` and sets
+    `memory_commit_deferred: true` on the `build` node.
 
 
 

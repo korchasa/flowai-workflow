@@ -46,3 +46,11 @@ operative knowledge across runs.
 3. **Session end:**
    a. Append one entry to HISTORY (≤20 entries total, trim if needed).
    b. Rewrite MEMORY with current-state snapshot (≤50 lines).
+   c. **Commit MEMORY + HISTORY files** in the worktree before exiting the
+      session. Use a focused commit (`git add` only the memory/history
+      paths) with a `chore(memory):` or scope-appropriate prefix. Skipping
+      this step means the reflection is lost on worktree teardown.
+      **Per-agent override:** loop-body agents (e.g. `build`) may set
+      `memory_commit_deferred: true` in `workflow.yaml`, which tells the
+      engine NOT to fail the node when memory is left dirty. Use only
+      when the agent will commit in a subsequent iteration.

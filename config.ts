@@ -29,11 +29,16 @@ export const DEFAULT_SETTINGS: Required<NodeSettings> = {
 
 /** Default workflow-level settings. Fields intentionally excluded from
  * Required<> because undefined carries semantic meaning ("not set"):
- * `permission_mode`, `budget`, `allowed_tools`, `disallowed_tools`. */
+ * `permission_mode`, `budget`, `allowed_tools`, `disallowed_tools`,
+ * `memory_paths`. */
 export const DEFAULT_WORKFLOW_DEFAULTS: Required<
   Omit<
     WorkflowDefaults,
-    "permission_mode" | "budget" | "allowed_tools" | "disallowed_tools"
+    | "permission_mode"
+    | "budget"
+    | "allowed_tools"
+    | "disallowed_tools"
+    | "memory_paths"
   >
 > = {
   ...DEFAULT_SETTINGS,
@@ -189,6 +194,22 @@ function validateSchema(config: Record<string, unknown>): void {
       validateBudget("defaults", defaults.budget);
     }
     validateToolFilterLevel("defaults", defaults);
+
+    // Validate memory_paths if present (FR-S28)
+    if (defaults.memory_paths !== undefined) {
+      if (!Array.isArray(defaults.memory_paths)) {
+        throw new Error(
+          `defaults.memory_paths must be an array of glob strings`,
+        );
+      }
+      for (const pat of defaults.memory_paths) {
+        if (typeof pat !== "string" || pat.length === 0) {
+          throw new Error(
+            `defaults.memory_paths entries must be non-empty strings`,
+          );
+        }
+      }
+    }
   }
 
   // Validate mutual exclusivity: phases block and per-node phase field cannot coexist
@@ -465,6 +486,16 @@ function validateNode(
 
   // Validate tool filter fields if present (FR-E48)
   validateToolFilterLevel(`Node '${id}'`, node);
+
+  // Validate memory_commit_deferred if present (FR-S28)
+  if (
+    node.memory_commit_deferred !== undefined &&
+    typeof node.memory_commit_deferred !== "boolean"
+  ) {
+    throw new Error(
+      `Node '${id}' memory_commit_deferred must be a boolean`,
+    );
+  }
 }
 
 function validateSettings(

@@ -15,6 +15,11 @@ defaults:
   model: claude-sonnet-4-6
   permission_mode: bypassPermissions
   on_failure_script: .flowai-workflow/scripts/rollback-uncommitted.sh
+  # FR-S28: agents must commit reflection-memory files at session end (the
+  # engine fails the node if any of these globs are dirty post-run, unless
+  # the node sets `memory_commit_deferred: true`).
+  memory_paths:
+    - .flowai-workflow/memory/agent-*.md
   hitl:
     ask_script: .flowai-workflow/scripts/hitl-ask.sh
     check_script: .flowai-workflow/scripts/hitl-check.sh
@@ -115,6 +120,9 @@ nodes:
         type: agent
         label: "Developer — Implementation"
         inputs: [decision]
+        # FR-S28: developer iterates within the loop and may legitimately
+        # leave its memory dirty between iterations; commits land later.
+        memory_commit_deferred: true
         system_prompt: |
           {{file(".claude/agents/agent-developer.md")}}
         prompt: |

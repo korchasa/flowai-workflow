@@ -102,6 +102,14 @@ export interface WorkflowDefaults extends NodeSettings {
   /** Blacklist of tools forbidden to agent nodes (FR-E48).
    * Mutually exclusive with `allowed_tools`. */
   disallowed_tools?: string[];
+  /** Glob patterns identifying agent reflection-memory files (FR-S28).
+   * After every agent invocation under worktree isolation, the engine
+   * checks the worktree's working tree against these globs; any matching
+   * path that is dirty AND the node did not declare
+   * `memory_commit_deferred: true` causes the node to fail.
+   * Empty / undefined disables the check entirely (engine is
+   * domain-agnostic — workflows opt in by configuring this list). */
+  memory_paths?: string[];
 }
 
 /** Configuration for a single workflow node. */
@@ -201,6 +209,13 @@ export interface NodeConfig {
   /** Blacklist of tools (FR-E48). REPLACE-semantics cascade.
    * Mutex with `allowed_tools`. */
   disallowed_tools?: string[];
+
+  /** Opt out of the per-invocation memory-dirty check (FR-S28). When true,
+   * the engine does NOT fail this node if memory_paths-matching files are
+   * dirty after the agent runs. Intended for loop-body agents (e.g.
+   * `build`) that legitimately defer the commit to a later iteration.
+   * Default: false. Only meaningful when `defaults.memory_paths` is set. */
+  memory_commit_deferred?: boolean;
 }
 
 /** Per-node settings (merged with defaults). */

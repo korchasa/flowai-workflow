@@ -11,6 +11,7 @@ import { runWithGuardrail } from "./guardrail.ts";
 import { handleAgentHitl } from "./hitl-handler.ts";
 import { detectHitlRequest, isHitlConfigured } from "./hitl.ts";
 import { runHuman } from "./human.ts";
+import { findDirtyMemoryFiles, formatMemoryViolation } from "./memory-check.ts";
 import type { UserInput } from "./human.ts";
 import { saveAgentLog } from "./log.ts";
 import { runLoop } from "./loop.ts";
@@ -155,6 +156,31 @@ export async function executeAgentNode(
       result.error_category ?? "unknown",
     );
     return result;
+  }
+
+  // FR-S28: per-agent reflection-memory commit-step enforcement. After a
+  // successful agent run inside a worktree, any path matching the
+  // configured `defaults.memory_paths` globs MUST be either unchanged or
+  // committed by the agent itself. Loop-body agents may opt out via
+  // `memory_commit_deferred: true` on the node.
+  const memoryPaths = eng.config.defaults?.memory_paths ?? [];
+  if (
+    eng.workDir !== "." &&
+    memoryPaths.length > 0 &&
+    node.memory_commit_deferred !== true
+  ) {
+    const dirtyMemory = await findDirtyMemoryFiles(eng.workDir, memoryPaths);
+    if (dirtyMemory.length > 0) {
+      const msg = formatMemoryViolation(nodeId, dirtyMemory);
+      eng.output.warn(msg);
+      markNodeFailed(eng.state, nodeId, msg, "scope_violation");
+      return {
+        ...result,
+        success: false,
+        error: msg,
+        error_category: "scope_violation",
+      };
+    }
   }
 
   // Check for HITL request in permission_denials
