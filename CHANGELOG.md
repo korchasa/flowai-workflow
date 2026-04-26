@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.2](https://github.com/korchasa/flowai-workflow/compare/v0.3.1...v0.3.2) (2026-04-26)
+
+
+### Features
+
+* **engine+sdlc:** enforce reflection-memory commit step (FR-S28) ([342790d](https://github.com/korchasa/flowai-workflow/commit/342790dbe8aad066061b82d717e05aef14dcdc0e))
+* **engine:** add guardrail pure module for FR-E50 ([8d580ae](https://github.com/korchasa/flowai-workflow/commit/8d580ae881684d6ba63b3cc63612466a6b27c12b))
+* **engine:** integrate guardrail in node-dispatch (FR-E50) ([2f14f2b](https://github.com/korchasa/flowai-workflow/commit/2f14f2b3eeacbd11f4d4c51179e3443c8f2183b5))
+* **engine:** pin detached HEAD before worktree removal (FR-E51) ([974e229](https://github.com/korchasa/flowai-workflow/commit/974e229e75e973c78059f26b2e2dc249d07e5b2e))
+
+
+### Bug Fixes
+
+* **engine:** wrap input artifact reads via workPath (FR-E52) ([f74c034](https://github.com/korchasa/flowai-workflow/commit/f74c03441ae410d93c54d1eb2e2acda26df63e07))
+
 ### [0.3.1](https://github.com/korchasa/flowai-workflow/compare/v0.3.0...v0.3.1) (2026-04-25)
 
 
