@@ -503,15 +503,25 @@ if (import.meta.main) {
   await run("deno", ["fmt"], "Formatting (auto-fix)");
   await run("deno", ["lint"], "Linting");
 
-  // Type check root-level .ts files and scripts/*.ts. The ai-ide-cli
-  // library lives in a sibling repo and runs its own check there;
-  // flowai-workflow imports it via JSR.
+  // Type check root-level .ts files, scripts/*.ts, and .claude/hooks/*.ts.
+  // The ai-ide-cli library lives in a sibling repo and runs its own check
+  // there; flowai-workflow imports it via JSR. `.claude/hooks/` is in
+  // publish.exclude (so `deno publish --dry-run` skips it) — listing it
+  // here is the only thing that type-checks Deno-based hooks. Missing
+  // directory is silently skipped so end-user projects that lack
+  // `.claude/hooks/` still pass.
   const typeCheckFiles: string[] = [];
-  for (const dir of [".", "scripts"]) {
-    for await (const entry of Deno.readDir(dir)) {
-      if (entry.isFile && entry.name.endsWith(".ts")) {
-        typeCheckFiles.push(dir === "." ? entry.name : `${dir}/${entry.name}`);
+  for (const dir of [".", "scripts", ".claude/hooks"]) {
+    try {
+      for await (const entry of Deno.readDir(dir)) {
+        if (entry.isFile && entry.name.endsWith(".ts")) {
+          typeCheckFiles.push(
+            dir === "." ? entry.name : `${dir}/${entry.name}`,
+          );
+        }
       }
+    } catch (err) {
+      if (!(err instanceof Deno.errors.NotFound)) throw err;
     }
   }
   await run("deno", ["check", ...typeCheckFiles.sort()], "Type Check");
