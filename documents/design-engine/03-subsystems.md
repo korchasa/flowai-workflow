@@ -139,16 +139,33 @@
   The engine derives `workflowDir` once via `deriveWorkflowDir(options.config_path)`
   in the `Engine` constructor and passes it to `defaultLockPath` at acquisition
   time. `EngineOptions.lock_path` override (tests only) bypasses the derivation.
-- **Lock content (`LockInfo`):** `{ pid, hostname, run_id, started_at }`.
-  Hostname stored for diagnostics only — local FS implies a shared PID
-  namespace, so `Deno.kill(pid, "SIGCONT")` is the authoritative liveness
-  check (FR-E25). Only `NotFound` (`ESRCH`) proves a dead PID;
-  `PermissionDenied` (`EPERM`) means the process exists under another user
-  and counts as alive. Stale-on-dead-PID lock is reclaimed transparently.
+- **Lock content (`LockInfo`):** `{ pid, hostname, run_id, started_at,
+  renewed_at? }`. Hostname is a decision input, not a diagnostic: a readable
+  lock file does NOT imply a shared PID namespace, because the runs
+  directory can outlive the namespace that wrote it (Kubernetes hostPath,
+  docker volume, reboot with the lock on a network disk). A PID from a
+  foreign namespace names an unrelated local process, which is why liveness
+  is a lease the holder refreshes (FR-E102).
+- **Liveness (`isLockHolderAlive`, FR-E102):** one predicate, two arms.
+  Same host — or a lock with no `hostname`, a shape `readLockInfo` still
+  accepts — uses `Deno.kill(pid, "SIGCONT")`: only `NotFound` (`ESRCH`)
+  proves a dead PID, while `PermissionDenied` (`EPERM`) means the process
+  exists under another user and counts as alive. A live PID is then
+  qualified by a fresh lease when the lock carries one, which catches a
+  reboot that reissued the PID; a lock without `renewed_at` predates the
+  lease and is decided by the PID alone. Foreign host ignores the PID and
+  reads the lease only, falling back to `started_at` for a pre-lease lock.
+  A stamp more than one lease window in the future is unusable, so clock
+  skew on a dead node cannot hold the folder.
+- **Lease timing:** `LOCK_RENEW_INTERVAL_MS` 15 s, `LOCK_LEASE_MS` 45 s —
+  three renewals, so a single failed write never costs a live run its lock,
+  and an abandoned lock blocks the folder for at most that long.
 - **Interfaces:**
   - `defaultLockPath(workflowDir: string): string` — pure helper, returns
     `<workflowDir>/runs/.lock`.
-  - `acquireLock(lockPath, runId)` — throws when a live PID holds the file;
+  - `acquireLock(lockPath, runId)` — returns the `LockInfo` it published, so
+    the caller can renew and release without a second read that could fail
+    while the lock is already held. Throws when a live holder has the file;
     reclaims on dead PID; rewrites on `SyntaxError` (corrupted file).
     Publication is ATOMIC: the payload is staged in a sibling temp file and
     linked into place with `Deno.link`, so the lock name appears only when
@@ -156,12 +173,33 @@
     conclude the folder was free; `Deno.open({createNew})` alone is not
     enough either — it publishes an empty file that a racer reads as
     corrupt debris, deletes, and then acquires.
-  - `releaseLock(lockPath)` — idempotent unlink.
+  - `releaseLock(lockPath)` — idempotent unconditional unlink. Used by
+    `acquireLock` to drop debris it has just judged dead.
+  - `releaseLockIfOwned(lockPath, info)` — unlinks only while `info` still
+    names the holder. This is the run's own release path: the lease makes it
+    possible to lose the lock while still alive, and an unconditional unlink
+    there would delete the lock of the run that reclaimed the folder,
+    handing it to a third run.
+  - `startLockRenewal(lockPath, info, opts?)` — refreshes `renewed_at` on an
+    unref'd interval, staging a sibling temp file and `Deno.rename`-ing it
+    into place. Renewal must overwrite, and `Deno.link` cannot, which is why
+    creation and renewal use different primitives. A `stopped` flag is
+    re-checked after every await, because `stop()` cannot recall a tick
+    already past its read. Transient read/write failures retry on the next
+    tick; losing ownership calls `onLost` and stops.
   - `readLockInfo(lockPath)` — debug helper.
 - **Integration points:**
   - `engine.ts::Engine.run()` — `defaultLockPath(this.workflowDir)`,
-    `acquireLock` before any side-effecting work, `releaseLock` in `finally`,
-    `onShutdown(() => releaseLock(...))` for SIGINT/SIGTERM cleanup.
+    `acquireLock` before any side-effecting work, then `startLockRenewal`.
+    Teardown stops renewal BEFORE releasing, on both the `finally` path and
+    the `onShutdown` SIGINT/SIGTERM path, and releases through
+    `releaseLockIfOwned`. A lost lease is recorded and re-thrown after the
+    graph finishes, so a run never reports success while another run owns
+    the folder.
+  - `mcp-server.ts::cancel_run` — refuses to signal a holder whose hostname
+    is not this host; that PID names an unrelated local process.
+  - `scripts/sdlc-status.ts` — imports `isLockHolderAlive` rather than
+    probing PIDs itself, so the reporter cannot disagree with the engine.
 - **Cross-workflow parallelism:** Each workflow folder owns its
   `<workflowDir>/runs/<run-id>/` umbrella, which holds both per-run state
   (FR-E9) and the per-run git worktree (FR-E57: `runs/<run-id>/worktree/`,

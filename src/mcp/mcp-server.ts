@@ -423,6 +423,19 @@ function registerCancelRun(server: McpServer, workflowDir: string): void {
               `requested run_id=${run_id}`,
           );
         }
+        // FR-E102: a PID from another namespace names an unrelated local
+        // process. Signalling it would not cancel the run and would hit a
+        // bystander instead. A lock with no hostname predates the field and
+        // is treated as local, matching `isLockHolderAlive`.
+        if (
+          info.hostname !== undefined && info.hostname !== Deno.hostname()
+        ) {
+          return err(
+            `lock holder runs on a different host (${info.hostname}); ` +
+              `its pid ${info.pid} names an unrelated process here, so it ` +
+              `cannot be signalled from this machine`,
+          );
+        }
         try {
           Deno.kill(info.pid, "SIGTERM");
         } catch (killErr) {

@@ -170,9 +170,11 @@ template path contract (FR-E52), and the per-workflow run lock (FR-E54).
   - Lock path is purely a function of `workflowDir`; no fallback to the
     legacy global path. Stale `.flowai-workflow/runs/.lock` from older
     binaries is ignored (orphan file, not consulted).
-  - Same-workflow-folder semantics unchanged: PID-based liveness check,
-    stale-lock reclaim on dead PID, hostname stored for diagnostics only
-    (FR-E25 invariants preserved).
+  - Same-workflow-folder semantics unchanged: two runs against one folder
+    serialize, a stale lock is reclaimed automatically. How staleness is
+    decided is no longer part of this FR — FR-E102 replaced the bare PID
+    probe with a holder-renewed lease, and `hostname` is a decision input
+    there rather than a diagnostic field.
   - `EngineOptions.lock_path` override (test-only) still wins when set —
     no auto-derivation when explicit.
   - **Worktree namespace was NOT yet per-workflow at FR-E54 time.** Code
@@ -180,6 +182,7 @@ template path contract (FR-E52), and the per-workflow run lock (FR-E54).
     so two distinct workflow folders running concurrently would have
     collided in that one path. FR-E57 closes the gap by relocating
     worktrees to `<workflowDir>/runs/<run-id>/worktree/` — see §3.55.
+- **Tasks:** [lock-liveness-across-pid-namespaces](../tasks/2026/09/lock-liveness-across-pid-namespaces.md)
 - **Motivation:** Multi-workflow layouts under `.flowai-workflow/` (e.g.,
   `github-inbox/`, `github-inbox-opencode/`, `github-inbox-opencode-test/`)
   are first-class since FR-S47/FR-E53. The pre-existing single repo-global
@@ -295,3 +298,56 @@ template path contract (FR-E52), and the per-workflow run lock (FR-E54).
     non-overwrite, self-copy guard, runs-root skip with `workflowDir`
     excluding nested-worktree mirrors, empty-repo zero-result, progress
     lines).
+
+### 3.59 FR-E102: Lock Liveness Across PID Namespaces
+
+- **Description:** Run-lock liveness is proven by the holder rather than
+  inferred from its PID. `LockInfo` carries `renewed_at`, refreshed by the
+  running engine every `LOCK_RENEW_INTERVAL_MS` (15 s); a lease stays valid
+  for `LOCK_LEASE_MS` (45 s, three renewals). `isLockHolderAlive` is the one
+  predicate every consumer calls.
+
+  **Constraints:**
+  - Same host — or a lock with no `hostname` at all, a shape `readLockInfo`
+    still accepts: a dead PID answers dead at once, so a local crash needs
+    no lease timeout. A live PID is additionally qualified by a fresh lease
+    when the lock carries one; that is what catches a reboot on a shared
+    disk, where the hostname is unchanged and the PID has been reissued. A
+    lock with no `renewed_at` predates the lease, so the PID alone decides —
+    the pre-FR-E102 rule, preserved.
+  - Foreign host: the PID belongs to another namespace and carries no
+    information, so only the lease counts. A pre-lease lock falls back to
+    `started_at`, which is what lets an upgraded binary clear a lock an
+    older one left jammed.
+  - A stamp more than one lease window in the future is treated as unusable,
+    so a fast clock on a dead node cannot hold the folder open.
+  - A run releases through `releaseLockIfOwned`, never an unconditional
+    unlink. A run whose lease expired must not delete the lock of the run
+    that reclaimed the folder.
+  - Losing the lease fails the run: `Engine.run()` throws rather than report
+    success while another run owns the folder. In-flight nodes are not
+    aborted — see the task's Follow-ups.
+  - `cancel_run` refuses to signal a holder on another host, because that
+    PID names an unrelated local process.
+  - Liveness has exactly one implementation. `scripts/sdlc-status.ts`
+    imports the predicate instead of probing PIDs itself.
+- **Tasks:** [lock-liveness-across-pid-namespaces](../tasks/2026/09/lock-liveness-across-pid-namespaces.md)
+- **Motivation:** The lock file outlives the PID namespace whenever the runs
+  directory does — a Kubernetes hostPath, a docker volume, a reboot with the
+  lock on a network disk. A PID from a dead pod names a live, unrelated
+  process in the next pod, so the stale-reclaim branch never fired. A
+  production instance lost 39 consecutive hourly runs over roughly 40 hours
+  and could not self-heal; a human had to delete the file.
+- **Decision:** [documents/tasks/2026/09/lock-liveness-across-pid-namespaces.md](../tasks/2026/09/lock-liveness-across-pid-namespaces.md)
+- **Dep:** FR-E54, FR-E25
+- **Acceptance criteria:**
+  - **Tests:** `lock_test.ts` (predicate, renewal, owned release),
+    `lock-lease_test.ts` (engine wiring), `mcp-server_test.ts`
+    (`cancel_run` host gate), `sdlc-status_test.ts` (single predicate)
+    — all FR-E102-prefixed.
+  - [x] A foreign-host lock is never kept alive by a live local PID.
+    Evidence: `lock.ts:isLockHolderAlive`.
+  - [x] A foreign-host holder that still renews is never reclaimed.
+    Evidence: `lock.ts:isLeaseFresh`.
+  - [x] The reported production lock shape is reclaimed by the next
+    acquisition. Evidence: `lock_test.ts` ratatoskr regression case.

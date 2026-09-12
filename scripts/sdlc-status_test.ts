@@ -1,10 +1,6 @@
 import { assertEquals, assertExists } from "@std/assert";
 import { join } from "@std/path";
-import {
-  formatStatusText,
-  loadWorkflowStatus,
-  pidAlive,
-} from "./sdlc-status.ts";
+import { formatStatusText, loadWorkflowStatus } from "./sdlc-status.ts";
 
 async function withTempDir(
   fn: (dir: string) => Promise<void>,
@@ -16,14 +12,6 @@ async function withTempDir(
     await Deno.remove(dir, { recursive: true });
   }
 }
-
-Deno.test("pidAlive returns false for impossible pid", () => {
-  assertEquals(pidAlive(2_147_483_646), false);
-});
-
-Deno.test("pidAlive returns true for current process", () => {
-  assertEquals(pidAlive(Deno.pid), true);
-});
 
 Deno.test("loadWorkflowStatus returns null lock and null run for empty workflow", async () => {
   await withTempDir(async (dir) => {
@@ -44,7 +32,9 @@ Deno.test("loadWorkflowStatus parses lock and state.json", async () => {
       join(dir, "runs", ".lock"),
       JSON.stringify({
         pid: Deno.pid,
-        hostname: "test",
+        // This host: the assertion below is about a live local run, and
+        // since FR-E102 a foreign hostname routes to the lease instead.
+        hostname: Deno.hostname(),
         run_id: runId,
         started_at: "2026-05-27T11:54:19.000Z",
       }),
@@ -74,6 +64,28 @@ Deno.test("loadWorkflowStatus parses lock and state.json", async () => {
     assertEquals(status.run?.status, "running");
     assertEquals(status.run?.current_node, "design");
     assertEquals(status.run?.nodes.specification, "completed");
+  });
+});
+
+Deno.test("FR-E102 loadWorkflowStatus reports an expired foreign-host lock as not alive", async () => {
+  await withTempDir(async (dir) => {
+    const runId = "20260911T010001";
+    await Deno.mkdir(join(dir, "runs", runId), { recursive: true });
+    // The lock left behind by a pod that is gone. Its pid is live in THIS
+    // namespace, so a bare pid probe reports a run that ended days ago as
+    // still running — the reporter must agree with the engine, not guess.
+    await Deno.writeTextFile(
+      join(dir, "runs", ".lock"),
+      JSON.stringify({
+        pid: Deno.pid,
+        hostname: "ratatoskr-feed-29818140-qqf75",
+        run_id: runId,
+        started_at: "2026-09-11T01:00:01.187Z",
+      }),
+    );
+    const status = await loadWorkflowStatus(dir);
+    assertExists(status.lock);
+    assertEquals(status.lock?.alive, false);
   });
 });
 

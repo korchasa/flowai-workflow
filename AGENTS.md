@@ -596,6 +596,9 @@ for full context, alternatives, and consequences.
   [cwd-relative-template-paths](documents/tasks/2026/05/cwd-relative-template-paths.md).
 - Run lock is per-workflow-folder, rooted at `<workflowDir>/runs/.lock` —
   [per-workflow-run-lock](documents/tasks/2026/05/per-workflow-run-lock.md).
+- Lock liveness is a holder-renewed lease, not a PID probe — a readable
+  lock file does not imply a shared PID namespace —
+  [lock-liveness-across-pid-namespaces](documents/tasks/2026/09/lock-liveness-across-pid-namespaces.md).
 - `PhaseRegistry` is per-`Engine.run()`, never module-level —
   [phase-registry-per-run](documents/tasks/2026/05/phase-registry-per-run.md).
 - Engine never installs OS signal handlers; bin entry points only —

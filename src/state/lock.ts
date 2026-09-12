@@ -14,7 +14,22 @@ export interface LockInfo {
   hostname: string;
   run_id: string;
   started_at: string;
+  /** Last time the holder proved it was still running (FR-E102). Absent in
+   * locks written by pre-FR-E102 binaries, which is why every consumer has
+   * to tolerate `undefined` rather than assume the field. */
+  renewed_at?: string;
 }
+
+/** How often a running holder refreshes {@link LockInfo.renewed_at}. */
+export const LOCK_RENEW_INTERVAL_MS = 15_000;
+
+/** How long a lease stays valid without a refresh (FR-E102).
+ *
+ * Three renewal intervals wide, so one failed write — an NFS hiccup, a
+ * momentarily starved node — never costs a live run its lock. It also bounds
+ * recovery: a holder that dies without releasing blocks the folder for at
+ * most this long instead of forever. */
+export const LOCK_LEASE_MS = 3 * LOCK_RENEW_INTERVAL_MS;
 
 /** Default lock file path for the given workflow folder (FR-E54).
  * `workflowDir` is the directory containing `workflow.yaml`
@@ -65,11 +80,55 @@ export async function readLockInfo(lockPath: string): Promise<LockInfo> {
   return parsed as LockInfo;
 }
 
-/** Check if an existing lock is still held by a live process.
- * Always checks PID directly — lock file on local FS guarantees
- * PID namespace is shared. Hostname stored for diagnostics only. */
-function isLockAlive(existing: LockInfo): boolean {
-  return isProcessAlive(existing.pid);
+/** Report whether `stamp` is a lease that has not expired at `now`.
+ *
+ * A stamp further than one lease window into the FUTURE is rejected too. No
+ * correctly-clocked holder can be that far ahead, and admitting it would let
+ * a fast clock on a dead node hold the folder for the whole skew — the
+ * original jam rebuilt out of different parts. Ordinary NTP drift of a few
+ * seconds stays comfortably inside the window. */
+function isLeaseFresh(stamp: string | undefined, now: number): boolean {
+  if (stamp === undefined) return false;
+  const written = Date.parse(stamp);
+  if (Number.isNaN(written)) return false;
+  const age = now - written;
+  if (age < -LOCK_LEASE_MS) return false;
+  return age < LOCK_LEASE_MS;
+}
+
+/** Report whether the holder named by `info` is still running (FR-E102).
+ *
+ * Two namespaces, two rules:
+ *
+ * - **Same host** (or a lock with no `hostname` at all, the shape older
+ *   binaries wrote and {@link readLockInfo} still accepts). A dead PID
+ *   answers dead immediately, so a local crash is detected without waiting
+ *   out a lease. A live PID is then qualified by the stamp when there is
+ *   one: after a reboot the hostname is unchanged and the PID may have been
+ *   handed to an unrelated process, and only the dead lease reveals that.
+ *   A lock with no stamp predates the lease, so the PID alone decides —
+ *   exactly the pre-FR-E102 behaviour.
+ * - **Foreign host.** The PID belongs to another namespace and carries no
+ *   information here, so only the lease counts. A pre-lease lock falls back
+ *   to `started_at`, which is what lets an upgraded binary clear a lock that
+ *   an older one left jammed. */
+export function isLockHolderAlive(
+  info: LockInfo,
+  now: number = Date.now(),
+): boolean {
+  const sameHost = info.hostname === undefined ||
+    info.hostname === Deno.hostname();
+  if (sameHost) {
+    if (!isProcessAlive(info.pid)) return false;
+    if (info.renewed_at === undefined) return true;
+    return isLeaseFresh(info.renewed_at, now);
+  }
+  return isLeaseFresh(info.renewed_at ?? info.started_at, now);
+}
+
+/** True when both records name the same holder of the same run. */
+function isSameHolder(a: LockInfo, b: LockInfo): boolean {
+  return a.run_id === b.run_id && a.pid === b.pid && a.hostname === b.hostname;
 }
 
 /** Report whether `runId` is the run currently held alive by the workflow
@@ -90,7 +149,7 @@ export async function isRunLive(
     // NotFound (no lock) or SyntaxError (corrupted lock) → not live.
     return false;
   }
-  return info.run_id === runId && isProcessAlive(info.pid);
+  return info.run_id === runId && isLockHolderAlive(info);
 }
 
 /** Return the lock holder for `workflowDir` iff a live process holds it
@@ -109,7 +168,7 @@ export async function liveLockHolder(
     // NotFound (no lock) or SyntaxError (corrupted lock) → not active.
     return null;
   }
-  return isProcessAlive(info.pid) ? info : null;
+  return isLockHolderAlive(info) ? info : null;
 }
 
 /**
@@ -127,16 +186,25 @@ export async function liveLockHolder(
  * retried. A single retry is enough — a third party winning the re-created
  * slot is itself a live holder and surfaces as the normal "already running"
  * error.
+ *
+ * Returns the record it published. The caller needs it to renew the lease
+ * and to release safely, and handing it back keeps the caller from re-reading
+ * the file — a read that can fail, leaving the lock held with nothing yet
+ * registered to release it.
  */
 export async function acquireLock(
   lockPath: string,
   runId: string,
-): Promise<void> {
+): Promise<LockInfo> {
+  const startedAt = new Date().toISOString();
   const info: LockInfo = {
     pid: Deno.pid,
     hostname: Deno.hostname(),
     run_id: runId,
-    started_at: new Date().toISOString(),
+    started_at: startedAt,
+    // Seed the lease at creation so a foreign observer never has to fall
+    // back to `started_at` for a lock this binary wrote.
+    renewed_at: startedAt,
   };
   const payload = JSON.stringify(info, null, 2) + "\n";
 
@@ -149,7 +217,7 @@ export async function acquireLock(
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       await createLockFile(lockPath, payload);
-      return;
+      return info;
     } catch (err) {
       if (!(err instanceof Deno.errors.AlreadyExists)) throw err;
     }
@@ -167,7 +235,7 @@ export async function acquireLock(
       // Corrupted lock file — treated as debris below (existing stays undefined).
     }
 
-    if (existing && isLockAlive(existing)) {
+    if (existing && isLockHolderAlive(existing)) {
       throw new Error(
         `Workflow is already running (run_id: ${existing.run_id}, pid: ${existing.pid}, host: ${existing.hostname}). ` +
           `Remove ${lockPath} manually if the process is stuck.`,
@@ -206,7 +274,11 @@ async function createLockFile(
   }
 }
 
-/** Release workflow lock. No-op if lock file doesn't exist. */
+/** Release workflow lock unconditionally. No-op if lock file doesn't exist.
+ *
+ * Used by {@link acquireLock} to drop debris it has just judged dead. A run
+ * releasing its OWN lock must use {@link releaseLockIfOwned} instead — see
+ * the note there for why the difference matters. */
 export async function releaseLock(lockPath: string): Promise<void> {
   try {
     await Deno.remove(lockPath);
@@ -215,4 +287,137 @@ export async function releaseLock(lockPath: string): Promise<void> {
       throw err;
     }
   }
+}
+
+/** Release the lock only while `info` still names its holder (FR-E102).
+ *
+ * The lease makes it possible for a run to lose its lock while still alive:
+ * its renewals stall past the window, another run reclaims the folder, and
+ * the first run reaches its own `finally` believing it still owns the file.
+ * An unconditional unlink there would delete the NEW holder's lock and hand
+ * the folder to a third run — two engines in one worktree, which is the
+ * failure the lock exists to prevent. */
+export async function releaseLockIfOwned(
+  lockPath: string,
+  info: LockInfo,
+): Promise<void> {
+  let current: LockInfo;
+  try {
+    current = await readLockInfo(lockPath);
+  } catch {
+    // Absent or unreadable — nothing of ours to remove.
+    return;
+  }
+  if (!isSameHolder(current, info)) return;
+  await releaseLock(lockPath);
+}
+
+/** Handle returned by {@link startLockRenewal}. */
+export interface LockRenewal {
+  /** Stop renewing. Synchronous and idempotent. */
+  stop(): void;
+}
+
+/** Options for {@link startLockRenewal}. */
+export interface LockRenewalOptions {
+  /** Renewal period. Defaults to {@link LOCK_RENEW_INTERVAL_MS}. */
+  intervalMs?: number;
+  /** Called once when the lock stops being ours — it vanished, or another
+   * run reclaimed it. Renewal has already stopped by then. The caller is
+   * expected to treat this as fatal: another run may now own the workflow
+   * folder, so continuing to write into the shared worktree is exactly the
+   * two-holders failure the lock prevents. */
+  onLost?: (reason: string) => void;
+}
+
+/** Write `info` over `lockPath` atomically.
+ *
+ * Renewal overwrites; creation does not. `Deno.link`, which
+ * {@link createLockFile} uses to publish a lock exactly once, fails with
+ * `AlreadyExists` on an existing name, so renewal stages a sibling temp file
+ * and `Deno.rename`s it into place instead. Both are atomic; they differ
+ * only in whether an existing name is allowed. */
+async function writeLockAtomic(
+  lockPath: string,
+  info: LockInfo,
+): Promise<void> {
+  const tmpPath = `${lockPath}.${Deno.pid}.renew.tmp`;
+  await Deno.writeTextFile(tmpPath, JSON.stringify(info, null, 2) + "\n");
+  await Deno.rename(tmpPath, lockPath);
+}
+
+/** Keep proving that this process still holds `lockPath` (FR-E102).
+ *
+ * Refreshes `renewed_at` every `intervalMs` so observers in other PID
+ * namespaces can tell a running holder from debris. The timer is unref'd and
+ * never keeps a process alive.
+ *
+ * Transient read and write failures are swallowed and retried on the next
+ * tick — the lease is three intervals wide precisely so one bad write is not
+ * fatal. Losing ownership is the only condition that stops renewal. */
+export function startLockRenewal(
+  lockPath: string,
+  info: LockInfo,
+  opts: LockRenewalOptions = {},
+): LockRenewal {
+  const intervalMs = opts.intervalMs ?? LOCK_RENEW_INTERVAL_MS;
+  let stopped = false;
+
+  const stop = (): void => {
+    if (stopped) return;
+    stopped = true;
+    clearInterval(timer);
+  };
+
+  const lose = (reason: string): void => {
+    stop();
+    opts.onLost?.(reason);
+  };
+
+  const tick = async (): Promise<void> => {
+    if (stopped) return;
+
+    let current: LockInfo;
+    try {
+      current = await readLockInfo(lockPath);
+    } catch (err) {
+      if (err instanceof Deno.errors.NotFound) {
+        lose(`lock file ${lockPath} disappeared`);
+      }
+      // Anything else (corrupt read mid-write, transient I/O) retries.
+      return;
+    }
+
+    // `stop()` is synchronous and cannot recall a tick already past its
+    // read, so the flag is re-checked after every await. Without this, a
+    // tick in flight would rename the file back into place after the run
+    // released it.
+    if (stopped) return;
+
+    if (!isSameHolder(current, info)) {
+      lose(
+        `lock is held by run ${current.run_id} (pid ${current.pid}, ` +
+          `host ${current.hostname})`,
+      );
+      return;
+    }
+
+    const renewed: LockInfo = { ...info, renewed_at: new Date().toISOString() };
+    try {
+      await writeLockAtomic(lockPath, renewed);
+    } catch {
+      return; // Transient — the next tick retries inside the lease window.
+    }
+    if (stopped) {
+      // Teardown landed while this write was in flight. Undo it, so the
+      // guarantee "no tick recreates the lock after release" is exact
+      // rather than merely probable.
+      await releaseLockIfOwned(lockPath, renewed).catch(() => {});
+    }
+  };
+
+  const timer = setInterval(() => void tick(), intervalMs);
+  Deno.unrefTimer(timer);
+
+  return { stop };
 }

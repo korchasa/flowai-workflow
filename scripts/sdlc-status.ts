@@ -5,7 +5,7 @@
  *
  * Reads only durable artifacts under `<workflowDir>/runs/`:
  *
- * - `runs/.lock`   — JSON `{pid, hostname, run_id, started_at}` written by
+ * - `runs/.lock`   — JSON `{pid, hostname, run_id, started_at, renewed_at}` written by
  *                    the engine while a run owns the workflow folder.
  * - `runs/<id>/state.json`    — engine-owned run state (RunState).
  * - `runs/<id>/journal.jsonl` — append-only event log; tail printed on
@@ -24,14 +24,17 @@
  */
 
 import { join } from "@std/path";
+import {
+  isLockHolderAlive,
+  type LockInfo as RunLockInfo,
+} from "../src/state/lock.ts";
 
-export interface LockInfo {
-  pid: number;
-  run_id: string;
-  hostname: string;
-  started_at: string;
-  alive: boolean;
-}
+/** The engine's lock record plus the liveness verdict for display.
+ *
+ * The shape is the engine's own {@link RunLockInfo}, not a copy. A local
+ * duplicate used to drift: it carried its own pid probe, so the reporter
+ * called a lock alive that the engine had already judged dead (FR-E102). */
+export type LockInfo = RunLockInfo & { alive: boolean };
 
 export interface RunSummary {
   id: string;
@@ -53,16 +56,6 @@ export interface WorkflowStatus {
 
 export interface LoadOptions {
   journalTail?: number;
-}
-
-/** Cheap liveness probe via signal 0 — does not touch the process. */
-export function pidAlive(pid: number): boolean {
-  try {
-    Deno.kill(pid, "SIGCONT");
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function readJsonIfExists<T>(path: string): Promise<T | null> {
@@ -157,14 +150,9 @@ export async function loadWorkflowStatus(
   opts: LoadOptions = {},
 ): Promise<WorkflowStatus> {
   const runsDir = join(workflowDir, "runs");
-  const lockRaw = await readJsonIfExists<{
-    pid: number;
-    run_id: string;
-    hostname: string;
-    started_at: string;
-  }>(join(runsDir, ".lock"));
+  const lockRaw = await readJsonIfExists<RunLockInfo>(join(runsDir, ".lock"));
   const lock: LockInfo | null = lockRaw
-    ? { ...lockRaw, alive: pidAlive(lockRaw.pid) }
+    ? { ...lockRaw, alive: isLockHolderAlive(lockRaw) }
     : null;
 
   let chosen = runId;

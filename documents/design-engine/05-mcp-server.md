@@ -104,7 +104,11 @@ err((e as Error).message) }`. `ok(payload)` returns
   `live === false` the caller resumes separately via `resume_node`.
 - **`cancel_run({ run_id })`** —
   `readLockInfo(defaultLockPath(workflowDir))`. If
-  `info.run_id !== run_id` → `err("no matching active run…")`.
+  `info.run_id !== run_id` → `err("no matching active run…")`. If the
+  holder names a different host → `err("lock holder runs on a different
+  host…")` without signalling anything, because that PID names an
+  unrelated local process (FR-E102); a lock with no `hostname` predates
+  the field and counts as local.
   Otherwise `Deno.kill(info.pid, "SIGTERM")` inside a try/catch:
   `Deno.errors.NotFound` and `Deno.errors.PermissionDenied` are
   treated as benign no-ops (process gone between read and kill) and

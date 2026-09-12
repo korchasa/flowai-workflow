@@ -42,7 +42,12 @@ import {
 } from "./branch.ts";
 import { terminalInput } from "./human.ts";
 import type { UserInput } from "./human.ts";
-import { acquireLock, defaultLockPath, releaseLock } from "../state/lock.ts";
+import {
+  acquireLock,
+  defaultLockPath,
+  releaseLockIfOwned,
+  startLockRenewal,
+} from "../state/lock.ts";
 import { onShutdown } from "../process-registry.ts";
 import { OutputManager } from "../output.ts";
 import type { RunSummary } from "../output.ts";
@@ -321,12 +326,26 @@ export class Engine {
     // workflow folder; distinct workflow folders run in parallel.
     const lockPath = this.options.lock_path ??
       defaultLockPath(this.workflowDir);
-    await acquireLock(lockPath, this.state.run_id);
+    const heldLock = await acquireLock(lockPath, this.state.run_id);
+
+    // FR-E102: keep proving this run holds the lock. Observers in another PID
+    // namespace — a sibling pod on a shared runs directory — cannot check our
+    // PID, so a refreshed lease is the only evidence they can read.
+    let leaseLost: string | undefined;
+    const renewal = startLockRenewal(lockPath, heldLock, {
+      intervalMs: this.options.lock_renew_interval_ms,
+      onLost: (reason) => {
+        leaseLost = reason;
+      },
+    });
 
     // Register shutdown callbacks for signal-initiated cleanup;
     // disposers remove them after normal completion to prevent leak in loops
     const disposers = [
-      onShutdown(() => releaseLock(lockPath)),
+      onShutdown(() => {
+        renewal.stop();
+        return releaseLockIfOwned(lockPath, heldLock);
+      }),
       onShutdown(async () => {
         if (this.state.status === "running") {
           markRunFailed(this.state);
@@ -336,10 +355,22 @@ export class Engine {
     ];
 
     try {
-      return await this.runWithLock(levels, lockPath);
+      const result = await this.runWithLock(levels, lockPath);
+      if (leaseLost !== undefined) {
+        // Another run owns this workflow folder, so this run has been
+        // sharing a worktree with it. Reporting success would hide that.
+        throw new Error(
+          `Workflow lock lost during the run: ${leaseLost}. ` +
+            `This run's results cannot be trusted.`,
+        );
+      }
+      return result;
     } finally {
       for (const dispose of disposers) dispose();
-      await releaseLock(lockPath);
+      // Stop before releasing: a tick in flight must not outlive the run,
+      // and the release must not remove a lock another run now owns.
+      renewal.stop();
+      await releaseLockIfOwned(lockPath, heldLock);
       // FR-E49: restore DISABLE_AUTOUPDATER to its pre-run value.
       if (origAutoupdaterVal === undefined) {
         Deno.env.delete("DISABLE_AUTOUPDATER");

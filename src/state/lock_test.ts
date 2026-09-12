@@ -1,4 +1,4 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@std/assert";
 import {
   acquireLock,
   defaultLockPath,
@@ -7,7 +7,21 @@ import {
   type LockInfo,
   readLockInfo,
   releaseLock,
+  releaseLockIfOwned,
+  startLockRenewal,
 } from "./lock.ts";
+
+/** Hostname from the reported ratatoskr pod — any value that cannot equal
+ * `Deno.hostname()` works; the real one keeps the regression legible. */
+const FOREIGN_HOST = "ratatoskr-feed-29818140-qqf75";
+
+/** ISO stamp `ms` milliseconds in the past. */
+function ago(ms: number): string {
+  return new Date(Date.now() - ms).toISOString();
+}
+
+/** Long enough to be outside any plausible lease window. */
+const LONG_AGO = 10 * 60_000;
 
 Deno.test("FR-E54 readLockInfo — valid JSON of the wrong shape is a SyntaxError", async () => {
   const tmpDir = await Deno.makeTempDir();
@@ -114,20 +128,22 @@ Deno.test("acquireLock — fails if same-host live process holds lock", async ()
   await Deno.remove(tmpDir, { recursive: true });
 });
 
-Deno.test("acquireLock — reclaims stale lock from different host (dead PID)", async () => {
+Deno.test("FR-E102 acquireLock — reclaims an expired foreign-host lock", async () => {
   const tmpDir = await Deno.makeTempDir();
   const lockPath = `${tmpDir}/.lock`;
 
-  // Lock from a different hostname with dead PID — should be reclaimed
+  // A lock from another host. Its PID belongs to another namespace, so it
+  // carries no information here; the expired lease is what proves the
+  // holder is gone.
   const remoteLock: LockInfo = {
-    pid: 99999999, // PID doesn't exist locally
+    pid: 99999999,
     hostname: "docker-container-abc123",
     run_id: "run-remote",
-    started_at: new Date().toISOString(),
+    started_at: ago(LONG_AGO),
+    renewed_at: ago(LONG_AGO),
   };
   await Deno.writeTextFile(lockPath, JSON.stringify(remoteLock));
 
-  // Dead PID → stale lock, reclaim regardless of hostname
   await acquireLock(lockPath, "run-local");
 
   const info = await readLockInfo(lockPath);
@@ -397,4 +413,309 @@ Deno.test("acquireLock — same workflow dir still serializes (FR-E54 carry-over
   assertEquals(caught, true);
 
   await Deno.remove(tmpRoot, { recursive: true });
+});
+
+// ---------------------------------------------------------------------------
+// FR-E102: liveness across PID namespaces.
+//
+// The runs directory can outlive the process namespace that wrote the lock —
+// a Kubernetes hostPath, a docker volume, a reboot with the lock on a shared
+// disk. A PID from a foreign namespace names an unrelated local process, so
+// liveness has to be proven by the holder rather than inferred from a number.
+// ---------------------------------------------------------------------------
+
+Deno.test("FR-E102 acquireLock — returns the record it wrote", async () => {
+  const tmpDir = await Deno.makeTempDir();
+  const lockPath = `${tmpDir}/.lock`;
+
+  // The caller needs this record to renew and to release safely. Re-reading
+  // the file instead leaves a window between acquiring the lock and
+  // registering anything that would release it.
+  const held = await acquireLock(lockPath, "run-returned");
+  assertEquals(held, await readLockInfo(lockPath));
+
+  await releaseLock(lockPath);
+  await Deno.remove(tmpDir, { recursive: true });
+});
+
+Deno.test("FR-E102 acquireLock — a foreign-host lock is not kept alive by a live local PID", async () => {
+  const tmpDir = await Deno.makeTempDir();
+  const lockPath = `${tmpDir}/.lock`;
+
+  // `Deno.pid` is alive in THIS namespace and says nothing about the holder's.
+  await Deno.writeTextFile(
+    lockPath,
+    JSON.stringify({
+      pid: Deno.pid,
+      hostname: FOREIGN_HOST,
+      run_id: "run-foreign",
+      started_at: ago(LONG_AGO),
+      renewed_at: ago(LONG_AGO),
+    }),
+  );
+
+  await acquireLock(lockPath, "run-local");
+  assertEquals((await readLockInfo(lockPath)).run_id, "run-local");
+
+  await releaseLock(lockPath);
+  await Deno.remove(tmpDir, { recursive: true });
+});
+
+Deno.test("FR-E102 acquireLock — reclaims the ratatoskr k8s lock (foreign host, locally-live PID)", async () => {
+  const tmpDir = await Deno.makeTempDir();
+  const lockPath = `${tmpDir}/.lock`;
+
+  // The exact shape left behind on 2026-09-11: written by a pre-lease binary,
+  // so no `renewed_at` at all, naming a pod that no longer exists. It jammed
+  // 39 consecutive hourly runs until a human deleted the file.
+  await Deno.writeTextFile(
+    lockPath,
+    JSON.stringify({
+      pid: Deno.pid,
+      hostname: FOREIGN_HOST,
+      run_id: "20260911T010001",
+      started_at: ago(40 * 60 * 60_000),
+    }),
+  );
+
+  await acquireLock(lockPath, "20260912T120000");
+  assertEquals((await readLockInfo(lockPath)).run_id, "20260912T120000");
+
+  await releaseLock(lockPath);
+  await Deno.remove(tmpDir, { recursive: true });
+});
+
+Deno.test("FR-E102 acquireLock — a foreign-host holder that still renews is not reclaimed", async () => {
+  const tmpDir = await Deno.makeTempDir();
+  const lockPath = `${tmpDir}/.lock`;
+
+  // Dead PID locally, but the holder is renewing from another host: a live
+  // remote run sharing the directory over NFS. Reclaiming would put two
+  // engines in one worktree.
+  await Deno.writeTextFile(
+    lockPath,
+    JSON.stringify({
+      pid: 99999999,
+      hostname: FOREIGN_HOST,
+      run_id: "run-remote-live",
+      started_at: ago(LONG_AGO),
+      renewed_at: new Date().toISOString(),
+    }),
+  );
+
+  await assertRejects(
+    () => acquireLock(lockPath, "run-local"),
+    Error,
+    "already running",
+  );
+
+  await Deno.remove(tmpDir, { recursive: true });
+});
+
+Deno.test("FR-E102 acquireLock — a same-host lock with a live PID but an expired lease is reclaimed", async () => {
+  const tmpDir = await Deno.makeTempDir();
+  const lockPath = `${tmpDir}/.lock`;
+
+  // Reboot with the lock on a shared disk: the hostname is unchanged and the
+  // PID has been handed to an unrelated process. Only the dead lease reveals
+  // that the run is gone.
+  await Deno.writeTextFile(
+    lockPath,
+    JSON.stringify({
+      pid: Deno.pid,
+      hostname: Deno.hostname(),
+      run_id: "run-before-reboot",
+      started_at: ago(LONG_AGO),
+      renewed_at: ago(LONG_AGO),
+    }),
+  );
+
+  await acquireLock(lockPath, "run-after-reboot");
+  assertEquals((await readLockInfo(lockPath)).run_id, "run-after-reboot");
+
+  await releaseLock(lockPath);
+  await Deno.remove(tmpDir, { recursive: true });
+});
+
+Deno.test("FR-E102 lock liveness — a stamp beyond the lease window in the future is not alive", async () => {
+  const tmpDir = await Deno.makeTempDir();
+  const lockPath = `${tmpDir}/.lock`;
+
+  // A fast clock on a dead node would otherwise hold the folder for the whole
+  // skew — the reported jam rebuilt out of different parts.
+  await Deno.writeTextFile(
+    lockPath,
+    JSON.stringify({
+      pid: 99999999,
+      hostname: FOREIGN_HOST,
+      run_id: "run-skewed",
+      started_at: ago(LONG_AGO),
+      renewed_at: new Date(Date.now() + 60 * 60_000).toISOString(),
+    }),
+  );
+
+  await acquireLock(lockPath, "run-local");
+  assertEquals((await readLockInfo(lockPath)).run_id, "run-local");
+
+  await releaseLock(lockPath);
+  await Deno.remove(tmpDir, { recursive: true });
+});
+
+Deno.test("FR-E102 lock liveness — isRunLive, liveLockHolder and acquireLock agree on a foreign-host lock", async () => {
+  const wf = await Deno.makeTempDir();
+  await Deno.mkdir(`${wf}/runs`, { recursive: true });
+  const lockPath = defaultLockPath(wf);
+
+  // Expired foreign lease: all three answers must be "not held".
+  await Deno.writeTextFile(
+    lockPath,
+    JSON.stringify({
+      pid: Deno.pid,
+      hostname: FOREIGN_HOST,
+      run_id: "run-foreign",
+      started_at: ago(LONG_AGO),
+      renewed_at: ago(LONG_AGO),
+    }),
+  );
+  assertEquals(await isRunLive(wf, "run-foreign"), false);
+  assertEquals(await liveLockHolder(wf), null);
+  await acquireLock(lockPath, "run-local");
+  await releaseLock(lockPath);
+
+  // Fresh foreign lease: all three answers must be "held".
+  await Deno.writeTextFile(
+    lockPath,
+    JSON.stringify({
+      pid: 99999999,
+      hostname: FOREIGN_HOST,
+      run_id: "run-foreign",
+      started_at: ago(LONG_AGO),
+      renewed_at: new Date().toISOString(),
+    }),
+  );
+  assertEquals(await isRunLive(wf, "run-foreign"), true);
+  assertEquals((await liveLockHolder(wf))?.run_id, "run-foreign");
+  await assertRejects(() => acquireLock(lockPath, "run-local"), Error);
+
+  await Deno.remove(wf, { recursive: true });
+});
+
+Deno.test("FR-E102 startLockRenewal — advances renewed_at while the holder runs", async () => {
+  const tmpDir = await Deno.makeTempDir();
+  const lockPath = `${tmpDir}/.lock`;
+
+  await acquireLock(lockPath, "run-renewing");
+  const info = await readLockInfo(lockPath);
+  const before = info.renewed_at;
+  assert(before !== undefined, "acquireLock must stamp renewed_at");
+
+  const renewal = startLockRenewal(lockPath, info, { intervalMs: 20 });
+  await new Promise((r) => setTimeout(r, 150));
+  renewal.stop();
+
+  const after = await readLockInfo(lockPath);
+  assert(
+    Date.parse(after.renewed_at!) > Date.parse(before),
+    "renewed_at must advance while the holder runs",
+  );
+  assertEquals(after.run_id, "run-renewing");
+
+  await releaseLock(lockPath);
+  await Deno.remove(tmpDir, { recursive: true });
+});
+
+Deno.test("FR-E102 startLockRenewal — after stop() the stamp never advances again", async () => {
+  const tmpDir = await Deno.makeTempDir();
+  const lockPath = `${tmpDir}/.lock`;
+
+  await acquireLock(lockPath, "run-stopping");
+  const renewal = startLockRenewal(lockPath, await readLockInfo(lockPath), {
+    intervalMs: 20,
+  });
+  await new Promise((r) => setTimeout(r, 60));
+  renewal.stop();
+  const frozen = (await readLockInfo(lockPath)).renewed_at;
+
+  // An unref'd timer is excluded from the op sanitizer's accounting, so a
+  // forgotten teardown cannot be caught by leak detection — assert the
+  // observable effect instead.
+  await new Promise((r) => setTimeout(r, 120));
+  assertEquals((await readLockInfo(lockPath)).renewed_at, frozen);
+
+  // A tick already in flight must not resurrect a released lock either.
+  await releaseLock(lockPath);
+  await new Promise((r) => setTimeout(r, 120));
+  await assertRejects(() => readLockInfo(lockPath), Deno.errors.NotFound);
+
+  await Deno.remove(tmpDir, { recursive: true });
+});
+
+Deno.test("FR-E102 startLockRenewal — reports loss of ownership to its owner", async () => {
+  const tmpDir = await Deno.makeTempDir();
+  const lockPath = `${tmpDir}/.lock`;
+
+  await acquireLock(lockPath, "run-a");
+  const mine = await readLockInfo(lockPath);
+
+  let lost: string | undefined;
+  const renewal = startLockRenewal(lockPath, mine, {
+    intervalMs: 20,
+    onLost: (reason) => {
+      lost = reason;
+    },
+  });
+
+  // Another run takes the folder over while we are still running.
+  await Deno.writeTextFile(
+    lockPath,
+    JSON.stringify({
+      pid: 424242,
+      hostname: "other-host",
+      run_id: "run-b",
+      started_at: new Date().toISOString(),
+      renewed_at: new Date().toISOString(),
+    }),
+  );
+
+  await new Promise((r) => setTimeout(r, 150));
+  renewal.stop();
+
+  assert(lost !== undefined, "onLost must fire when the lock is taken over");
+  assertEquals(
+    (await readLockInfo(lockPath)).run_id,
+    "run-b",
+    "renewal must not overwrite the new holder",
+  );
+
+  await Deno.remove(tmpDir, { recursive: true });
+});
+
+Deno.test("FR-E102 releaseLockIfOwned — leaves a lock reclaimed by another run intact", async () => {
+  const tmpDir = await Deno.makeTempDir();
+  const lockPath = `${tmpDir}/.lock`;
+
+  await acquireLock(lockPath, "run-a");
+  const mine = await readLockInfo(lockPath);
+
+  // Our lease expired and another run took the folder. Unlinking now would
+  // free it for a third run while run-b is still working.
+  await Deno.writeTextFile(
+    lockPath,
+    JSON.stringify({
+      pid: 424242,
+      hostname: "other-host",
+      run_id: "run-b",
+      started_at: new Date().toISOString(),
+      renewed_at: new Date().toISOString(),
+    }),
+  );
+
+  await releaseLockIfOwned(lockPath, mine);
+  assertEquals((await readLockInfo(lockPath)).run_id, "run-b");
+
+  // It still releases a lock we do own.
+  await releaseLockIfOwned(lockPath, await readLockInfo(lockPath));
+  await assertRejects(() => readLockInfo(lockPath), Deno.errors.NotFound);
+
+  await Deno.remove(tmpDir, { recursive: true });
 });
