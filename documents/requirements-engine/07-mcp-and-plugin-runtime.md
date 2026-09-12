@@ -49,7 +49,8 @@ per-file token budget.
     used by CLI `run --resume`). Blocks until the engine completes (may
     take minutes).
   - `cancel_run({ run_id })` — read the workflow lock, send SIGTERM to the
-    holder. Rejects when `lockInfo.run_id !== run_id`. Treats
+    holder. Rejects when `lockInfo.run_id !== run_id`, and refuses to
+    signal at all when the holder names another host (FR-E102). Treats
     `Deno.errors.NotFound` and `PermissionDenied` from `Deno.kill` as a
     benign no-op (process already gone between read and kill).
   - `apply_workflow_patch({ operations })` — apply add/replace/remove ops

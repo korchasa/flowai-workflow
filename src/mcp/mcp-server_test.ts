@@ -393,7 +393,9 @@ Deno.test("FR-E73 cancel_run treats already-gone process as success", async () =
       lockPath,
       JSON.stringify({
         pid: ghostPid,
-        hostname: "test",
+        // Must be this host: since FR-E102 a foreign host is refused before
+        // any signal, which would shadow the already-gone path under test.
+        hostname: Deno.hostname(),
         run_id: "ghost-run",
         started_at: new Date().toISOString(),
       }),
@@ -414,6 +416,46 @@ Deno.test("FR-E73 cancel_run treats already-gone process as success", async () =
     assertEquals(payload.cancelled, false);
     assertEquals(payload.pid, ghostPid);
     assertStringIncludes(payload.reason ?? "", "already gone");
+    await shutdown();
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+Deno.test("FR-E102 cancel_run refuses to signal a foreign-host lock holder", async () => {
+  const fixture = await setupFixtureWorkflow();
+  try {
+    const lockPath = defaultLockPath(fixture.workflowDir);
+    await Deno.mkdir(join(fixture.workflowDir, "runs"), { recursive: true });
+    // A lock written by a pod that is gone. Its PID names a live process in
+    // THIS namespace, so without a host gate the server would signal an
+    // unrelated local process. PID 1 rather than `Deno.pid` deliberately:
+    // a regression here must not be able to terminate the test runner.
+    await Deno.writeTextFile(
+      lockPath,
+      JSON.stringify({
+        pid: 1,
+        hostname: "ratatoskr-feed-29818140-qqf75",
+        run_id: "run-foreign",
+        started_at: new Date().toISOString(),
+        renewed_at: new Date().toISOString(),
+      }),
+    );
+
+    const { client, shutdown } = await startServerWithClient(
+      fixture.workflowDir,
+    );
+    const result = await client.callTool({
+      name: "cancel_run",
+      arguments: { run_id: "run-foreign" },
+    }) as { isError?: boolean; content: Array<{ text: string }> };
+
+    assertEquals(result.isError, true);
+    assertStringIncludes(result.content[0].text, "different host");
+    assertStringIncludes(
+      result.content[0].text,
+      "ratatoskr-feed-29818140-qqf75",
+    );
     await shutdown();
   } finally {
     await fixture.cleanup();

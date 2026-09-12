@@ -952,6 +952,10 @@ export interface EngineOptions {
   /** Override lock file path (default: `<workflowDir>/runs/.lock`, FR-E54).
    * Used in tests. */
   lock_path?: string;
+  /** Override how often the run refreshes its lock lease in milliseconds
+   * (default: `LOCK_RENEW_INTERVAL_MS`, FR-E102). Used in tests, which
+   * cannot wait out the production interval. */
+  lock_renew_interval_ms?: number;
   /** Workflow-wide USD cost cap (FR-E47). Strict: exact-equal does not trigger. */
   budget_usd?: number;
   /** Optional caller-supplied process tracker scope

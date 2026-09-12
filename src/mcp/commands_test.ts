@@ -188,7 +188,9 @@ Deno.test("FR-E75 deliverHumanAnswer — reports live=true when the run lock is 
       lockPath,
       JSON.stringify({
         pid: Deno.pid,
-        hostname: "test",
+        // This host: the assertion is about a live local engine, and since
+        // FR-E102 a foreign hostname is judged by the lease instead.
+        hostname: Deno.hostname(),
         run_id: fx.runId,
         started_at: new Date().toISOString(),
       }),

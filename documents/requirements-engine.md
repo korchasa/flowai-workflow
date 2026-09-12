@@ -155,3 +155,4 @@ FR-IDs are stable — never renumber them on move.
 - FR-E98 (ACP-Unsupported Invoke Options)              → 11-acp-transport-contract
 - FR-E100 (Session Continuation Across Attempts)       → 13-session-continuation
 - FR-E101 (Config Migration Layer `migrateWorkflow`)   → 03-config-and-validation
+- FR-E102 (Lock Liveness Across PID Namespaces)        → 04b-worktree-isolation
