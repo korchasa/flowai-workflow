@@ -1,10 +1,7 @@
 import { assertEquals, assertExists } from "@std/assert";
 import { join } from "@std/path";
-import {
-  formatStatusText,
-  loadWorkflowStatus,
-  pidAlive,
-} from "./sdlc-status.ts";
+import { formatStatusText, loadWorkflowStatus } from "./sdlc-status.ts";
+import { acquireLock, defaultLockPath } from "../src/state/lock.ts";
 
 async function withTempDir(
   fn: (dir: string) => Promise<void>,
@@ -17,12 +14,22 @@ async function withTempDir(
   }
 }
 
-Deno.test("pidAlive returns false for impossible pid", () => {
-  assertEquals(pidAlive(2_147_483_646), false);
-});
+Deno.test("FR-E102 lock.alive follows the kernel lock, not the record", async () => {
+  await withTempDir(async (dir) => {
+    await Deno.mkdir(join(dir, "runs"), { recursive: true });
+    const held = await acquireLock(defaultLockPath(dir), "run-held");
 
-Deno.test("pidAlive returns true for current process", () => {
-  assertEquals(pidAlive(Deno.pid), true);
+    const live = await loadWorkflowStatus(dir);
+    assertEquals(live.lock?.run_id, "run-held");
+    assertEquals(live.lock?.alive, true);
+
+    await held.release();
+
+    // Same record on disk, no holder behind it.
+    const after = await loadWorkflowStatus(dir);
+    assertEquals(after.lock?.run_id, "run-held");
+    assertEquals(after.lock?.alive, false);
+  });
 });
 
 Deno.test("loadWorkflowStatus returns null lock and null run for empty workflow", async () => {
@@ -68,7 +75,9 @@ Deno.test("loadWorkflowStatus parses lock and state.json", async () => {
     assertExists(status.lock);
     assertEquals(status.lock?.pid, Deno.pid);
     assertEquals(status.lock?.run_id, runId);
-    assertEquals(status.lock?.alive, true);
+    // Hand-written record, no holder behind it: FR-E102 reads that as dead
+    // however live the PID it names looks on this host.
+    assertEquals(status.lock?.alive, false);
     assertExists(status.run);
     assertEquals(status.run?.id, runId);
     assertEquals(status.run?.status, "running");

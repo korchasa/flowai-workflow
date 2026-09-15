@@ -16,7 +16,6 @@ import {
   resumeRunBackground,
   startRun,
 } from "./commands.ts";
-import type { LockInfo } from "../state/lock.ts";
 import { RunJournalWriter } from "../state/run-journal.ts";
 import { createRunState, getHitlInboxPath, getRunDir } from "../state/state.ts";
 import {
@@ -24,7 +23,7 @@ import {
   nodeStarted,
   nodeWaiting,
 } from "../engine/node-lifecycle.ts";
-import { defaultLockPath } from "../state/lock.ts";
+import { acquireLock, defaultLockPath } from "../state/lock.ts";
 
 const WORKFLOW_YAML = `name: fr-e75-cmd
 version: "1"
@@ -178,21 +177,13 @@ Deno.test("FR-E75 deliverHumanAnswer — writes inbox verbatim, live=false with 
   }
 });
 
-Deno.test("FR-E75 deliverHumanAnswer — reports live=true when the run lock is held by a live PID", async () => {
+Deno.test("FR-E75 deliverHumanAnswer — reports live=true while the run holds the lock", async () => {
   const fx = await setupRun("waiting");
+  // FR-E102: holding the lock means holding it, not writing a file that says
+  // so. This process takes the real one for the duration of the test.
+  await Deno.mkdir(join(fx.workflowDir, "runs"), { recursive: true });
+  const held = await acquireLock(defaultLockPath(fx.workflowDir), fx.runId);
   try {
-    // Plant a lock owned by the current (alive) process for this run.
-    const lockPath = defaultLockPath(fx.workflowDir);
-    await Deno.mkdir(join(fx.workflowDir, "runs"), { recursive: true });
-    await Deno.writeTextFile(
-      lockPath,
-      JSON.stringify({
-        pid: Deno.pid,
-        hostname: "test",
-        run_id: fx.runId,
-        started_at: new Date().toISOString(),
-      }),
-    );
     const res = await deliverHumanAnswer({
       workflowDir: fx.workflowDir,
       runId: fx.runId,
@@ -201,6 +192,7 @@ Deno.test("FR-E75 deliverHumanAnswer — reports live=true when the run lock is 
     });
     assertEquals(res.live, true);
   } finally {
+    await held.release();
     await fx.cleanup();
   }
 });
@@ -237,21 +229,16 @@ Deno.test("FR-E84 startRun wait:false — rejects when a run already holds the l
   try {
     await Deno.writeTextFile(join(workflowDir, "workflow.yaml"), WORKFLOW_YAML);
     await Deno.mkdir(join(workflowDir, "runs"), { recursive: true });
-    const held: LockInfo = {
-      pid: Deno.pid, // alive by definition
-      hostname: Deno.hostname(),
-      run_id: "run-already",
-      started_at: "2026-06-21T00:00:00.000Z",
-    };
-    await Deno.writeTextFile(
-      join(workflowDir, "runs", ".lock"),
-      JSON.stringify(held),
-    );
-    await assertRejects(
-      () => startRun({ workflowDir, wait: false }),
-      Error,
-      "already active",
-    );
+    const held = await acquireLock(defaultLockPath(workflowDir), "run-already");
+    try {
+      await assertRejects(
+        () => startRun({ workflowDir, wait: false }),
+        Error,
+        "already active",
+      );
+    } finally {
+      await held.release();
+    }
   } finally {
     await Deno.remove(workflowDir, { recursive: true });
   }
@@ -333,21 +320,16 @@ Deno.test("FR-E85 resumeRunBackground — rejects when the run is already live (
   try {
     await Deno.writeTextFile(join(workflowDir, "workflow.yaml"), WORKFLOW_YAML);
     await Deno.mkdir(join(workflowDir, "runs"), { recursive: true });
-    const held: LockInfo = {
-      pid: Deno.pid, // alive by definition
-      hostname: Deno.hostname(),
-      run_id: "run-live-1",
-      started_at: "2026-06-22T00:00:00.000Z",
-    };
-    await Deno.writeTextFile(
-      join(workflowDir, "runs", ".lock"),
-      JSON.stringify(held),
-    );
-    await assertRejects(
-      () => resumeRunBackground({ workflowDir, runId: "run-live-1" }),
-      Error,
-      "already live",
-    );
+    const held = await acquireLock(defaultLockPath(workflowDir), "run-live-1");
+    try {
+      await assertRejects(
+        () => resumeRunBackground({ workflowDir, runId: "run-live-1" }),
+        Error,
+        "already live",
+      );
+    } finally {
+      await held.release();
+    }
   } finally {
     await Deno.remove(workflowDir, { recursive: true });
   }

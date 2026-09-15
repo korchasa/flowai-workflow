@@ -170,9 +170,9 @@ template path contract (FR-E52), and the per-workflow run lock (FR-E54).
   - Lock path is purely a function of `workflowDir`; no fallback to the
     legacy global path. Stale `.flowai-workflow/runs/.lock` from older
     binaries is ignored (orphan file, not consulted).
-  - Same-workflow-folder semantics unchanged: PID-based liveness check,
-    stale-lock reclaim on dead PID, hostname stored for diagnostics only
-    (FR-E25 invariants preserved).
+  - Same-workflow-folder semantics unchanged by this FR. How a holder is
+    judged live is no longer part of it — FR-E102 replaced the PID check
+    with a kernel lock on the file.
   - `EngineOptions.lock_path` override (test-only) still wins when set —
     no auto-derivation when explicit.
   - **Worktree namespace was NOT yet per-workflow at FR-E54 time.** Code
@@ -295,3 +295,78 @@ template path contract (FR-E52), and the per-workflow run lock (FR-E54).
     non-overwrite, self-copy guard, runs-root skip with `workflowDir`
     excluding nested-worktree mirrors, empty-repo zero-result, progress
     lines).
+
+### 3.59 FR-E102: Run Lock Held By The Kernel
+
+- **Description:** The run lock is an advisory kernel lock
+  (`FsFile.tryLock(true)`) on an open descriptor, not the presence of
+  `<workflowDir>/runs/.lock`. The file carries the holder's record —
+  `{ pid, hostname, run_id, started_at }` — for operators and for
+  `cancel_run`; nothing in it decides whether the folder is busy.
+  `liveLockHolder` is the one predicate every consumer calls.
+
+  **Constraints:**
+  - A lock file no process holds never blocks a run, whatever it names and
+    however live that PID looks on this host. There is no liveness
+    heuristic left to be wrong about.
+  - The lock file is never unlinked. Deleting it while a run holds the lock
+    lets the next run lock a fresh inode, after which both processes
+    believe they own the folder. The refusal message says this, because the
+    pre-FR-E102 message told operators to delete the file.
+  - The holder publishes its record in place (truncate + write) while
+    holding the lock. Staging through a sibling file and renaming would
+    swap the inode out from under the lock.
+  - The liveness probe is shared and read-only. Shared: two probes must not
+    conflict with each other, or the loser reads the last run's record and
+    reports a holder that does not exist. Read-only: the probe never writes,
+    and the lock file usually belongs to another user.
+  - Acquisition asks three times, 50 ms apart, before calling the folder
+    busy. A run holds the lock for minutes and a probe for microseconds, so
+    one lost race is contention, not a holder. This is not a liveness guess:
+    a real holder refuses every attempt.
+  - `cancel_run` signals the recorded PID only when the holder's hostname
+    is this host: a PID from another namespace names an unrelated local
+    process.
+  - Liveness has exactly one implementation. `scripts/sdlc-status.ts`
+    imports the predicate instead of probing PIDs itself.
+  - **Boundary:** advisory locks are dependable on a local filesystem, not
+    over NFS, and this FR offers no substitute there. A run started by a
+    pre-FR-E102 binary holds the folder by file existence alone, which a
+    new binary does not observe; overlapping the two across an upgrade
+    needs external serialization.
+- **Tasks:** [lock-held-by-the-kernel](../tasks/2026/09/lock-held-by-the-kernel.md)
+- **Motivation:** A file lock must be released by the process that wrote it,
+  and a process killed by SIGKILL never gets to. The PID check that judged
+  the leftover was not a substitute: a PID is meaningful only inside the
+  namespace that issued it, and the runs directory routinely outlives that
+  namespace — a Kubernetes hostPath, a docker volume, a reboot. A
+  production instance was killed by its cgroup OOM killer mid-run; PID 12
+  in every later pod was the engine's own `deno` process, so the folder
+  looked busy forever. It lost 39 consecutive hourly runs over roughly 40
+  hours, recovered only when a human deleted the file, and lost another 67
+  hours to the same cause three days later.
+- **Decision:** [documents/tasks/2026/09/lock-held-by-the-kernel.md](../tasks/2026/09/lock-held-by-the-kernel.md)
+- **Dep:** FR-E54, FR-E25
+- **Acceptance criteria:**
+  - **Tests:** `lock_test.ts` (acquire, refusal, release, probe, and a
+    cross-process holder killed with SIGKILL), `sdlc-status_test.ts`
+    (`alive` follows the kernel, not the record), `mcp-server_test.ts`
+    (`cancel_run` host gate, and no active run behind a record nobody
+    holds), `commands_test.ts` (the live-run pre-checks hold a real lock)
+    — FR-E102-prefixed.
+  - [x] Debris naming a live local PID does not block a run.
+    Evidence: `lock_test.ts` "debris naming a live local PID does not block".
+  - [x] A holder killed with SIGKILL leaves the folder free at once.
+    Evidence: `lock_test.ts` "the kernel releases the lock when the holder
+    is killed" — a child process takes the lock, the parent is refused,
+    the child is killed, the parent acquires.
+  - [x] Releasing keeps the record on disk.
+    Evidence: `lock_test.ts` "release — keeps the file as the record of the
+    last run".
+  - [x] A probe in flight is not mistaken for a holder, and does not fail a
+    run that starts during it. Evidence: `lock_test.ts` "one probe does not
+    look like a holder to another" and "a passing probe does not fail a run".
+  - [x] A lock file the caller may read but not write is readable.
+    Evidence: `lock_test.ts` "reads a lock file it may not write".
+  - [x] `cancel_run` refuses to signal a holder on another host.
+    Evidence: `mcp-server.ts::registerCancelRun`.

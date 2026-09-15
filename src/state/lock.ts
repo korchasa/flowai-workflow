@@ -2,13 +2,39 @@
  * @module
  * Per-workflow run lock (FR-E54). Serializes concurrent runs against the
  * same workflow folder; distinct workflow folders run in parallel.
- * Lock file lives at `<workflowDir>/runs/.lock` and contains JSON with
- * PID, hostname, run_id, and timestamp.
- * Stale detection: always PID check. Hostname stored for diagnostics only.
- * Rationale: lock file lives on local FS, so if readable — PID is checkable.
+ *
+ * The lock is held by the KERNEL, on an open file descriptor, not by the
+ * presence of `<workflowDir>/runs/.lock` (FR-E102). The file carries a JSON
+ * record of the holder — pid, hostname, run_id, started_at — but that record
+ * decides nothing: it is what an operator reads, not what the engine trusts.
+ *
+ * Rationale: a lock that is a file must be released by the process that
+ * wrote it, and a process killed by SIGKILL — an OOM kill, a node crash —
+ * never gets to. Something else then has to judge whether the recorded
+ * holder is still alive, and the obvious proxy, its PID, is not one. A PID
+ * is meaningful only inside the namespace that issued it, and the runs
+ * directory routinely outlives that namespace: a Kubernetes hostPath, a
+ * docker volume, a reboot. In the incident that produced this module the
+ * recorded PID was 12, and PID 12 in every later pod was the engine's own
+ * `deno` process — live, unrelated, and enough to make the folder look busy
+ * forever. 39 hourly runs died on it before a human deleted the file.
+ *
+ * An advisory kernel lock has no such proxy. The kernel drops it when the
+ * holder's last descriptor closes, which happens on every exit path there
+ * is, including the ones that run no code. There is nothing to time out and
+ * nothing to reclaim.
+ *
+ * Two consequences worth knowing:
+ * - The file is never unlinked. Deleting it while a run holds the lock lets
+ *   the next run create a fresh inode and lock that instead, and both
+ *   processes then believe they own the folder.
+ * - Advisory locks are dependable on a local filesystem. Over NFS or another
+ *   network filesystem they are not, and this module offers no substitute
+ *   there.
  */
 
-/** Lock file content structure. */
+/** Lock file content: the holder's record, kept for humans and for
+ * `cancel_run`. Never an input to the liveness decision. */
 export interface LockInfo {
   pid: number;
   hostname: string;
@@ -24,21 +50,22 @@ export function defaultLockPath(workflowDir: string): string {
   return `${workflowDir}/runs/.lock`;
 }
 
-/** Check if a process with given PID is alive on this host.
- *
- * `PermissionDenied` (POSIX `EPERM`) means the process EXISTS but belongs to
- * another user — it must count as alive. Treating it as dead (the previous
- * behaviour of a blanket `catch`) let one user reclaim a lock still held by
- * another user's running engine. Only `NotFound` (`ESRCH`) proves the PID is
- * gone; anything else is surfaced as "alive" because we cannot prove
- * otherwise and reclaiming on a guess is the destructive option. */
-function isProcessAlive(pid: number): boolean {
-  try {
-    Deno.kill(pid, "SIGCONT");
-    return true;
-  } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return false;
-    return true;
+/** A lock this process holds. Releasing closes the descriptor, which is what
+ * drops the kernel lock; the file stays behind as the holder's record. */
+export class HeldLock {
+  #file: Deno.FsFile | null;
+
+  constructor(file: Deno.FsFile, readonly info: LockInfo) {
+    this.#file = file;
+  }
+
+  /** Release the lock. Idempotent — the engine releases both from its
+   * `finally` and from a shutdown handler. */
+  release(): Promise<void> {
+    const file = this.#file;
+    this.#file = null;
+    if (file) file.close();
+    return Promise.resolve();
   }
 }
 
@@ -47,9 +74,9 @@ function isProcessAlive(pid: number): boolean {
  * Throws `Deno.errors.NotFound` when the file is absent and `SyntaxError`
  * when its contents are not a well-formed {@link LockInfo} — including
  * syntactically valid JSON of the wrong shape (`null`, an array, a record
- * missing `pid`). Callers rely on that single "corrupt" category to decide
- * between reclaiming debris and surfacing a genuine I/O failure, so shape
- * validation must not be left to the first property access. */
+ * missing `pid`). Shape validation must not be left to the first property
+ * access: callers distinguish "unreadable record" from a genuine I/O
+ * failure. */
 export async function readLockInfo(lockPath: string): Promise<LockInfo> {
   const text = await Deno.readTextFile(lockPath);
   const parsed = JSON.parse(text);
@@ -65,154 +92,148 @@ export async function readLockInfo(lockPath: string): Promise<LockInfo> {
   return parsed as LockInfo;
 }
 
-/** Check if an existing lock is still held by a live process.
- * Always checks PID directly — lock file on local FS guarantees
- * PID namespace is shared. Hostname stored for diagnostics only. */
-function isLockAlive(existing: LockInfo): boolean {
-  return isProcessAlive(existing.pid);
-}
-
-/** Report whether `runId` is the run currently held alive by the workflow
- * lock (FR-E75). True iff the lock file exists, names this exact `runId`,
- * and its PID is a live process. Returns false (never throws) when the
- * lock is absent, corrupted, owned by a different run, or held by a dead
- * PID. Used by the unified command layer so `answer` can tell the operator
- * whether the live poll loop will pick up the inbox file or whether they
- * must resume the engine separately. */
-export async function isRunLive(
-  workflowDir: string,
-  runId: string,
-): Promise<boolean> {
-  let info: LockInfo;
-  try {
-    info = await readLockInfo(defaultLockPath(workflowDir));
-  } catch {
-    // NotFound (no lock) or SyntaxError (corrupted lock) → not live.
-    return false;
-  }
-  return info.run_id === runId && isProcessAlive(info.pid);
-}
-
-/** Return the lock holder for `workflowDir` iff a live process holds it
- * (FR-E84). Unlike {@link isRunLive} it does NOT match a specific run_id —
- * it answers "is ANY run currently active for this workflow folder", the
- * pre-check {@link startRun} needs before launching a fresh background run.
- * Returns null (never throws) when the lock is absent, corrupted, or held
- * by a dead PID. */
-export async function liveLockHolder(
-  workflowDir: string,
-): Promise<LockInfo | null> {
-  let info: LockInfo;
-  try {
-    info = await readLockInfo(defaultLockPath(workflowDir));
-  } catch {
-    // NotFound (no lock) or SyntaxError (corrupted lock) → not active.
-    return null;
-  }
-  return isProcessAlive(info.pid) ? info : null;
-}
-
 /**
- * Acquire the workflow lock. Throws if another live process holds it.
- * Reclaims stale locks (dead PID) and corrupted lock files automatically.
+ * Acquire the workflow lock. Throws when another process holds it.
  *
- * Creation is ATOMIC: the lock file is opened with `createNew: true`, so the
- * kernel — not this process — decides the winner when two engines race. The
- * previous read-then-write shape had a window between "no lock found" and
- * "lock written" in which both racers concluded the folder was free and both
- * proceeded, defeating FR-E54's serialization guarantee.
- *
- * On `AlreadyExists` the holder is inspected once: a live PID is a hard
- * failure; a dead PID or an unparseable file is removed and creation is
- * retried. A single retry is enough — a third party winning the re-created
- * slot is itself a live holder and surfaces as the normal "already running"
- * error.
+ * The descriptor returned inside {@link HeldLock} is the lock: keep it open
+ * for the whole run and release it when the run ends. A file left behind by
+ * a killed holder is not a lock and never blocks — whatever it names, and
+ * however alive that PID looks on this host.
  */
 export async function acquireLock(
   lockPath: string,
   runId: string,
-): Promise<void> {
-  const info: LockInfo = {
-    pid: Deno.pid,
-    hostname: Deno.hostname(),
-    run_id: runId,
-    started_at: new Date().toISOString(),
-  };
-  const payload = JSON.stringify(info, null, 2) + "\n";
-
-  // Ensure parent directory exists
+): Promise<HeldLock> {
   const dir = lockPath.substring(0, lockPath.lastIndexOf("/"));
-  if (dir) {
-    await Deno.mkdir(dir, { recursive: true });
-  }
+  if (dir) await Deno.mkdir(dir, { recursive: true });
 
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      await createLockFile(lockPath, payload);
-      return;
-    } catch (err) {
-      if (!(err instanceof Deno.errors.AlreadyExists)) throw err;
-    }
-
-    // Someone holds the file. Decide whether it is a live run or debris.
-    let existing: LockInfo | undefined;
-    try {
-      existing = await readLockInfo(lockPath);
-    } catch (err) {
-      if (err instanceof Deno.errors.NotFound) {
-        // Holder released between create and read — retry the create.
-        continue;
-      }
-      if (!(err instanceof SyntaxError)) throw err;
-      // Corrupted lock file — treated as debris below (existing stays undefined).
-    }
-
-    if (existing && isLockAlive(existing)) {
-      throw new Error(
-        `Workflow is already running (run_id: ${existing.run_id}, pid: ${existing.pid}, host: ${existing.hostname}). ` +
-          `Remove ${lockPath} manually if the process is stuck.`,
-      );
-    }
-
-    // Stale (dead PID) or corrupted — drop it and retry once.
-    await releaseLock(lockPath);
-  }
-
-  throw new Error(
-    `Failed to acquire workflow lock at ${lockPath}: contended by another process`,
-  );
-}
-
-/**
- * Publish the lock file exclusively. Throws `AlreadyExists` when taken.
- *
- * Staged through a sibling temp file plus `Deno.link`, NOT a plain
- * `Deno.open({createNew: true})`. `createNew` publishes an EMPTY file and
- * fills it a moment later, so a racer that loses the create can still read
- * the empty file, classify it as corrupt debris, delete it and acquire the
- * lock — both processes then believe they hold it. A hard link makes the
- * name appear only when the content behind it is already complete.
- */
-async function createLockFile(
-  lockPath: string,
-  payload: string,
-): Promise<void> {
-  const tmpPath = `${lockPath}.${Deno.pid}.tmp`;
-  await Deno.writeTextFile(tmpPath, payload);
+  const file = await Deno.open(lockPath, {
+    read: true,
+    write: true,
+    create: true,
+  });
   try {
-    await Deno.link(tmpPath, lockPath);
-  } finally {
-    await Deno.remove(tmpPath).catch(() => {});
-  }
-}
-
-/** Release workflow lock. No-op if lock file doesn't exist. */
-export async function releaseLock(lockPath: string): Promise<void> {
-  try {
-    await Deno.remove(lockPath);
+    if (!await takeWithRetries(file)) {
+      throw new Error(describeHolder(lockPath, await recordOf(lockPath)));
+    }
+    const info: LockInfo = {
+      pid: Deno.pid,
+      hostname: Deno.hostname(),
+      run_id: runId,
+      started_at: new Date().toISOString(),
+    };
+    await publish(file, info);
+    return new HeldLock(file, info);
   } catch (err) {
-    if (!(err instanceof Deno.errors.NotFound)) {
-      throw err;
+    // Closing drops the lock too, on every path out of here.
+    file.close();
+    throw err;
+  }
+}
+
+/** Return the holder's record iff a process currently holds the lock on
+ * `workflowDir` (FR-E84) — the pre-check callers need before launching a
+ * run. Returns null when the folder is free: no lock file, or a file no
+ * process holds. Throws only when the lock is held and its record cannot be
+ * read, which is the sub-millisecond window between a holder taking the lock
+ * and writing its record. */
+export async function liveLockHolder(
+  workflowDir: string,
+): Promise<LockInfo | null> {
+  const lockPath = defaultLockPath(workflowDir);
+  let file: Deno.FsFile;
+  try {
+    // Read-only: the probe never writes, and the lock file often belongs to
+    // another user — the engine in a container writes it as root, and an
+    // operator reading status is not root.
+    file = await Deno.open(lockPath, { read: true });
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return null;
+    throw err;
+  }
+  try {
+    // A SHARED lock, not an exclusive one. It still conflicts with the
+    // holder's exclusive lock, which is the question being asked, but two
+    // probes no longer conflict with each other — with exclusive probes the
+    // loser of that race reads the previous run's record and reports a
+    // holder that does not exist.
+    if (await file.tryLock(false)) {
+      await file.unlock();
+      return null;
     }
+  } finally {
+    file.close();
+  }
+  return await readLockInfo(lockPath);
+}
+
+/** Report whether `runId` is the run currently holding the workflow lock
+ * (FR-E75). Returns false (never throws) when the folder is free, held by a
+ * different run, or unreadable. Used by the unified command layer so
+ * `answer` can tell the operator whether the live poll loop will pick up the
+ * inbox file or whether they must resume the engine separately. */
+export async function isRunLive(
+  workflowDir: string,
+  runId: string,
+): Promise<boolean> {
+  try {
+    const holder = await liveLockHolder(workflowDir);
+    return holder?.run_id === runId;
+  } catch {
+    return false;
+  }
+}
+
+/** How many times acquisition asks for the lock before calling the folder
+ * busy, and how long it waits between asks. A run holds the lock for minutes;
+ * a probe holds it for microseconds. Retrying separates the two without
+ * guessing anything about the holder — losing the lock race once says
+ * nothing, and losing it three times over 100 ms says a run owns the folder.
+ * The floor matters: a single attempt let one concurrent status probe fail a
+ * whole run with "already running", the error this module exists to stop. */
+const ACQUIRE_ATTEMPTS = 3;
+const ACQUIRE_RETRY_MS = 50;
+
+async function takeWithRetries(file: Deno.FsFile): Promise<boolean> {
+  for (let attempt = 0; attempt < ACQUIRE_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, ACQUIRE_RETRY_MS));
+    }
+    if (await file.tryLock(true)) return true;
+  }
+  return false;
+}
+
+/** The holder's record, or null when it cannot be read. Used for the error
+ * message only, where an unreadable record must not mask the refusal. */
+async function recordOf(lockPath: string): Promise<LockInfo | null> {
+  try {
+    return await readLockInfo(lockPath);
+  } catch {
+    return null;
+  }
+}
+
+function describeHolder(lockPath: string, info: LockInfo | null): string {
+  const who = info
+    ? `run_id: ${info.run_id}, pid: ${info.pid}, host: ${info.hostname}, ` +
+      `started: ${info.started_at}`
+    : "its record is unreadable";
+  return `Workflow is already running (${who}). The lock is held by a live ` +
+    `process, not by ${lockPath}; deleting that file does not free the ` +
+    `folder, it only lets a second run believe it owns one.`;
+}
+
+/** Overwrite the record in place. The descriptor stays open and locked, so
+ * the record cannot be staged through a rename: that would swap the inode
+ * out from under the lock. */
+async function publish(file: Deno.FsFile, info: LockInfo): Promise<void> {
+  const payload = new TextEncoder().encode(
+    JSON.stringify(info, null, 2) + "\n",
+  );
+  await file.truncate(0);
+  await file.seek(0, Deno.SeekMode.Start);
+  for (let written = 0; written < payload.length;) {
+    written += await file.write(payload.subarray(written));
   }
 }

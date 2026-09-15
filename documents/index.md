@@ -4,6 +4,7 @@
 
 - [FR-E1](requirements-engine/01-execution-model.md#31-fr-e1-continuation-mechanism) — Continuation mechanism: re-invoke the agent in the same session when validation fails — [x]
 - [FR-E100](requirements-engine/13-session-continuation.md#3100-fr-e100-session-continuation-across-attempts) — Session continuation across attempts (`session: fresh|continue|<node-id>` on agent nodes and in `defaults`) — [x]
+- [FR-E102](requirements-engine/04b-worktree-isolation.md#359-fr-e102-run-lock-held-by-the-kernel) — Run lock held by the kernel, so a holder killed without cleanup leaves the folder free — [x]
 - [FR-E11](requirements-engine/02-nodes-and-models.md#311-fr-e11-conditional-post-workflow-node-execution-run_on) — Conditional post-workflow node execution (`run_on`), including its resume semantics — [x]
 - [FR-E18](requirements-engine/05-cli-and-observability.md#318-fr-e18-stream-log-timestamps) — Stream-log lines prefixed with `[HH:MM:SS]` wall-clock timestamp (engine-owned write under ACP) — [x]
 - [FR-E20](requirements-engine/05-cli-and-observability.md#320-fr-e20-repeated-file-read-warning) — Stream-log `[WARN]` when same file path read >2 times in one node run — [x]
@@ -11,6 +12,7 @@
 - [FR-E39](requirements-engine/06-distribution-and-housekeeping.md#339-fr-e39-standalone-binary-distribution) — Standalone binary distribution via `deno compile` + GitHub Release assets — [x]
 - [FR-E41](requirements-engine/06-distribution-and-housekeeping.md#341-fr-e41-cli-auto-update-and-automated-release-pipeline) — Automated CI release pipeline with conventional-commit version bumping — [x]
 - [FR-E43](requirements-engine/02-nodes-and-models.md#343-fr-e43-runtime-fallback-fallback) — Runtime fallback (`defaults.fallback`): switch entire runtime on overload / quota / availability errors — [ ]
+- [FR-E54](requirements-engine/04b-worktree-isolation.md#354-fr-e54-per-workflow-run-lock) — Per-workflow run lock rooted at `<workflowDir>/runs/.lock` — [x]
 - [FR-E68](requirements-engine/05-cli-and-observability.md#368-fr-e68-node-lifecycle-callback-for-embedded-hosts) — Expose node lifecycle callback for embedded hosts — [x]
 - [FR-E69](requirements-engine/05-cli-and-observability.md#369-fr-e69-durable-run-journal-replay) — Persist durable run journal for host recovery replay — [x]
 - [FR-E70](requirements-engine/06-distribution-and-housekeeping.md#370-fr-e70-claude-code--codex-plugin-distribution) — Claude Code / Codex plugin distribution (plugin-first; downstream `flowai-workflow-plugins` repo) — [x]

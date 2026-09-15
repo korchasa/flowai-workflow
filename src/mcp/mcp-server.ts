@@ -49,7 +49,7 @@ import {
   resumeRunBackground,
   startRun,
 } from "./commands.ts";
-import { defaultLockPath, readLockInfo } from "../state/lock.ts";
+import { liveLockHolder } from "../state/lock.ts";
 import { replayRunJournal } from "../state/run-journal.ts";
 import {
   assertSafeRelativePath,
@@ -410,26 +410,35 @@ function registerCancelRun(server: McpServer, workflowDir: string): void {
   server.tool(
     "cancel_run",
     "Send SIGTERM to the process holding the workflow lock, if any. " +
-      "Rejects when the lock's run_id does not match the requested one.",
+      "Rejects when the lock's run_id does not match the requested one, " +
+      "and when the holder runs on another host.",
     { run_id: z.string() },
     async ({ run_id }: { run_id: string }) => {
       try {
         assertSafeSegment(run_id, "run_id");
-        const lockPath = defaultLockPath(workflowDir);
-        const info = await readLockInfo(lockPath);
+        const info = await liveLockHolder(workflowDir);
+        if (info === null) {
+          return err("no active run: nothing holds the workflow lock");
+        }
         if (info.run_id !== run_id) {
           return err(
             `no matching active run: lock holds run_id=${info.run_id}, ` +
               `requested run_id=${run_id}`,
           );
         }
+        if (info.hostname !== Deno.hostname()) {
+          // A PID is meaningful only inside the namespace that issued it
+          // (FR-E102). Signalling this one would hit whatever local process
+          // happens to wear the number.
+          return err(
+            `run ${run_id} is held on host ${info.hostname}, not on ` +
+              `${Deno.hostname()}; cancel it there`,
+          );
+        }
         try {
           Deno.kill(info.pid, "SIGTERM");
         } catch (killErr) {
-          // Race: holder released between readLockInfo and kill. The lock's
-          // PID either no longer exists (Deno.errors.NotFound) or is owned
-          // by a different process now (PermissionDenied on some OSes).
-          // Treat as a benign no-op — the run is gone.
+          // Race: the holder exited between the probe and the kill.
           if (
             killErr instanceof Deno.errors.NotFound ||
             killErr instanceof Deno.errors.PermissionDenied

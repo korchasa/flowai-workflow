@@ -42,7 +42,7 @@ import {
 } from "./branch.ts";
 import { terminalInput } from "./human.ts";
 import type { UserInput } from "./human.ts";
-import { acquireLock, defaultLockPath, releaseLock } from "../state/lock.ts";
+import { acquireLock, defaultLockPath } from "../state/lock.ts";
 import { onShutdown } from "../process-registry.ts";
 import { OutputManager } from "../output.ts";
 import type { RunSummary } from "../output.ts";
@@ -321,12 +321,14 @@ export class Engine {
     // workflow folder; distinct workflow folders run in parallel.
     const lockPath = this.options.lock_path ??
       defaultLockPath(this.workflowDir);
-    await acquireLock(lockPath, this.state.run_id);
+    // The descriptor inside `held` is the lock (FR-E102); releasing it is
+    // closing that descriptor, and a signal that kills us releases it too.
+    const held = await acquireLock(lockPath, this.state.run_id);
 
     // Register shutdown callbacks for signal-initiated cleanup;
     // disposers remove them after normal completion to prevent leak in loops
     const disposers = [
-      onShutdown(() => releaseLock(lockPath)),
+      onShutdown(() => held.release()),
       onShutdown(async () => {
         if (this.state.status === "running") {
           markRunFailed(this.state);
@@ -339,7 +341,7 @@ export class Engine {
       return await this.runWithLock(levels, lockPath);
     } finally {
       for (const dispose of disposers) dispose();
-      await releaseLock(lockPath);
+      await held.release();
       // FR-E49: restore DISABLE_AUTOUPDATER to its pre-run value.
       if (origAutoupdaterVal === undefined) {
         Deno.env.delete("DISABLE_AUTOUPDATER");
