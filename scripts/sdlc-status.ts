@@ -6,7 +6,9 @@
  * Reads only durable artifacts under `<workflowDir>/runs/`:
  *
  * - `runs/.lock`   — JSON `{pid, hostname, run_id, started_at}` written by
- *                    the engine while a run owns the workflow folder.
+ *                    the engine while a run owns the workflow folder. The
+ *                    record outlives the run; whether a run is live is the
+ *                    kernel lock on that file (FR-E102).
  * - `runs/<id>/state.json`    — engine-owned run state (RunState).
  * - `runs/<id>/journal.jsonl` — append-only event log; tail printed on
  *                                request.
@@ -24,6 +26,7 @@
  */
 
 import { join } from "@std/path";
+import { liveLockHolder } from "../src/state/lock.ts";
 
 export interface LockInfo {
   pid: number;
@@ -53,16 +56,6 @@ export interface WorkflowStatus {
 
 export interface LoadOptions {
   journalTail?: number;
-}
-
-/** Cheap liveness probe via signal 0 — does not touch the process. */
-export function pidAlive(pid: number): boolean {
-  try {
-    Deno.kill(pid, "SIGCONT");
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function readJsonIfExists<T>(path: string): Promise<T | null> {
@@ -163,8 +156,11 @@ export async function loadWorkflowStatus(
     hostname: string;
     started_at: string;
   }>(join(runsDir, ".lock"));
+  // `alive` is the kernel's answer, not the file's (FR-E102): the record
+  // survives the run that wrote it, the lock does not.
+  const holder = lockRaw ? await liveLockHolder(workflowDir) : null;
   const lock: LockInfo | null = lockRaw
-    ? { ...lockRaw, alive: pidAlive(lockRaw.pid) }
+    ? { ...lockRaw, alive: holder?.run_id === lockRaw.run_id }
     : null;
 
   let chosen = runId;

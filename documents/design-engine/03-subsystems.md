@@ -129,7 +129,7 @@
   scope. Injectable `getParentPid`/`onParentDeath` keep the logic unit-
   testable without real reparenting or `Deno.exit`.
 
-### 3.3a Workflow Lock (`lock.ts`) — FR-E25, FR-E54
+### 3.3a Workflow Lock (`lock.ts`) — FR-E25, FR-E54, FR-E102
 
 - **Status:** Implemented.
 - **Purpose:** Serialize concurrent runs **per workflow folder** (`<workflowDir>` =
@@ -139,29 +139,53 @@
   The engine derives `workflowDir` once via `deriveWorkflowDir(options.config_path)`
   in the `Engine` constructor and passes it to `defaultLockPath` at acquisition
   time. `EngineOptions.lock_path` override (tests only) bypasses the derivation.
-- **Lock content (`LockInfo`):** `{ pid, hostname, run_id, started_at }`.
-  Hostname stored for diagnostics only — local FS implies a shared PID
-  namespace, so `Deno.kill(pid, "SIGCONT")` is the authoritative liveness
-  check (FR-E25). Only `NotFound` (`ESRCH`) proves a dead PID;
-  `PermissionDenied` (`EPERM`) means the process exists under another user
-  and counts as alive. Stale-on-dead-PID lock is reclaimed transparently.
+- **What holds the lock:** an advisory kernel lock (`FsFile.tryLock(true)`)
+  on an open descriptor, not the presence of the file (FR-E102). The kernel
+  drops it when the holder's last descriptor closes, so every exit path
+  releases it, including SIGKILL, an OOM kill and a node crash — the paths
+  that run no code. There is no liveness heuristic, no timeout and nothing
+  to reclaim.
+- **Lock content (`LockInfo`):** `{ pid, hostname, run_id, started_at }`,
+  rewritten in place by the holder after it takes the lock. The record is
+  read by operators and by `cancel_run`; it decides nothing. A PID means
+  something only inside the namespace that issued it, and the runs directory
+  routinely outlives that namespace (Kubernetes hostPath, docker volume,
+  reboot), which is exactly how the pre-FR-E102 PID check jammed a
+  production folder for days.
+- **The file is never unlinked.** Deleting it while a run holds the lock
+  lets the next run create a fresh inode and lock that instead, so both
+  processes believe they own the folder. `acquireLock`'s refusal message
+  says so, because the pre-FR-E102 message told operators the opposite.
+- **Boundary:** advisory locks are dependable on a local filesystem, not
+  over NFS. The module offers no substitute there. Upgrade boundary: a run
+  started by a pre-FR-E102 binary holds the folder by file existence alone,
+  which a new binary does not see; overlapping the two across an upgrade is
+  the one case that needs external serialization.
 - **Interfaces:**
   - `defaultLockPath(workflowDir: string): string` — pure helper, returns
     `<workflowDir>/runs/.lock`.
-  - `acquireLock(lockPath, runId)` — throws when a live PID holds the file;
-    reclaims on dead PID; rewrites on `SyntaxError` (corrupted file).
-    Publication is ATOMIC: the payload is staged in a sibling temp file and
-    linked into place with `Deno.link`, so the lock name appears only when
-    its content is complete. A read-then-write shape let two racers both
-    conclude the folder was free; `Deno.open({createNew})` alone is not
-    enough either — it publishes an empty file that a racer reads as
-    corrupt debris, deletes, and then acquires.
-  - `releaseLock(lockPath)` — idempotent unlink.
-  - `readLockInfo(lockPath)` — debug helper.
+  - `acquireLock(lockPath, runId): Promise<HeldLock>` — opens the file,
+    takes the kernel lock or throws, then publishes the record in place
+    (truncate + write, never a rename: staging through a sibling file would
+    swap the inode out from under the lock).
+  - `HeldLock.release()` — closes the descriptor, which is what drops the
+    lock. Idempotent: the engine releases from `finally` and from a
+    shutdown handler.
+  - `liveLockHolder(workflowDir)` — the one liveness predicate. Takes the
+    lock to find out whether anyone else has it, releases it again, and
+    returns the record only when the folder is genuinely held.
+  - `isRunLive(workflowDir, runId)` — `liveLockHolder` narrowed to one run;
+    never throws.
+  - `readLockInfo(lockPath)` — reads the record, shape-validated.
 - **Integration points:**
   - `engine.ts::Engine.run()` — `defaultLockPath(this.workflowDir)`,
-    `acquireLock` before any side-effecting work, `releaseLock` in `finally`,
-    `onShutdown(() => releaseLock(...))` for SIGINT/SIGTERM cleanup.
+    `acquireLock` before any side-effecting work, `held.release()` in
+    `finally`, `onShutdown(() => held.release())` for SIGINT/SIGTERM cleanup.
+  - `mcp-server.ts::cancel_run` — signals `info.pid` only when
+    `liveLockHolder` reports a holder whose `hostname` is this host; a PID
+    from another namespace names an unrelated local process.
+  - `scripts/sdlc-status.ts` — reports `lock.alive` from `liveLockHolder`
+    instead of probing the recorded PID itself.
 - **Cross-workflow parallelism:** Each workflow folder owns its
   `<workflowDir>/runs/<run-id>/` umbrella, which holds both per-run state
   (FR-E9) and the per-run git worktree (FR-E57: `runs/<run-id>/worktree/`,

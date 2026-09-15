@@ -24,7 +24,7 @@ import {
   nodeStarted,
   nodeWaiting,
 } from "../engine/node-lifecycle.ts";
-import { defaultLockPath } from "../state/lock.ts";
+import { acquireLock, defaultLockPath } from "../state/lock.ts";
 
 // --- Fixture helpers ---
 
@@ -350,21 +350,14 @@ Deno.test("FR-E75 provide_human_input rejects a node that is not waiting", async
 
 Deno.test("FR-E73 cancel_run rejects mismatched run_id", async () => {
   const fixture = await setupFixtureWorkflow();
+  // A real lock, held by this process. We never signal ourselves because the
+  // requested run_id is a different one.
+  await Deno.mkdir(join(fixture.workflowDir, "runs"), { recursive: true });
+  const held = await acquireLock(
+    defaultLockPath(fixture.workflowDir),
+    "other-run",
+  );
   try {
-    // Plant a lock file pointing at the current Deno process. We never call
-    // SIGTERM on ourselves because the run_id is different.
-    const lockPath = defaultLockPath(fixture.workflowDir);
-    await Deno.mkdir(join(fixture.workflowDir, "runs"), { recursive: true });
-    await Deno.writeTextFile(
-      lockPath,
-      JSON.stringify({
-        pid: Deno.pid,
-        hostname: "test",
-        run_id: "other-run",
-        started_at: new Date().toISOString(),
-      }),
-    );
-
     const { client, shutdown } = await startServerWithClient(
       fixture.workflowDir,
     );
@@ -376,25 +369,53 @@ Deno.test("FR-E73 cancel_run rejects mismatched run_id", async () => {
     assertStringIncludes(result.content[0].text, "no matching active run");
     await shutdown();
   } finally {
+    await held.release();
     await fixture.cleanup();
   }
 });
 
-Deno.test("FR-E73 cancel_run treats already-gone process as success", async () => {
+Deno.test("FR-E102 cancel_run refuses to signal a holder on another host", async () => {
   const fixture = await setupFixtureWorkflow();
+  await Deno.mkdir(join(fixture.workflowDir, "runs"), { recursive: true });
+  const lockPath = defaultLockPath(fixture.workflowDir);
+  const held = await acquireLock(lockPath, "remote-run");
   try {
-    // Use a PID that is virtually guaranteed not to exist (Int32 max).
-    // `Deno.kill(0, …)` would broadcast to the process group on POSIX
-    // and TERM the test runner itself.
-    const ghostPid = 0x7fffffff;
-    const lockPath = defaultLockPath(fixture.workflowDir);
-    await Deno.mkdir(join(fixture.workflowDir, "runs"), { recursive: true });
+    // The shape a shared volume produces: the lock is genuinely held, but its
+    // record was written by a process in another PID namespace. Signalling
+    // that PID here would hit whatever local process wears the number.
     await Deno.writeTextFile(
       lockPath,
+      JSON.stringify({ ...held.info, hostname: "some-other-host" }),
+    );
+
+    const { client, shutdown } = await startServerWithClient(
+      fixture.workflowDir,
+    );
+    const result = await client.callTool({
+      name: "cancel_run",
+      arguments: { run_id: "remote-run" },
+    }) as { isError?: boolean; content: Array<{ text: string }> };
+    assertEquals(result.isError, true);
+    assertStringIncludes(result.content[0].text, "some-other-host");
+    await shutdown();
+  } finally {
+    await held.release();
+    await fixture.cleanup();
+  }
+});
+
+Deno.test("FR-E102 cancel_run reports no active run when nothing holds the lock", async () => {
+  const fixture = await setupFixtureWorkflow();
+  try {
+    // A record left by a killed holder is not a holder, whatever PID it
+    // names — the pre-FR-E102 code would have signalled it.
+    await Deno.mkdir(join(fixture.workflowDir, "runs"), { recursive: true });
+    await Deno.writeTextFile(
+      defaultLockPath(fixture.workflowDir),
       JSON.stringify({
-        pid: ghostPid,
-        hostname: "test",
-        run_id: "ghost-run",
+        pid: Deno.pid,
+        hostname: Deno.hostname(),
+        run_id: "dead-run",
         started_at: new Date().toISOString(),
       }),
     );
@@ -404,16 +425,10 @@ Deno.test("FR-E73 cancel_run treats already-gone process as success", async () =
     );
     const result = await client.callTool({
       name: "cancel_run",
-      arguments: { run_id: "ghost-run" },
-    }) as { content: Array<{ text: string }>; isError?: boolean };
-    const payload = JSON.parse(result.content[0].text) as {
-      cancelled: boolean;
-      pid: number;
-      reason?: string;
-    };
-    assertEquals(payload.cancelled, false);
-    assertEquals(payload.pid, ghostPid);
-    assertStringIncludes(payload.reason ?? "", "already gone");
+      arguments: { run_id: "dead-run" },
+    }) as { isError?: boolean; content: Array<{ text: string }> };
+    assertEquals(result.isError, true);
+    assertStringIncludes(result.content[0].text, "no active run");
     await shutdown();
   } finally {
     await fixture.cleanup();
