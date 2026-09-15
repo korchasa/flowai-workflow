@@ -67,7 +67,7 @@
     callbacks.
 - **Interfaces (free functions over default singleton):** Same names; they
   delegate to the package-wide default `ProcessRegistry` instance. Used by
-  `Engine.run()` itself for its own `onShutdown(() => releaseLock(...))`
+  `Engine.run()` itself for its own `onShutdown(() => held.release())`
   hook so stand-alone CLI behavior is byte-for-byte identical.
 - **Engine option flow (FR-E60):**
   `EngineOptions.processRegistry?` → `node-dispatch.ts` →
@@ -87,9 +87,10 @@
 - **Integration points:**
   - `agent.ts::runAgent` — forwards `processRegistry` to every
     `adapter.invoke()` (initial + continuation).
-  - `engine.ts::Engine.run()` — `onShutdown(() => releaseLock(...))` for
+  - `engine.ts::Engine.run()` — `onShutdown(() => held.release())` for
     SIGINT/SIGTERM cleanup (default singleton); does NOT call
-    `installSignalHandlers()`.
+    `installSignalHandlers()`. A signal that kills the process outright
+    releases the lock anyway — the kernel holds it (FR-E102).
   - `cli.ts`, `self-runner.ts` — `installSignalHandlers()` at entry point
     (bin-mode only).
 - **Design rationale:** The default singleton preserves bit-for-bit
@@ -167,13 +168,21 @@
   - `acquireLock(lockPath, runId): Promise<HeldLock>` — opens the file,
     takes the kernel lock or throws, then publishes the record in place
     (truncate + write, never a rename: staging through a sibling file would
-    swap the inode out from under the lock).
+    swap the inode out from under the lock). Asks three times, 50 ms apart,
+    before calling the folder busy: a run holds the lock for minutes and a
+    probe for microseconds, so one lost race says nothing. A single attempt
+    let a concurrent status probe fail a whole run with "already running".
   - `HeldLock.release()` — closes the descriptor, which is what drops the
     lock. Idempotent: the engine releases from `finally` and from a
     shutdown handler.
   - `liveLockHolder(workflowDir)` — the one liveness predicate. Takes the
     lock to find out whether anyone else has it, releases it again, and
-    returns the record only when the folder is genuinely held.
+    returns the record only when the folder is genuinely held. The probe is
+    SHARED and read-only: shared so two probes do not conflict with each
+    other (with exclusive probes the loser reads the last run's record and
+    reports a holder that does not exist), read-only because the probe never
+    writes and the lock file usually belongs to another user — the engine in
+    a container writes it as root.
   - `isRunLive(workflowDir, runId)` — `liveLockHolder` narrowed to one run;
     never throws.
   - `readLockInfo(lockPath)` — reads the record, shape-validated.

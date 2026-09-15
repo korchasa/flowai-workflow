@@ -337,7 +337,9 @@ transport-agnostic.
   to completion. Blocking — the MCP request stays open for the
   entire engine run, which may take minutes.
 - `cancel_run({ run_id })` — SIGTERM to the lock holder; rejects when
-  the lock's `run_id` mismatches the request.
+  nothing holds the lock, when the lock's `run_id` mismatches the
+  request, and when the holder runs on another host (its PID names an
+  unrelated local process there).
 - `apply_workflow_patch({ operations: [{ op, path, value? }, ...] })`
   — applies add/replace/remove JSON-Pointer ops (RFC 6901) to
   `workflow.yaml`. Rejects ops on the root or `version` key.

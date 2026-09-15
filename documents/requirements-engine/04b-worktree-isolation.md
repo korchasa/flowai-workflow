@@ -316,6 +316,14 @@ template path contract (FR-E52), and the per-workflow run lock (FR-E54).
   - The holder publishes its record in place (truncate + write) while
     holding the lock. Staging through a sibling file and renaming would
     swap the inode out from under the lock.
+  - The liveness probe is shared and read-only. Shared: two probes must not
+    conflict with each other, or the loser reads the last run's record and
+    reports a holder that does not exist. Read-only: the probe never writes,
+    and the lock file usually belongs to another user.
+  - Acquisition asks three times, 50 ms apart, before calling the folder
+    busy. A run holds the lock for minutes and a probe for microseconds, so
+    one lost race is contention, not a holder. This is not a liveness guess:
+    a real holder refuses every attempt.
   - `cancel_run` signals the recorded PID only when the holder's hostname
     is this host: a PID from another namespace names an unrelated local
     process.
@@ -355,5 +363,10 @@ template path contract (FR-E52), and the per-workflow run lock (FR-E54).
   - [x] Releasing keeps the record on disk.
     Evidence: `lock_test.ts` "release — keeps the file as the record of the
     last run".
+  - [x] A probe in flight is not mistaken for a holder, and does not fail a
+    run that starts during it. Evidence: `lock_test.ts` "one probe does not
+    look like a holder to another" and "a passing probe does not fail a run".
+  - [x] A lock file the caller may read but not write is readable.
+    Evidence: `lock_test.ts` "reads a lock file it may not write".
   - [x] `cancel_run` refuses to signal a holder on another host.
     Evidence: `mcp-server.ts::registerCancelRun`.

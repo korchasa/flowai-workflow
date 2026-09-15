@@ -83,7 +83,17 @@ lock is held — never staged and renamed, which would swap the inode out from
 under the lock.
 
 `liveLockHolder` answers the one question by taking the lock and giving it
-back: if it can be taken, nobody holds it, whatever the file says.
+back: if it can be taken, nobody holds it, whatever the file says. The probe
+takes a SHARED lock on a read-only descriptor. Shared, because an exclusive
+probe conflicts with other probes, and the loser of that race reads the last
+run's record and reports a holder that does not exist. Read-only, because the
+probe never writes and the lock file usually belongs to another user.
+
+Acquisition asks three times, 50 ms apart, before calling the folder busy. A
+run holds the lock for minutes and a probe for microseconds, so one lost race
+is contention rather than a holder — a single attempt let a concurrent status
+probe fail a whole run with the "already running" error this task exists to
+remove. A real holder still refuses every attempt, so nothing is guessed.
 
 The file is never unlinked. The refusal message says so, because the old one
 told operators to delete it.

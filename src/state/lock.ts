@@ -113,7 +113,7 @@ export async function acquireLock(
     create: true,
   });
   try {
-    if (!await file.tryLock(true)) {
+    if (!await takeWithRetries(file)) {
       throw new Error(describeHolder(lockPath, await recordOf(lockPath)));
     }
     const info: LockInfo = {
@@ -143,13 +143,21 @@ export async function liveLockHolder(
   const lockPath = defaultLockPath(workflowDir);
   let file: Deno.FsFile;
   try {
-    file = await Deno.open(lockPath, { read: true, write: true });
+    // Read-only: the probe never writes, and the lock file often belongs to
+    // another user — the engine in a container writes it as root, and an
+    // operator reading status is not root.
+    file = await Deno.open(lockPath, { read: true });
   } catch (err) {
     if (err instanceof Deno.errors.NotFound) return null;
     throw err;
   }
   try {
-    if (await file.tryLock(true)) {
+    // A SHARED lock, not an exclusive one. It still conflicts with the
+    // holder's exclusive lock, which is the question being asked, but two
+    // probes no longer conflict with each other — with exclusive probes the
+    // loser of that race reads the previous run's record and reports a
+    // holder that does not exist.
+    if (await file.tryLock(false)) {
       await file.unlock();
       return null;
     }
@@ -174,6 +182,26 @@ export async function isRunLive(
   } catch {
     return false;
   }
+}
+
+/** How many times acquisition asks for the lock before calling the folder
+ * busy, and how long it waits between asks. A run holds the lock for minutes;
+ * a probe holds it for microseconds. Retrying separates the two without
+ * guessing anything about the holder — losing the lock race once says
+ * nothing, and losing it three times over 100 ms says a run owns the folder.
+ * The floor matters: a single attempt let one concurrent status probe fail a
+ * whole run with "already running", the error this module exists to stop. */
+const ACQUIRE_ATTEMPTS = 3;
+const ACQUIRE_RETRY_MS = 50;
+
+async function takeWithRetries(file: Deno.FsFile): Promise<boolean> {
+  for (let attempt = 0; attempt < ACQUIRE_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, ACQUIRE_RETRY_MS));
+    }
+    if (await file.tryLock(true)) return true;
+  }
+  return false;
 }
 
 /** The holder's record, or null when it cannot be read. Used for the error

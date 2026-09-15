@@ -238,6 +238,85 @@ Deno.test("FR-E102 the kernel releases the lock when the holder is killed", asyn
     assertEquals(held.info.run_id, "run-parent");
     await held.release();
   } finally {
+    // An assertion that throws before the explicit kill would otherwise leave
+    // the child holding the lock until its own timer expires, and Deno would
+    // report a leaked child process instead of the assertion that failed.
+    try {
+      child.kill("SIGKILL");
+      await child.status;
+    } catch {
+      // Already reaped by the body above.
+    }
     await Deno.remove(wf, { recursive: true });
+  }
+});
+
+Deno.test("FR-E102 liveLockHolder — one probe does not look like a holder to another", async () => {
+  // Probing used to take an exclusive lock, so two probes raced each other:
+  // the loser read the previous run's record and reported it as live, and
+  // start_run then refused to start a run against a free folder.
+  const wf = await Deno.makeTempDir();
+  await Deno.mkdir(`${wf}/runs`, { recursive: true });
+  const lockPath = defaultLockPath(wf);
+  await writeDebris(lockPath, { pid: Deno.pid, run_id: "run-long-gone" });
+
+  // Stand in for a probe that is mid-flight: the shared lock another
+  // liveLockHolder call holds while it decides.
+  const probe = await Deno.open(lockPath, { read: true });
+  assertEquals(await probe.tryLock(false), true);
+  try {
+    assertEquals(await liveLockHolder(wf), null);
+  } finally {
+    await probe.unlock();
+    probe.close();
+    await Deno.remove(wf, { recursive: true });
+  }
+});
+
+Deno.test("FR-E102 liveLockHolder — reads a lock file it may not write", async () => {
+  // In a container the engine writes the lock as root; whoever reads status
+  // afterwards is usually not root.
+  const wf = await Deno.makeTempDir();
+  await Deno.mkdir(`${wf}/runs`, { recursive: true });
+  const lockPath = defaultLockPath(wf);
+  await writeDebris(lockPath, { run_id: "run-gone" });
+  await Deno.chmod(lockPath, 0o444);
+
+  try {
+    assertEquals(await liveLockHolder(wf), null);
+  } finally {
+    await Deno.chmod(lockPath, 0o644);
+    await Deno.remove(wf, { recursive: true });
+  }
+});
+
+Deno.test("FR-E102 acquireLock — a passing probe does not fail a run", async () => {
+  // A probe holds the lock for microseconds. Acquisition that gave up after
+  // one refusal would fail the run with the very "already running" error this
+  // module exists to stop.
+  const dir = await Deno.makeTempDir();
+  const lockPath = `${dir}/.lock`;
+  const probe = await Deno.open(lockPath, {
+    read: true,
+    write: true,
+    create: true,
+  });
+  assertEquals(await probe.tryLock(false), true);
+  const releasing = new Promise<void>((resolve) => {
+    setTimeout(() => {
+      probe.unlock().then(() => {
+        probe.close();
+        resolve();
+      });
+    }, 60);
+  });
+
+  try {
+    const held = await acquireLock(lockPath, "run-after-probe");
+    assertEquals(held.info.run_id, "run-after-probe");
+    await held.release();
+  } finally {
+    await releasing;
+    await Deno.remove(dir, { recursive: true });
   }
 });
