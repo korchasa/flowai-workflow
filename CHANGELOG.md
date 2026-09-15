@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.13.0](https://github.com/korchasa/flowai-workflow/compare/v0.12.3...v0.13.0) (2026-09-15)
+
+### Features
+
+* **engine:** hold the run lock in the kernel, not in the file ([d18691f](https://github.com/korchasa/flowai-workflow/commit/d18691fe27bdc59866fdeafc1de3b90549ebe6e4))
+
+### Bug Fixes
+
+* **engine:** make the lock probe shared, read-only and patient ([b89f563](https://github.com/korchasa/flowai-workflow/commit/b89f563d58ee456878d05a01136c8398449e62da))
+
+### Documentation
+
+* **engine:** select FR-E101 variant B and update SDS ([7fe20fa](https://github.com/korchasa/flowai-workflow/commit/7fe20fab13badeeecc572643fd5710ca4bb12e2b))
+* **srs:** record the live FR-E100 resume evidence from the dogfood run ([e5e7771](https://github.com/korchasa/flowai-workflow/commit/e5e77711da10c7acc188053d3c70245fc34e6e20))
+
+### Chores
+
+* **deps:** raise the ai-ide-cli pin to 0.8.14 ([1edb3ba](https://github.com/korchasa/flowai-workflow/commit/1edb3ba5e74ccf9f2a05ae6500427e71b2d9cfe7))
 ## [0.12.3](https://github.com/korchasa/flowai-workflow/compare/v0.12.2...v0.12.3) (2026-09-07)
 
 ### Bug Fixes
