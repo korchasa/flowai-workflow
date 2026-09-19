@@ -1,7 +1,7 @@
 {
   "version": "5",
   "specifiers": {
-    "jsr:@korchasa/ai-ide-cli@0.9": "0.9.0",
+    "jsr:@korchasa/ai-ide-cli@~0.9.1": "0.9.1",
     "jsr:@std/assert@^1.0.19": "1.0.19",
     "jsr:@std/fs@1": "1.0.24",
     "jsr:@std/internal@^1.0.12": "1.0.14",
@@ -17,8 +17,8 @@
     "npm:zod@^4.4.3": "4.4.3"
   },
   "jsr": {
-    "@korchasa/ai-ide-cli@0.9.0": {
-      "integrity": "ee12040f3faef1307453a8980b63ab41766b8df5512e05b9db711a4825fc4f1f",
+    "@korchasa/ai-ide-cli@0.9.1": {
+      "integrity": "65878026fd8aa1b9afb8a8907a36346862e308c543912de30aa1373987ccfdfd",
       "dependencies": [
         "jsr:@std/fs",
         "jsr:@std/path@^1.1.4",
@@ -938,7 +938,7 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@korchasa/ai-ide-cli@0.9",
+      "jsr:@korchasa/ai-ide-cli@~0.9.1",
       "jsr:@std/assert@^1.0.19",
       "jsr:@std/path@^1.1.6",
       "jsr:@std/semver@^1.0.8",

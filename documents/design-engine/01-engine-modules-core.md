@@ -197,7 +197,7 @@
     published separately on JSR. Runtime adapters, low-level
     Claude/OpenCode/Cursor runners, stream parsers, HITL MCP helper, and
     process registry live in that package. Engine pins the dependency
-    via `jsr:@korchasa/ai-ide-cli@^0.9.0` in `deno.json` and
+    via `jsr:@korchasa/ai-ide-cli@^0.9.1` in `deno.json` and
     imports via sub-path specifiers (e.g. `@korchasa/ai-ide-cli/runtime`,
     `@korchasa/ai-ide-cli/claude/process`). Library has zero imports
     from engine (one-way dependency invariant). The specifier always
