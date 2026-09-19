@@ -110,7 +110,7 @@
   in the sibling repository
   [`korchasa/ai-ide-cli`](https://github.com/korchasa/ai-ide-cli).
   Engine depends on the library one-way via JSR
-  (`jsr:@korchasa/ai-ide-cli@^0.8.12`) pinned in `deno.json`. The
+  (`jsr:@korchasa/ai-ide-cli@^0.9.0`) pinned in `deno.json`. The
   specifier always resolves through JSR — there is no `links` field and
   no sibling-checkout override, so runtime changes reach the engine only
   after a publish + pin bump. Library has zero imports from engine.

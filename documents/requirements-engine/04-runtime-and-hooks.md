@@ -349,7 +349,7 @@
 
 - **Description:** The engine drives every agent invocation over the Agent
   Client Protocol (ACP) transport shipped by `@korchasa/ai-ide-cli`
-  (`^0.8.12`). ACP is implicit and non-configurable — there is NO workflow- or
+  (`^0.9.0`). ACP is implicit and non-configurable — there is NO workflow- or
   node-level `transport` knob, no cascade, and no `"cli"` fallback exposed to
   workflow authors. The package itself is multi-transport and defaults to
   `"cli"` when `RuntimeInvokeOptions.transport` is omitted, so the engine

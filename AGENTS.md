@@ -338,7 +338,7 @@ Single-package repository:
     agent. Test-only: excluded from the JSR tarball.
   - The ACP runtime layer is **not** in `src/` — it is the external
     `@korchasa/ai-ide-cli` JSR dependency (import-map alias
-    `@korchasa/ai-ide-cli`, pinned `^0.8.12` in `deno.json#imports`).
+    `@korchasa/ai-ide-cli`, pinned `^0.9.0` in `deno.json#imports`).
     External to this tree, NOT external to your ownership — see
     "Runtime-layer ownership" below.
 - `scripts/` — dev tooling (check, compile, dashboard, release-notes,
@@ -351,7 +351,7 @@ Single-package repository:
   `init/` is just the verbatim-copy scaffolder.
 
 The ACP runtime layer is the external `@korchasa/ai-ide-cli` JSR package
-(pinned `^0.8.12`), developed in the sibling repo
+(pinned `^0.9.0`), developed in the sibling repo
 `/Users/korchasa/www/flowai/ai-ide-cli` and consumed here purely via JSR.
 The package is multi-transport (CLI default, ACP opt-in); the engine drives
 it ACP-only by passing `transport: "acp"` at every `adapter.invoke()` /
