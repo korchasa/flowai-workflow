@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.14.0](https://github.com/korchasa/flowai-workflow/compare/v0.13.0...v0.14.0) (2026-09-20)
+
+### Chores
+
+* **deps:** raise the ai-ide-cli pin to 0.9.0 ([2d40404](https://github.com/korchasa/flowai-workflow/commit/2d40404de469a470bb12fec7239fe222eb3699be))
+* **deps:** raise the ai-ide-cli pin to 0.9.1 ([9f35e6b](https://github.com/korchasa/flowai-workflow/commit/9f35e6b4dc4bb99191ac1f0df5664cce33801f0f))
 ## [0.13.0](https://github.com/korchasa/flowai-workflow/compare/v0.12.3...v0.13.0) (2026-09-15)
 
 ### Features
