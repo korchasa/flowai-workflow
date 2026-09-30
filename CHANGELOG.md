@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.15.1](https://github.com/korchasa/flowai-workflow/compare/v0.15.0...v0.15.1) (2026-09-30)
+
+### Bug Fixes
+
+* **deps:** give the ai-ide-cli range a real floor — 0.x does not publish ([#251](https://github.com/korchasa/flowai-workflow/issues/251)) ([b69410a](https://github.com/korchasa/flowai-workflow/commit/b69410a2d9e2ed790b733bd9a2a8d9da2894f2e6))
 ## [0.15.0](https://github.com/korchasa/flowai-workflow/compare/v0.14.0...v0.15.0) (2026-09-30)
 
 ### ⚠ BREAKING CHANGES
