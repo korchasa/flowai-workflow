@@ -338,7 +338,8 @@ Single-package repository:
     agent. Test-only: excluded from the JSR tarball.
   - The ACP runtime layer is **not** in `src/` — it is the external
     `@korchasa/ai-ide-cli` JSR dependency (import-map alias
-    `@korchasa/ai-ide-cli`, pinned `^0.9.1` in `deno.json#imports`).
+    `@korchasa/ai-ide-cli`, declared `0.x` in `deno.json#imports` — a
+    range, not a pin).
     External to this tree, NOT external to your ownership — see
     "Runtime-layer ownership" below.
 - `scripts/` — dev tooling (check, compile, dashboard, release-notes,
@@ -351,7 +352,10 @@ Single-package repository:
   `init/` is just the verbatim-copy scaffolder.
 
 The ACP runtime layer is the external `@korchasa/ai-ide-cli` JSR package
-(pinned `^0.9.1`), developed in the sibling repo
+(declared `0.x` — every `0.y` release resolves, so a library release
+reaches consumers through a lock refresh instead of a pin bump here;
+Deno's specifier grammar has no `>=` form, so `0.x` is how "no ceiling
+inside the major" is spelled), developed in the sibling repo
 `/Users/korchasa/www/flowai/ai-ide-cli` and consumed here purely via JSR.
 The package is multi-transport (CLI default, ACP opt-in); the engine drives
 it ACP-only by passing `transport: "acp"` at every `adapter.invoke()` /
@@ -359,8 +363,11 @@ it ACP-only by passing `transport: "acp"` at every `adapter.invoke()` /
 reading capabilities through `adapter.capabilitiesFor("acp")`. ACP is thus
 the engine's sole runtime transport without any engine-level `transport`
 config knob. There is no in-tree runtime source: runtime behaviour changes
-land in the sibling repo, get published to JSR, and only then arrive here
-via a pin bump.
+land in the sibling repo, get published to JSR, and arrive here on the
+next lock refresh — no pin bump, and no engine release, is needed for a
+consumer to pick them up. The flip side: a breaking change inside `0.y`
+arrives the same way, so `deno task check` after `deno install` is what
+catches it.
 
 ### Runtime-layer ownership
 
@@ -372,9 +379,11 @@ sibling repo as a second working tree of the same job. Concretely:
 - Diagnose runtime symptoms down into the sibling repo's source, not
   only up to the engine boundary.
 - Fix there under that repo's own AGENTS.md rules (its own TDD flow and
-  `deno task check`), publish a new JSR version, bump the pin here, and
-  re-run `deno task check` in this repo. The change is done only when
-  BOTH repos are green and the pin points at the published version.
+  `deno task check`), publish a new JSR version, refresh this repo's lock
+  (`deno install`), and re-run `deno task check` here. The change is done
+  only when BOTH repos are green and this repo's lock resolves the
+  published version. The range itself stays `0.x` — raise it only to move
+  the floor after a breaking library change, never to follow a release.
 - Own the whole chain in one session when the fix spans both repos.
   Don't stop at "filed upstream".
 - FR numbering there stays `FR-L<N>`; requirements/design for the
@@ -383,10 +392,11 @@ sibling repo as a second working tree of the same job. Concretely:
 **Update-check procedure** (for "check ACP updates"-class requests):
 read the latest published version from
 `https://jsr.io/@korchasa/ai-ide-cli/meta.json`, diff the `exports`
-lists of the pinned and latest `<ver>_meta.json`, read the sibling
-repo's release history for what each version changed, then bump
-`deno.json#imports`, refresh the lock with `deno install`, and run
-`deno task check`.
+lists of the locked and latest `<ver>_meta.json`, read the sibling
+repo's release history for what each version changed, then refresh the
+lock with `deno install` and run `deno task check`. `deno.json#imports`
+needs no edit — `0.x` already admits the new version; the lock is what
+decides which one runs.
 
 **A freshly published version is not resolvable immediately.** JSR serves
 `https://jsr.io/@korchasa/ai-ide-cli/meta.json` (the version index Deno
