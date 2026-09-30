@@ -1,7 +1,7 @@
 {
   "version": "5",
   "specifiers": {
-    "jsr:@korchasa/ai-ide-cli@0": "0.9.1",
+    "jsr:@korchasa/ai-ide-cli@0.10": "0.10.0",
     "jsr:@std/assert@^1.0.19": "1.0.19",
     "jsr:@std/fs@1": "1.0.24",
     "jsr:@std/internal@^1.0.12": "1.0.14",
@@ -10,15 +10,15 @@
     "jsr:@std/path@^1.1.5": "1.1.6",
     "jsr:@std/path@^1.1.6": "1.1.6",
     "jsr:@std/semver@^1.0.8": "1.0.8",
-    "jsr:@std/yaml@^1.0.12": "1.2.0",
-    "jsr:@std/yaml@^1.2.0": "1.2.0",
+    "jsr:@std/yaml@^1.0.12": "1.3.0",
+    "jsr:@std/yaml@^1.2.0": "1.3.0",
     "npm:@modelcontextprotocol/sdk@^1.30.0": "1.30.0_zod@4.4.3",
     "npm:commit-and-tag-version@13.1.2": "13.1.2",
     "npm:zod@^4.4.3": "4.4.3"
   },
   "jsr": {
-    "@korchasa/ai-ide-cli@0.9.1": {
-      "integrity": "65878026fd8aa1b9afb8a8907a36346862e308c543912de30aa1373987ccfdfd",
+    "@korchasa/ai-ide-cli@0.10.0": {
+      "integrity": "7d3c4f18f0403e7d2255f0e2bf88c304e64d50d892e511654c5a262c0714d33d",
       "dependencies": [
         "jsr:@std/fs",
         "jsr:@std/path@^1.1.4",
@@ -53,8 +53,8 @@
     "@std/semver@1.0.8": {
       "integrity": "dc830e8b8b6a380c895d53fbfd1258dc253704ca57bbe1629ac65fd7830179b7"
     },
-    "@std/yaml@1.2.0": {
-      "integrity": "20beb41e4983ba3437dbefac62b14061ab058e8a187596f19d28ff9035f6e6cf"
+    "@std/yaml@1.3.0": {
+      "integrity": "b250103854378b8b36cbff0fe95aec017d3d9ce86b489c67605180c602fb4922"
     }
   },
   "npm": {
@@ -938,7 +938,7 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@korchasa/ai-ide-cli@0",
+      "jsr:@korchasa/ai-ide-cli@0.10",
       "jsr:@std/assert@^1.0.19",
       "jsr:@std/path@^1.1.6",
       "jsr:@std/semver@^1.0.8",
