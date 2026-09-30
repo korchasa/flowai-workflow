@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.15.0](https://github.com/korchasa/flowai-workflow/compare/v0.14.0...v0.15.0) (2026-09-30)
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** the engine no longer holds `@korchasa/ai-ide-cli` below
+  0.10.0. A consumer refreshing its lock resolves the newest `0.y`,
+  including its ACP fronts. Pin the library yourself if you need an older
+  one.
+
+### Features
+
+* **deps:** declare ai-ide-cli as a range, not a pin ([#250](https://github.com/korchasa/flowai-workflow/issues/250))
 ## [0.14.0](https://github.com/korchasa/flowai-workflow/compare/v0.13.0...v0.14.0) (2026-09-20)
 
 ### Chores
