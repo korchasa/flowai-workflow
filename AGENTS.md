@@ -338,8 +338,8 @@ Single-package repository:
     agent. Test-only: excluded from the JSR tarball.
   - The ACP runtime layer is **not** in `src/` — it is the external
     `@korchasa/ai-ide-cli` JSR dependency (import-map alias
-    `@korchasa/ai-ide-cli`, declared `^0.10.0` in `deno.json#imports` — a
-    range with a REAL floor, see below).
+    `@korchasa/ai-ide-cli`, declared `^1` in `deno.json#imports`, which
+    admits every 1.x — see below).
     External to this tree, NOT external to your ownership — see
     "Runtime-layer ownership" below.
 - `scripts/` — dev tooling (check, compile, dashboard, release-notes,
@@ -351,19 +351,26 @@ Single-package repository:
   verbatim into client projects. No separate `init/templates/` tree —
   `init/` is just the verbatim-copy scaffolder.
 
-The ACP runtime layer is the external `@korchasa/ai-ide-cli` JSR package
-(declared `^0.10.0` — a range, but with a real floor: **`0.x` does not
-publish.** `deno publish` resolves every `jsr:` dependency at its range's
-LOWEST version and type-checks the used subpaths against it, so `0.x`
-resolved to 0.1.11 and the publish failed with "invalid 'jsr:' dependency
-subpath: '@korchasa/ai-ide-cli@0.x/skill', resolved to 0.1.11, has no
-export './skill'" — measured 30.09.2026 on the 0.15.0 release, which cut
-a tag and a GitHub release and then failed at the JSR step. While the
-library is `0.y`, semver treats each minor as breaking, so the floor can
-only be `^0.<minor>.0` and a library minor still needs a bump here. The
-way out is the library reaching 1.0.0: `^1` then admits every minor and
-the lowest version still carries the exports), developed in the sibling
-repo
+The ACP runtime layer is the external `@korchasa/ai-ide-cli` JSR package,
+declared **`^1`** — every 1.x, so a library MINOR arrives here through a
+lock refresh and needs no edit in this repo. Only a library MAJOR does,
+which is the one case worth looking at before adopting.
+
+A range still needs a REAL floor, and that is why it is `^1` and not
+`1.x` or `*`: **`0.x` did not publish.** `deno publish` resolves every
+`jsr:` dependency at its range's LOWEST version and type-checks the used
+subpaths against it, so `0.x` resolved to 0.1.11 and the publish failed
+with "invalid 'jsr:' dependency subpath:
+'@korchasa/ai-ide-cli@0.x/skill', resolved to 0.1.11, has no export
+'./skill'" — measured 30.09.2026 on the 0.15.0 release, which cut a tag
+and a GitHub release and then failed at the JSR step. `^1` has the same
+property only because 1.0.0 already carries today's exports; a wider
+range would reach back past them again.
+
+While the library was `0.y`, semver treated each minor as breaking, so
+the floor could only be `^0.<minor>.0` and every library minor forced a
+bump here. The library left that series on 03.10.2026 (its FR-L48), which
+is what made `^1` possible. The package is developed in the sibling repo
 `/Users/korchasa/www/flowai/ai-ide-cli` and consumed here purely via JSR.
 The package is multi-transport (CLI default, ACP opt-in); the engine drives
 it ACP-only by passing `transport: "acp"` at every `adapter.invoke()` /
@@ -372,8 +379,8 @@ reading capabilities through `adapter.capabilitiesFor("acp")`. ACP is thus
 the engine's sole runtime transport without any engine-level `transport`
 config knob. There is no in-tree runtime source: runtime behaviour changes
 land in the sibling repo, get published to JSR, and arrive here through a
-lock refresh — a library PATCH needs no edit at all, a library MINOR needs
-the floor raised (see the `0.y` note above).
+lock refresh — a library PATCH or MINOR needs no edit at all, only a
+library MAJOR needs the floor raised.
 
 ### Runtime-layer ownership
 
@@ -388,9 +395,8 @@ sibling repo as a second working tree of the same job. Concretely:
   `deno task check`), publish a new JSR version, refresh this repo's lock
   (`deno install`), and re-run `deno task check` here. The change is done
   only when BOTH repos are green and this repo's lock resolves the
-  published version. Raise the floor when the library ships a MINOR (that
-  is the `0.y` breaking step, and the publish gate below enforces it); a
-  library PATCH needs only the lock.
+  published version. A library PATCH or MINOR needs only the lock; raise
+  the floor when the library ships a MAJOR, and read what it broke first.
 - Own the whole chain in one session when the fix spans both repos.
   Don't stop at "filed upstream".
 - FR numbering there stays `FR-L<N>`; requirements/design for the
@@ -401,9 +407,10 @@ read the latest published version from
 `https://jsr.io/@korchasa/ai-ide-cli/meta.json`, diff the `exports`
 lists of the locked and latest `<ver>_meta.json`, read the sibling
 repo's release history for what each version changed, then refresh the
-lock with `deno install` and run `deno task check`. A new library PATCH
-needs no `deno.json` edit; a new MINOR needs the floor raised to it,
-because `deno publish` type-checks against the range's lowest version.
+lock with `deno install` and run `deno task check`. A new library PATCH or
+MINOR needs no `deno.json` edit; a new MAJOR needs the floor raised to
+it, because `deno publish` type-checks against the range's lowest
+version.
 Deno also refuses a version younger than 24h ("blocked by the minimum
 dependency age policy"); `deno install --min-dep-age=0` writes the lock
 entry when the release is what you are deliberately moving to.
