@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.16.0](https://github.com/korchasa/flowai-workflow/compare/v0.15.1...v0.16.0) (2026-10-03)
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** admit every 1.x of the ACP runtime library
+
+### Build System
+
+* **deps:** admit every 1.x of the ACP runtime library ([9f85ca2](https://github.com/korchasa/flowai-workflow/commit/9f85ca2752c22f59df3abd1109e56a38e03e0ed7))
 ## [0.15.1](https://github.com/korchasa/flowai-workflow/compare/v0.15.0...v0.15.1) (2026-09-30)
 
 ### Bug Fixes
